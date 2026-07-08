@@ -1,0 +1,4 @@
+rust_input: crate::api
+dart_output: lib/src/bridge
+rust_output: rust/src/frb_generated.rs
+dart_format_line_length: 100
