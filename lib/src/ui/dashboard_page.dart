@@ -588,6 +588,10 @@ class _PositionPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final position = controller.position;
+    final effectiveLeverage =
+        position.isFlat || controller.config.myBalanceUsd <= 0
+        ? 0.0
+        : position.notionalUsd / controller.config.myBalanceUsd;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(18),
@@ -618,6 +622,13 @@ class _PositionPanel extends StatelessWidget {
               'Notional',
               '${position.notionalUsd.toStringAsFixed(2)} USDT',
             ),
+            const SizedBox(height: 10),
+            _Metric(
+              'Cross combined leverage',
+              _formatLeverage(position.crossCombinedLeverage),
+            ),
+            const SizedBox(height: 10),
+            _Metric('Effective leverage', _formatLeverage(effectiveLeverage)),
             const SizedBox(height: 10),
             _Metric(
               'Unrealized PnL',
@@ -667,6 +678,11 @@ class _PositionPanel extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatLeverage(double value) {
+    if (!value.isFinite || value <= 0) return '--';
+    return '${value.toStringAsFixed(2)}x';
   }
 
   Future<void> _confirmFlatten(

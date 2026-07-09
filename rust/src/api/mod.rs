@@ -140,7 +140,16 @@ pub async fn weex_submit_market_order(
             error: None,
         },
         Ok(value) => {
-            let error = if value.error_message.is_empty() {
+            let error = if value.error_message.is_empty() && value.error_code.is_empty() {
+                if value.order_id.is_empty() {
+                    "WEEX order rejected: no order id or rejection reason was returned".to_string()
+                } else {
+                    format!(
+                        "WEEX order rejected for order {} without a rejection reason",
+                        value.order_id
+                    )
+                }
+            } else if value.error_message.is_empty() {
                 format!("WEEX order rejected {}", value.error_code)
             } else {
                 format!(

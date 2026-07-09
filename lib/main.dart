@@ -1,13 +1,48 @@
+import 'dart:async';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/bridge/frb_generated.dart';
+import 'src/logging/app_log.dart';
 import 'src/state/app_controller.dart';
 import 'src/theme.dart';
 import 'src/ui/app_shell.dart';
 
 Future<void> main() async {
+  await runZonedGuarded(_main, (error, stackTrace) async {
+    await AppLog.write(
+      'Uncaught Dart zone error.',
+      error: error,
+      stackTrace: stackTrace,
+    );
+  });
+}
+
+Future<void> _main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppLog.startSession();
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    unawaited(
+      AppLog.write(
+        'Uncaught Flutter framework error.',
+        error: details.exception,
+        stackTrace: details.stack,
+      ),
+    );
+  };
+  PlatformDispatcher.instance.onError = (error, stackTrace) {
+    unawaited(
+      AppLog.write(
+        'Uncaught platform dispatcher error.',
+        error: error,
+        stackTrace: stackTrace,
+      ),
+    );
+    return true;
+  };
   await windowManager.ensureInitialized();
   WindowOptions windowOptions = const WindowOptions(
     size: Size(1100, 800),
@@ -25,8 +60,15 @@ Future<void> main() async {
   try {
     await RustLib.init();
     rustReady = true;
-  } catch (error) {
+  } catch (error, stackTrace) {
     debugPrint('Rust bridge init failed: $error');
+    unawaited(
+      AppLog.write(
+        'Rust bridge init failed.',
+        error: error,
+        stackTrace: stackTrace,
+      ),
+    );
   }
   final controller = AppController(useRustBridge: rustReady);
   await controller.loadConfig();

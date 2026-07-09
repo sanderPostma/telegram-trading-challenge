@@ -197,14 +197,16 @@ struct ContractTrade {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ContractOrderAck {
+    #[serde(default)]
     order_id: Value,
-    client_order_id: Option<String>,
     #[serde(default)]
-    success: bool,
+    client_order_id: Value,
     #[serde(default)]
-    error_code: String,
+    success: Option<bool>,
     #[serde(default)]
-    error_message: String,
+    error_code: Value,
+    #[serde(default)]
+    error_message: Value,
 }
 
 impl Default for WeexConfig {
@@ -286,12 +288,18 @@ pub async fn submit_market_order(
     }
     let body = market_order_body(&order, request.qty_step);
     let ack: ContractOrderAck = client.post("/capi/v3/order", body).await?;
+    let order_id = json_id_to_string(&ack.order_id);
+    let error_code = json_scalar_to_string(&ack.error_code);
+    let error_message = json_scalar_to_string(&ack.error_message);
+    let success = ack.success.unwrap_or_else(|| {
+        !order_id.is_empty() && (error_code.is_empty() || error_code == "0" || error_code == "200")
+    });
     Ok(WeexMarketOrderAck {
-        order_id: json_id_to_string(&ack.order_id),
-        client_order_id: ack.client_order_id,
-        success: ack.success,
-        error_code: ack.error_code,
-        error_message: ack.error_message,
+        order_id,
+        client_order_id: json_optional_id_to_string(&ack.client_order_id),
+        success,
+        error_code,
+        error_message,
     })
 }
 
@@ -678,10 +686,26 @@ fn parse_optional_f64(value: &str) -> Option<f64> {
 }
 
 fn json_id_to_string(value: &Value) -> String {
-    value
-        .as_str()
-        .map(ToString::to_string)
-        .unwrap_or_else(|| value.to_string().trim_matches('"').to_string())
+    json_scalar_to_string(value)
+}
+
+fn json_optional_id_to_string(value: &Value) -> Option<String> {
+    let text = json_scalar_to_string(value);
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
+}
+
+fn json_scalar_to_string(value: &Value) -> String {
+    match value {
+        Value::Null => String::new(),
+        Value::String(value) => value.clone(),
+        Value::Number(value) => value.to_string(),
+        Value::Bool(value) => value.to_string(),
+        _ => value.to_string().trim_matches('"').to_string(),
+    }
 }
 
 fn sanitize_client_order_id(value: &str) -> String {
@@ -953,6 +977,31 @@ mod tests {
     fn reduce_only_flips_position_side() {
         let request = OrderRequest::market("BTCUSDT", OrderSide::Buy, 0.1).reduce_only();
         assert_eq!(market_order_body(&request, 0.001)["positionSide"], "SHORT");
+    }
+
+    #[test]
+    fn parses_order_ack_with_nullable_fields() {
+        let ack: ContractOrderAck = serde_json::from_str(
+            r#"{
+                "orderId": 769695182256865816,
+                "clientOrderId": null,
+                "success": null,
+                "errorCode": null,
+                "errorMessage": null
+            }"#,
+        )
+        .unwrap();
+        let order_id = json_id_to_string(&ack.order_id);
+        let error_code = json_scalar_to_string(&ack.error_code);
+        let success = ack.success.unwrap_or_else(|| {
+            !order_id.is_empty()
+                && (error_code.is_empty() || error_code == "0" || error_code == "200")
+        });
+
+        assert_eq!(order_id, "769695182256865816");
+        assert_eq!(json_optional_id_to_string(&ack.client_order_id), None);
+        assert!(success);
+        assert_eq!(json_scalar_to_string(&ack.error_message), "");
     }
 
     #[test]

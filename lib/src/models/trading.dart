@@ -233,12 +233,14 @@ class PositionView {
     required this.qtyBtc,
     required this.notionalUsd,
     required this.unrealizedPnlUsd,
+    this.crossCombinedLeverage = 0,
   });
 
   final TradeDirection? direction;
   final double qtyBtc;
   final double notionalUsd;
   final double unrealizedPnlUsd;
+  final double crossCombinedLeverage;
 
   bool get isFlat => direction == null || qtyBtc == 0;
 }

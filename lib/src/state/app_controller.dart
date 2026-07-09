@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../bridge/api.dart' as rust;
 import '../bridge/scaling.dart' as rust_scaling;
 import '../bridge/weex.dart' as rust_weex;
+import '../logging/app_log.dart';
 import '../models/trading.dart';
 
 enum WeexPriceStatus { idle, connecting, live, unavailable }
@@ -48,6 +49,7 @@ class AppController extends ChangeNotifier {
   List<SeriesPoint> pnlHistory = const [];
 
   bool forceSetup = false;
+  String get logFilePath => AppLog.path;
 
   bool get requiresSetup =>
       forceSetup ||
@@ -134,8 +136,12 @@ class AppController extends ChangeNotifier {
       config = AppConfig.fromPersistentJson(
         Map<String, Object?>.from(decoded),
       ).copyWith(autoUpdateMaster: true);
-    } catch (error) {
-      _log('Saved settings could not be loaded: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'Saved settings could not be loaded: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     _resetLocalChartHistory();
   }
@@ -151,8 +157,12 @@ class AppController extends ChangeNotifier {
       balanceHistory = _bridgePoints(data.balance);
       equityHistory = _bridgePoints(data.equity);
       pnlHistory = _bridgePoints(data.pnl);
-    } catch (error) {
-      _log('Chart history could not be loaded from Rust: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'Chart history could not be loaded from Rust: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
 
     if (balanceHistory.isEmpty && equityHistory.isEmpty && pnlHistory.isEmpty) {
@@ -252,8 +262,12 @@ class AppController extends ChangeNotifier {
       _log(
         'Rust scaling rejected manual order: ${result.error ?? 'unknown error'}',
       );
-    } catch (error) {
-      _log('Rust scaling failed, using Dart fallback: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'Rust scaling failed, using Dart fallback: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     return null;
   }
@@ -326,10 +340,14 @@ class AppController extends ChangeNotifier {
       }
       final candles = await _getHistoricalCandles();
       _applyWeexReconciliation(result.value!, candles: candles);
-    } catch (error) {
+    } catch (error, stackTrace) {
       weexAccountConnected = false;
       weexReconciliationError = error.toString();
-      _log('WEEX account reconciliation failed: $error');
+      _log(
+        'WEEX account reconciliation failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
       notifyListeners();
     } finally {
       _weexReconcileInFlight = false;
@@ -353,7 +371,12 @@ class AppController extends ChangeNotifier {
       if (snapshot != null && snapshot.price > 0) {
         _applyWeexPrice(snapshot.price, source: snapshot.source);
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
+      _log(
+        'WEEX REST price failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
       _handleWeexPriceFailure('WEEX REST price failed: $error');
     } finally {
       _weexRestPollInFlight = false;
@@ -439,6 +462,9 @@ class AppController extends ChangeNotifier {
       unrealizedPnlUsd: direction == null
           ? 0
           : reconciledPosition.unrealizedPnlUsdt,
+      crossCombinedLeverage: direction == null
+          ? 0
+          : reconciledPosition.leverage,
     );
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
     weexAccountConnected = true;
@@ -525,8 +551,12 @@ class AppController extends ChangeNotifier {
         _configPrefsKey,
         jsonEncode(config.toPersistentJson()),
       );
-    } catch (error) {
-      _log('Settings could not be saved: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'Settings could not be saved: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
       notifyListeners();
     }
   }
@@ -556,9 +586,13 @@ class AppController extends ChangeNotifier {
           await _persistHistoricalCandleCache(candles);
           return candles;
         })
-        .catchError((Object error) {
+        .catchError((Object error, StackTrace stackTrace) {
           _historicalCandleFetch = null;
-          _log('WEEX historical candles could not be loaded: $error');
+          _log(
+            'WEEX historical candles could not be loaded: $error',
+            error: error,
+            stackTrace: stackTrace,
+          );
           return _historicalCandleCache;
         });
     _historicalCandleFetch = fetch;
@@ -604,8 +638,12 @@ class AppController extends ChangeNotifier {
       _historicalCandleCacheLoadedAt = DateTime.fromMillisecondsSinceEpoch(
         fetchedAtMs,
       );
-    } catch (error) {
-      _log('WEEX historical candle cache could not be loaded: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'WEEX historical candle cache could not be loaded: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -621,8 +659,12 @@ class AppController extends ChangeNotifier {
           ],
         }),
       );
-    } catch (error) {
-      _log('WEEX historical candle cache could not be saved: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'WEEX historical candle cache could not be saved: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
@@ -736,10 +778,23 @@ class AppController extends ChangeNotifier {
           qtyStep: 0.0001,
         ),
       );
-      if (result.ok && result.value != null) return result.value;
+      final ack = result.value;
+      if (ack != null) {
+        final suffix = ack.errorCode.isEmpty && ack.errorMessage.isEmpty
+            ? ''
+            : ' (${ack.errorCode} ${ack.errorMessage})'.trimRight();
+        _log(
+          'WEEX order ack: success=${ack.success}, order=${ack.orderId.isEmpty ? 'none' : ack.orderId}$suffix.',
+        );
+      }
+      if (result.ok && ack != null) return ack;
       _log('Live WEEX submit rejected: ${result.error ?? 'unknown error'}');
-    } catch (error) {
-      _log('Live WEEX submit failed: $error');
+    } catch (error, stackTrace) {
+      _log(
+        'Live WEEX submit failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
     return null;
   }
@@ -796,8 +851,12 @@ class AppController extends ChangeNotifier {
           equity: equity,
           cumulativePnl: pnl,
         );
-      } catch (error) {
-        _log('Chart history snapshot could not be written to Rust: $error');
+      } catch (error, stackTrace) {
+        _log(
+          'Chart history snapshot could not be written to Rust: $error',
+          error: error,
+          stackTrace: stackTrace,
+        );
       }
     }
 
@@ -839,6 +898,7 @@ class AppController extends ChangeNotifier {
       qtyBtc: position.qtyBtc,
       notionalUsd: position.notionalUsd,
       unrealizedPnlUsd: pnl,
+      crossCombinedLeverage: position.crossCombinedLeverage,
     );
   }
 
@@ -1059,12 +1119,13 @@ class AppController extends ChangeNotifier {
     };
   }
 
-  void _log(String message) {
+  void _log(String message, {Object? error, StackTrace? stackTrace}) {
     eventLog.insert(
       0,
       '${DateTime.now().toIso8601String().substring(11, 19)}  $message',
     );
     if (eventLog.length > 100) eventLog.removeLast();
+    unawaited(AppLog.write(message, error: error, stackTrace: stackTrace));
   }
 
   String _describe(PlannedOrder order) {
