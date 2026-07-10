@@ -73,6 +73,23 @@ pub struct WeexMarketOrderRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeexAlgoOrderRequest {
+    pub api_key: String,
+    pub api_secret: String,
+    pub passphrase: String,
+    pub symbol: String,
+    pub base_url: String,
+    pub side: String,
+    pub qty_btc: f64,
+    pub trigger_price: f64,
+    pub limit_price: f64,
+    pub order_type: String,
+    pub client_algo_id: String,
+    pub qty_step: f64,
+    pub price_step: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WeexMarketOrderAck {
     pub order_id: String,
     pub client_order_id: Option<String>,
@@ -202,6 +219,8 @@ struct ContractOrderAck {
     #[serde(default)]
     client_order_id: Value,
     #[serde(default)]
+    client_algo_id: Value,
+    #[serde(default)]
     success: Option<bool>,
     #[serde(default)]
     error_code: Value,
@@ -301,6 +320,70 @@ pub async fn submit_market_order(
         error_code,
         error_message,
     })
+}
+
+pub async fn submit_algo_order(
+    request: WeexAlgoOrderRequest,
+) -> anyhow::Result<WeexMarketOrderAck> {
+    let client = SignedRestClient::new(WeexAccountRequest {
+        api_key: request.api_key,
+        api_secret: request.api_secret,
+        passphrase: request.passphrase,
+        symbol: request.symbol,
+        base_url: request.base_url,
+        recent_lookback_ms: 7 * 24 * 60 * 60 * 1000,
+    })?;
+    let side = parse_order_side(&request.side)?;
+    if request.qty_btc <= 0.0 || !request.qty_btc.is_finite() {
+        anyhow::bail!("WEEX conditional order quantity must be positive");
+    }
+    if request.trigger_price <= 0.0 || !request.trigger_price.is_finite() {
+        anyhow::bail!("WEEX conditional order trigger price must be positive");
+    }
+    if request.limit_price <= 0.0 || !request.limit_price.is_finite() {
+        anyhow::bail!("WEEX conditional limit price must be positive");
+    }
+    let order_type = request.order_type.trim().to_ascii_uppercase();
+    if !matches!(order_type.as_str(), "STOP" | "TAKE_PROFIT") {
+        anyhow::bail!("WEEX conditional limit order type must be STOP or TAKE_PROFIT");
+    }
+
+    let body = algo_order_body(
+        &client.request.symbol,
+        side,
+        request.qty_btc,
+        request.trigger_price,
+        request.limit_price,
+        &order_type,
+        &request.client_algo_id,
+        request.qty_step,
+        request.price_step,
+    );
+    let ack: ContractOrderAck = client.post("/capi/v3/algoOrder", body).await?;
+    let order_id = json_id_to_string(&ack.order_id);
+    let error_code = json_scalar_to_string(&ack.error_code);
+    let error_message = json_scalar_to_string(&ack.error_message);
+    let success = ack.success.unwrap_or_else(|| {
+        !order_id.is_empty() && (error_code.is_empty() || error_code == "0" || error_code == "200")
+    });
+    Ok(WeexMarketOrderAck {
+        order_id,
+        client_order_id: json_optional_id_to_string(&ack.client_order_id)
+            .or_else(|| json_optional_id_to_string(&ack.client_algo_id)),
+        success,
+        error_code,
+        error_message,
+    })
+}
+
+fn parse_order_side(side: &str) -> anyhow::Result<OrderSide> {
+    if side.eq_ignore_ascii_case("buy") {
+        Ok(OrderSide::Buy)
+    } else if side.eq_ignore_ascii_case("sell") {
+        Ok(OrderSide::Sell)
+    } else {
+        anyhow::bail!("WEEX order side must be buy or sell")
+    }
 }
 
 struct SignedRestClient {
@@ -736,6 +819,34 @@ pub fn market_order_body(request: &OrderRequest, qty_step: f64) -> serde_json::V
     })
 }
 
+pub fn algo_order_body(
+    symbol: &str,
+    side: OrderSide,
+    quantity: f64,
+    trigger_price: f64,
+    limit_price: f64,
+    order_type: &str,
+    client_algo_id: &str,
+    qty_step: f64,
+    price_step: f64,
+) -> serde_json::Value {
+    let order = OrderRequest::market(symbol, side, quantity);
+    let side = match side {
+        OrderSide::Buy => "BUY",
+        OrderSide::Sell => "SELL",
+    };
+    json!({
+        "symbol": symbol,
+        "side": side,
+        "positionSide": position_side(&order),
+        "type": order_type,
+        "quantity": format_step(quantity, qty_step),
+        "price": format_step(limit_price, price_step),
+        "triggerPrice": format_step(trigger_price, price_step),
+        "clientAlgoId": sanitize_client_order_id(client_algo_id),
+    })
+}
+
 pub async fn stream_public_price(
     symbol: String,
     ws_public_url: String,
@@ -950,7 +1061,9 @@ pub fn format_step(value: f64, step: f64) -> String {
     if step <= 0.0 {
         return value.to_string();
     }
-    let rounded = (value / step).floor() * step;
+    // Decimal exchange steps are not exactly representable as f64. The small
+    // tolerance preserves an amount already on the advertised step.
+    let rounded = ((value / step) + 1e-9).floor() * step;
     let decimals = step_decimal_places(step);
     format!("{rounded:.decimals$}")
 }
@@ -977,6 +1090,27 @@ mod tests {
     fn reduce_only_flips_position_side() {
         let request = OrderRequest::market("BTCUSDT", OrderSide::Buy, 0.1).reduce_only();
         assert_eq!(market_order_body(&request, 0.001)["positionSide"], "SHORT");
+    }
+
+    #[test]
+    fn builds_conditional_limit_order_body() {
+        let body = algo_order_body(
+            "BTCUSDT",
+            OrderSide::Sell,
+            0.0021,
+            64_300.0,
+            64_300.0,
+            "STOP",
+            "tmg-123-limit",
+            0.0001,
+            0.1,
+        );
+        assert_eq!(body["side"], "SELL");
+        assert_eq!(body["positionSide"], "SHORT");
+        assert_eq!(body["type"], "STOP");
+        assert_eq!(body["quantity"], "0.0021");
+        assert_eq!(body["price"], "64300.0");
+        assert_eq!(body["triggerPrice"], "64300.0");
     }
 
     #[test]

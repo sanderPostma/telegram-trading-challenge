@@ -163,6 +163,73 @@ class WeexAccountRequest {
           recentLookbackMs == other.recentLookbackMs;
 }
 
+class WeexAlgoOrderRequest {
+  final String apiKey;
+  final String apiSecret;
+  final String passphrase;
+  final String symbol;
+  final String baseUrl;
+  final String side;
+  final double qtyBtc;
+  final double triggerPrice;
+  final double limitPrice;
+  final String orderType;
+  final String clientAlgoId;
+  final double qtyStep;
+  final double priceStep;
+
+  const WeexAlgoOrderRequest({
+    required this.apiKey,
+    required this.apiSecret,
+    required this.passphrase,
+    required this.symbol,
+    required this.baseUrl,
+    required this.side,
+    required this.qtyBtc,
+    required this.triggerPrice,
+    required this.limitPrice,
+    required this.orderType,
+    required this.clientAlgoId,
+    required this.qtyStep,
+    required this.priceStep,
+  });
+
+  @override
+  int get hashCode =>
+      apiKey.hashCode ^
+      apiSecret.hashCode ^
+      passphrase.hashCode ^
+      symbol.hashCode ^
+      baseUrl.hashCode ^
+      side.hashCode ^
+      qtyBtc.hashCode ^
+      triggerPrice.hashCode ^
+      limitPrice.hashCode ^
+      orderType.hashCode ^
+      clientAlgoId.hashCode ^
+      qtyStep.hashCode ^
+      priceStep.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeexAlgoOrderRequest &&
+          runtimeType == other.runtimeType &&
+          apiKey == other.apiKey &&
+          apiSecret == other.apiSecret &&
+          passphrase == other.passphrase &&
+          symbol == other.symbol &&
+          baseUrl == other.baseUrl &&
+          side == other.side &&
+          qtyBtc == other.qtyBtc &&
+          triggerPrice == other.triggerPrice &&
+          limitPrice == other.limitPrice &&
+          orderType == other.orderType &&
+          clientAlgoId == other.clientAlgoId &&
+          qtyStep == other.qtyStep &&
+          priceStep == other.priceStep;
+}
+
 class WeexExecutionSnapshot {
   final String execId;
   final String orderId;

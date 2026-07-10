@@ -3,7 +3,10 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
-use crate::dedup::{ActionStatus, DedupStore, IdempotencyKey};
+use crate::{
+    dedup::{ActionStatus, DedupStore, IdempotencyKey},
+    patterns::{default_rules, match_actions},
+};
 use chrono::Utc;
 use grammers_client::{
     client::{LoginToken, PasswordToken, UpdatesConfiguration},
@@ -40,8 +43,7 @@ pub struct TelegramMessageEvent {
     pub channel_id: i64,
     pub channel_title: String,
     pub message_id: i32,
-    pub action_ordinal: u32,
-    pub dedup_key: String,
+    pub dedup_keys: Vec<String>,
     pub text: String,
     pub received_at_ms: i64,
     pub error: Option<String>,
@@ -257,22 +259,30 @@ async fn stream_channel_messages_once(
                 if text.is_empty() {
                     continue;
                 }
-                let action_ordinal = 0;
-                let dedup_key = {
+                let dedup_keys = {
                     let state_path = Path::new(&request.state_path);
                     let mut store = DedupStore::load(state_path)?;
                     let message_id = i64::from(message.id());
                     if !store.should_process_message(channel_id, message_id) {
                         continue;
                     }
-                    let Some(key) = store.reserve(channel_id, message_id, action_ordinal) else {
-                        store.mark_message_seen(channel_id, message_id);
-                        store.save(state_path)?;
-                        continue;
-                    };
+                    let action_count = match_actions(&text, &default_rules())?.len().max(1);
+                    let mut keys = Vec::with_capacity(action_count);
+                    for action_ordinal in 0..action_count {
+                        let Some(key) =
+                            store.reserve(channel_id, message_id, action_ordinal as u32)
+                        else {
+                            keys.clear();
+                            break;
+                        };
+                        keys.push(key.0);
+                    }
                     store.mark_message_seen(channel_id, message_id);
                     store.save(state_path)?;
-                    key.0
+                    if keys.is_empty() {
+                        continue;
+                    }
+                    keys
                 };
                 let channel_title = message
                     .peer()
@@ -284,8 +294,7 @@ async fn stream_channel_messages_once(
                         channel_id: request.channel_id,
                         channel_title,
                         message_id: message.id(),
-                        action_ordinal,
-                        dedup_key,
+                        dedup_keys,
                         text,
                         received_at_ms: Utc::now().timestamp_millis(),
                         error: None,
@@ -336,8 +345,7 @@ impl TelegramMessageEvent {
             channel_id: 0,
             channel_title: String::new(),
             message_id: 0,
-            action_ordinal: 0,
-            dedup_key: String::new(),
+            dedup_keys: Vec::new(),
             text: String::new(),
             received_at_ms: Utc::now().timestamp_millis(),
             error: Some(error),

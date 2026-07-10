@@ -28,6 +28,7 @@ pub struct RuleHit {
     pub action: RuleAction,
     pub direction: Option<Direction>,
     pub size: Option<Size>,
+    pub trigger_price: Option<f64>,
 }
 
 pub fn default_rules() -> Vec<PatternRule> {
@@ -40,13 +41,13 @@ pub fn default_rules() -> Vec<PatternRule> {
         ),
         rule(
             "add_usd",
-            r"(?i)\bADDED\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?",
+            r"(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?",
             RuleAction::Add,
             20,
         ),
         rule(
             "add_btc",
-            r"(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?",
+            r"(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?",
             RuleAction::Add,
             21,
         ),
@@ -72,23 +73,44 @@ pub fn default_rules() -> Vec<PatternRule> {
 }
 
 pub fn match_first(text: &str, rules: &[PatternRule]) -> anyhow::Result<Option<RuleHit>> {
-    let mut rules = rules.iter().filter(|r| r.enabled).collect::<Vec<_>>();
-    rules.sort_by_key(|r| r.priority);
+    Ok(match_actions(text, rules)?.into_iter().next())
+}
 
-    for rule in rules {
+pub fn match_actions(text: &str, rules: &[PatternRule]) -> anyhow::Result<Vec<RuleHit>> {
+    let mut matches = Vec::new();
+    for rule in rules.iter().filter(|rule| rule.enabled) {
         let re = Regex::new(&rule.regex)?;
-        let Some(caps) = re.captures(text) else {
-            continue;
-        };
-        return Ok(Some(RuleHit {
-            rule_name: rule.name.clone(),
-            action: rule.action,
-            direction: caps.name("dir").and_then(|m| parse_direction(m.as_str())),
-            size: parse_size(&caps),
-        }));
+        for caps in re.captures_iter(text) {
+            let Some(full_match) = caps.get(0) else {
+                continue;
+            };
+            matches.push((
+                full_match.start(),
+                rule.priority,
+                RuleHit {
+                    rule_name: rule.name.clone(),
+                    action: rule.action,
+                    direction: caps.name("dir").and_then(|m| parse_direction(m.as_str())),
+                    size: parse_size(&caps),
+                    trigger_price: caps.name("trigger").and_then(|m| parse_number(m.as_str())),
+                },
+            ));
+        }
     }
 
-    Ok(None)
+    matches.sort_by_key(|(start, priority, _)| (*start, *priority));
+    let mut hits = Vec::new();
+    let mut previous_start = None;
+    for (start, _, hit) in matches {
+        // A rule set can contain overlapping alternatives. The higher-priority
+        // rule wins for a given text offset, while separate instructions remain.
+        if previous_start == Some(start) {
+            continue;
+        }
+        previous_start = Some(start);
+        hits.push(hit);
+    }
+    Ok(hits)
 }
 
 pub fn extract_master_balance(text: &str) -> Option<f64> {
@@ -168,6 +190,17 @@ mod tests {
         assert_eq!(add_without_to.action, RuleAction::Add);
         assert_eq!(add_without_to.direction, Some(Direction::Short));
         assert_eq!(add_without_to.size, Some(Size::Usd(5000.0)));
+
+        let compound = match_actions(
+            "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT 64,300",
+            &rules,
+        )
+        .unwrap();
+        assert_eq!(compound.len(), 2);
+        assert_eq!(compound[0].size, Some(Size::Usd(5000.0)));
+        assert_eq!(compound[0].trigger_price, None);
+        assert_eq!(compound[1].size, Some(Size::Usd(5000.0)));
+        assert_eq!(compound[1].trigger_price, Some(64_300.0));
 
         let noise = match_first("CHAT TEST", &rules).unwrap().unwrap();
         assert_eq!(noise.action, RuleAction::Ignore);

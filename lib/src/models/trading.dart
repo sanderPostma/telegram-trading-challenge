@@ -177,6 +177,7 @@ class PlannedOrder {
     required this.createdAt,
     required this.status,
     required this.source,
+    this.triggerPrice,
   });
 
   final String id;
@@ -190,6 +191,9 @@ class PlannedOrder {
   final DateTime createdAt;
   final TradeStatus status;
   final String source;
+  final double? triggerPrice;
+
+  bool get isConditional => triggerPrice != null;
 
   PlannedOrder copyWith({TradeStatus? status}) {
     return PlannedOrder(
@@ -204,6 +208,7 @@ class PlannedOrder {
       createdAt: createdAt,
       status: status ?? this.status,
       source: source,
+      triggerPrice: triggerPrice,
     );
   }
 
@@ -223,6 +228,7 @@ class PlannedOrder {
       createdAt: createdAt,
       status: status,
       source: source,
+      triggerPrice: triggerPrice,
     );
   }
 }

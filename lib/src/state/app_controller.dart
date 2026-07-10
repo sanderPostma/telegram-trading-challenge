@@ -39,6 +39,7 @@ class AppController extends ChangeNotifier {
   bool _hasExchangePnlBaseline = false;
   String? _lastWeexPriceSource;
   DateTime? _lastWeexPriceAt;
+  DateTime? _lastWeexReconciledAt;
   DateTime? _lastChartSnapshotAt;
   double _exchangeRealizedPnlUsd = 0;
   double _localRealizedPnlUsd = 0;
@@ -250,15 +251,14 @@ class AppController extends ChangeNotifier {
     required String text,
     String channel = 'Telegram',
     int? messageId,
-    String? dedupKey,
+    List<String> dedupKeys = const [],
   }) async {
     final rawText = text.trim();
     if (rawText.isEmpty) {
       await AppLog.write('Telegram incoming ignored: empty message.');
-      await _finalizeTelegramDedup(
-        dedupKey,
+      await _finalizeTelegramActions(dedupKeys, const [
         rust_telegram.TelegramActionStatus.rejected,
-      );
+      ]);
       return;
     }
 
@@ -268,46 +268,47 @@ class AppController extends ChangeNotifier {
 
     if (!useRustBridge) {
       _log('Telegram parse skipped: Rust bridge unavailable.');
-      await _finalizeTelegramDedup(
-        dedupKey,
+      await _finalizeTelegramActions(dedupKeys, const [
         rust_telegram.TelegramActionStatus.failed,
-      );
+      ]);
       return;
     }
 
     try {
-      final result = await rust.classifyMessage(text: rawText);
-      final action = result.value;
-      if (!result.ok || action == null) {
+      final result = await rust.classifyMessageActions(text: rawText);
+      final actions = result.value;
+      if (!result.ok || actions == null || actions.isEmpty) {
         await AppLog.write(
-          'Telegram parse failed: ${result.error ?? 'no action returned'}',
+          'Telegram parse failed: ${result.error ?? 'no actions returned'}',
         );
-        _log('Telegram parse failed: ${result.error ?? 'no action returned'}.');
-        await _finalizeTelegramDedup(
-          dedupKey,
+        _log(
+          'Telegram parse failed: ${result.error ?? 'no actions returned'}.',
+        );
+        await _finalizeTelegramActions(dedupKeys, const [
           rust_telegram.TelegramActionStatus.failed,
-        );
+        ]);
         return;
       }
 
-      await AppLog.write(
-        'Telegram parse result: ${_parsedActionDebug(action)}',
-      );
-      final status = await _handleParsedTelegramAction(
-        action,
-        channel: channel,
-      );
-      await _finalizeTelegramDedup(dedupKey, status);
+      final statuses = <rust_telegram.TelegramActionStatus>[];
+      for (final action in actions) {
+        await AppLog.write(
+          'Telegram parse result: ${_parsedActionDebug(action)}',
+        );
+        statuses.add(
+          await _handleParsedTelegramAction(action, channel: channel),
+        );
+      }
+      await _finalizeTelegramActions(dedupKeys, statuses);
     } catch (error, stackTrace) {
       _log(
         'Telegram parse failed: $error',
         error: error,
         stackTrace: stackTrace,
       );
-      await _finalizeTelegramDedup(
-        dedupKey,
+      await _finalizeTelegramActions(dedupKeys, const [
         rust_telegram.TelegramActionStatus.failed,
-      );
+      ]);
     }
   }
 
@@ -321,20 +322,44 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.rejected;
     }
 
-    if (!action.confidenceHigh || action.needsApproval) {
-      _log('Telegram needs review: $summary.');
-      return rust_telegram.TelegramActionStatus.rejected;
-    }
-
     final kind = _tradeKindFromParsed(action.kind);
     if (kind == null) {
       _log('Telegram parsed but not automated: $summary.');
       return rust_telegram.TelegramActionStatus.rejected;
     }
 
-    final direction = _tradeDirectionFromParsed(action.direction);
-    final parsedSize = _sizeFromParsed(action.size);
-    if (direction == null || parsedSize == null) {
+    final requiresPositionDirection =
+        kind == TradeKind.add && action.direction == null ||
+        kind == TradeKind.reduce;
+    if (requiresPositionDirection) {
+      await _refreshExchangePositionForTelegramAction();
+    }
+
+    final explicitDirection = _tradeDirectionFromParsed(action.direction);
+    final direction = kind == TradeKind.reduce
+        ? position.direction
+        : explicitDirection ?? _inferredTelegramDirection();
+    if (explicitDirection == null && direction != null) {
+      _log(
+        'Telegram direction inferred as ${direction.name.toUpperCase()} from ${position.isFlat ? 'latest trade history' : 'current WEEX position'}.',
+      );
+    }
+
+    final order = switch (kind) {
+      TradeKind.reduce => _buildParsedReductionOrder(
+        direction: direction,
+        fraction: _percentFromParsed(action.size),
+        source: 'Telegram $channel: $summary',
+      ),
+      _ => _buildParsedEntryOrAddOrder(
+        kind: kind,
+        direction: direction,
+        size: _sizeFromParsed(action.size),
+        triggerPrice: action.triggerPrice,
+        source: 'Telegram $channel: $summary',
+      ),
+    };
+    if (order == null) {
       _log('Telegram needs review: $summary.');
       return rust_telegram.TelegramActionStatus.rejected;
     }
@@ -343,14 +368,6 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.failed;
     }
 
-    final order = _buildOrder(
-      kind: kind,
-      direction: direction,
-      sourceAmount: parsedSize.$1,
-      sourceUnit: parsedSize.$2,
-      source: 'Telegram $channel: $summary',
-      status: TradeStatus.pendingApproval,
-    );
     if (order.scaledBtc <= 0 || order.scaledNotionalUsd <= 0) {
       await AppLog.write(
         'Telegram scaled order rejected: ${_describe(order)} from $summary.',
@@ -404,6 +421,18 @@ class AppController extends ChangeNotifier {
         error: error,
         stackTrace: stackTrace,
       );
+    }
+  }
+
+  Future<void> _finalizeTelegramActions(
+    List<String> dedupKeys,
+    List<rust_telegram.TelegramActionStatus> statuses,
+  ) async {
+    for (var index = 0; index < dedupKeys.length; index++) {
+      final status = index < statuses.length
+          ? statuses[index]
+          : rust_telegram.TelegramActionStatus.rejected;
+      await _finalizeTelegramDedup(dedupKeys[index], status);
     }
   }
 
@@ -505,7 +534,7 @@ class AppController extends ChangeNotifier {
                 text: event.text,
                 channel: event.channelTitle,
                 messageId: event.messageId,
-                dedupKey: event.dedupKey,
+                dedupKeys: event.dedupKeys,
               ),
             );
           },
@@ -791,6 +820,7 @@ class AppController extends ChangeNotifier {
           : reconciledPosition.leverage,
     );
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
+    _lastWeexReconciledAt = DateTime.now();
     weexAccountConnected = true;
     weexReconciliationError = null;
     unawaited(_snapshotChartState(force: true));
@@ -1006,6 +1036,7 @@ class AppController extends ChangeNotifier {
     required SizeUnit sourceUnit,
     required String source,
     required TradeStatus status,
+    double? triggerPrice,
   }) {
     final ratio = config.scaleRatio;
     final mark = config.markPrice;
@@ -1014,7 +1045,9 @@ class AppController extends ChangeNotifier {
         : mark > 0
         ? (sourceAmount * ratio) / mark
         : 0.0;
-    final notional = mark > 0 ? scaledBtc * mark : 0.0;
+    final roundedBtc = _roundDown(scaledBtc, 0.0001);
+    final notionalPrice = triggerPrice ?? mark;
+    final notional = notionalPrice > 0 ? roundedBtc * notionalPrice : 0.0;
     final now = DateTime.now();
     final nonce = '${now.microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
     return PlannedOrder(
@@ -1023,12 +1056,70 @@ class AppController extends ChangeNotifier {
       direction: direction,
       sourceAmount: sourceAmount,
       sourceUnit: sourceUnit,
-      scaledBtc: _roundDown(scaledBtc, 0.0001),
+      scaledBtc: roundedBtc,
       scaledNotionalUsd: notional,
       markPrice: mark,
       createdAt: now,
       status: status,
       source: source,
+      triggerPrice: triggerPrice,
+    );
+  }
+
+  PlannedOrder? _buildParsedEntryOrAddOrder({
+    required TradeKind kind,
+    required TradeDirection? direction,
+    required (double, SizeUnit)? size,
+    required double? triggerPrice,
+    required String source,
+  }) {
+    if (direction == null || size == null) return null;
+    if (triggerPrice != null && (triggerPrice <= 0 || !triggerPrice.isFinite)) {
+      return null;
+    }
+    return _buildOrder(
+      kind: kind,
+      direction: direction,
+      sourceAmount: size.$1,
+      sourceUnit: size.$2,
+      source: triggerPrice == null
+          ? source
+          : '$source, limit trigger at ${triggerPrice.toStringAsFixed(2)} USDT',
+      status: TradeStatus.pendingApproval,
+      triggerPrice: triggerPrice,
+    );
+  }
+
+  PlannedOrder? _buildParsedReductionOrder({
+    required TradeDirection? direction,
+    required double? fraction,
+    required String source,
+  }) {
+    if (direction == null ||
+        fraction == null ||
+        fraction <= 0 ||
+        fraction > 1) {
+      return null;
+    }
+    if (position.isFlat ||
+        position.direction != direction ||
+        position.qtyBtc <= 0) {
+      return null;
+    }
+    final quantity = _roundDown(position.qtyBtc * fraction, 0.0001);
+    final mark = config.markPrice;
+    return PlannedOrder(
+      id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
+      kind: TradeKind.reduce,
+      direction: direction,
+      sourceAmount: fraction * 100,
+      sourceUnit: SizeUnit.btc,
+      scaledBtc: quantity,
+      scaledNotionalUsd: quantity * mark,
+      markPrice: mark,
+      createdAt: DateTime.now(),
+      status: TradeStatus.pendingApproval,
+      source: '$source, reduce ${(fraction * 100).toStringAsFixed(0)}%',
     );
   }
 
@@ -1041,14 +1132,18 @@ class AppController extends ChangeNotifier {
     if (!config.simulationMode) {
       _replaceOrder(order.copyWith(status: TradeStatus.pendingApproval));
       notifyListeners();
-      _log('Live WEEX submit starting for ${_describe(order)}.');
+      _log(
+        'Live WEEX ${order.isConditional ? 'conditional limit' : 'market'} submit starting for ${_describe(order)}.',
+      );
       final ack = await _submitLiveOrder(order);
       if (ack == null) {
         _replaceOrder(order.copyWith(status: TradeStatus.failed));
         notifyListeners();
         return TradeStatus.failed;
       }
-      _log('WEEX accepted order ${ack.orderId}. Waiting for reconciliation.');
+      _log(
+        'WEEX accepted ${order.isConditional ? 'conditional order' : 'order'} ${ack.orderId}. Waiting for reconciliation.',
+      );
     }
 
     final status = config.simulationMode
@@ -1056,14 +1151,9 @@ class AppController extends ChangeNotifier {
         : TradeStatus.placed;
     final placed = order.copyWith(status: status);
     _replaceOrder(placed);
-    position = PositionView(
-      direction: placed.direction,
-      qtyBtc: placed.scaledBtc,
-      notionalUsd: placed.scaledNotionalUsd,
-      unrealizedPnlUsd: 0,
-    );
+    if (!placed.isConditional) _applyLocallyPlacedOrder(placed);
     _log(
-      '${config.simulationMode ? 'Simulated' : 'Placed'} ${_describe(placed)}.',
+      '${config.simulationMode ? 'Simulated' : 'Placed'} ${placed.isConditional ? 'conditional ' : ''}${_describe(placed)}.',
     );
     unawaited(_snapshotChartState(force: true));
     if (!config.simulationMode) {
@@ -1084,9 +1174,48 @@ class AppController extends ChangeNotifier {
       _log('Live WEEX submit failed: API key, secret, or passphrase is empty.');
       return null;
     }
-    final side = order.direction == TradeDirection.long ? 'buy' : 'sell';
+    final reduceOnly =
+        order.kind == TradeKind.reduce || order.kind == TradeKind.close;
+    final executionDirection = reduceOnly
+        ? _oppositeDirection(order.direction)
+        : order.direction;
+    final side = executionDirection == TradeDirection.long ? 'buy' : 'sell';
+    if (order.isConditional) {
+      final triggerPrice = order.triggerPrice!;
+      final orderType = _conditionalOrderType(order.direction, triggerPrice);
+      _log(
+        'Submitting WEEX $orderType LIMIT $side ${order.scaledBtc.toStringAsFixed(4)} BTC at trigger ${triggerPrice.toStringAsFixed(2)} USDT, simulation OFF.',
+      );
+      try {
+        final result = await rust.weexSubmitAlgoOrder(
+          request: rust_weex.WeexAlgoOrderRequest(
+            apiKey: config.weexApiKey,
+            apiSecret: config.weexSecret,
+            passphrase: config.weexPassphrase,
+            symbol: 'BTCUSDT',
+            baseUrl: 'https://api-contract.weex.com',
+            side: side,
+            qtyBtc: order.scaledBtc,
+            triggerPrice: triggerPrice,
+            limitPrice: triggerPrice,
+            orderType: orderType,
+            clientAlgoId: 'tmg-${order.id}-trigger',
+            qtyStep: 0.0001,
+            priceStep: 0.1,
+          ),
+        );
+        return _readWeexOrderResult(result, 'conditional order');
+      } catch (error, stackTrace) {
+        _log(
+          'Live WEEX conditional submit failed: $error',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        return null;
+      }
+    }
     _log(
-      'Submitting WEEX MARKET $side ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), simulation OFF.',
+      'Submitting WEEX MARKET $side ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), reduce_only=$reduceOnly, simulation OFF.',
     );
     try {
       final result = await rust.weexSubmitMarketOrder(
@@ -1098,22 +1227,12 @@ class AppController extends ChangeNotifier {
           baseUrl: 'https://api-contract.weex.com',
           side: side,
           qtyBtc: order.scaledBtc,
-          reduceOnly: false,
+          reduceOnly: reduceOnly,
           clientOrderId: 'tmg-${order.id}',
           qtyStep: 0.0001,
         ),
       );
-      final ack = result.value;
-      if (ack != null) {
-        final suffix = ack.errorCode.isEmpty && ack.errorMessage.isEmpty
-            ? ''
-            : ' (${ack.errorCode} ${ack.errorMessage})'.trimRight();
-        _log(
-          'WEEX order ack: success=${ack.success}, order=${ack.orderId.isEmpty ? 'none' : ack.orderId}$suffix.',
-        );
-      }
-      if (result.ok && ack != null) return ack;
-      _log('Live WEEX submit rejected: ${result.error ?? 'unknown error'}');
+      return _readWeexOrderResult(result, 'order');
     } catch (error, stackTrace) {
       _log(
         'Live WEEX submit failed: $error',
@@ -1122,6 +1241,69 @@ class AppController extends ChangeNotifier {
       );
     }
     return null;
+  }
+
+  rust_weex.WeexMarketOrderAck? _readWeexOrderResult(
+    rust.ApiResultWeexMarketOrderAck result,
+    String label,
+  ) {
+    final ack = result.value;
+    if (ack != null) {
+      final suffix = ack.errorCode.isEmpty && ack.errorMessage.isEmpty
+          ? ''
+          : ' (${ack.errorCode} ${ack.errorMessage})'.trimRight();
+      _log(
+        'WEEX $label ack: success=${ack.success}, order=${ack.orderId.isEmpty ? 'none' : ack.orderId}$suffix.',
+      );
+    }
+    if (result.ok && ack != null) return ack;
+    _log('Live WEEX $label rejected: ${result.error ?? 'unknown error'}');
+    return null;
+  }
+
+  void _applyLocallyPlacedOrder(PlannedOrder order) {
+    if (order.kind == TradeKind.reduce || order.kind == TradeKind.close) {
+      final remaining = (position.qtyBtc - order.scaledBtc).clamp(
+        0.0,
+        double.infinity,
+      );
+      position = PositionView(
+        direction: remaining <= 0 ? null : order.direction,
+        qtyBtc: remaining,
+        notionalUsd: remaining * config.markPrice,
+        unrealizedPnlUsd: 0,
+        crossCombinedLeverage: position.crossCombinedLeverage,
+      );
+      return;
+    }
+    final sameDirection =
+        position.direction == order.direction && !position.isFlat;
+    final quantity = sameDirection
+        ? position.qtyBtc + order.scaledBtc
+        : order.scaledBtc;
+    final notional = sameDirection
+        ? position.notionalUsd + order.scaledNotionalUsd
+        : order.scaledNotionalUsd;
+    position = PositionView(
+      direction: order.direction,
+      qtyBtc: quantity,
+      notionalUsd: notional,
+      unrealizedPnlUsd: 0,
+      crossCombinedLeverage: position.crossCombinedLeverage,
+    );
+  }
+
+  TradeDirection _oppositeDirection(TradeDirection direction) =>
+      direction == TradeDirection.long
+      ? TradeDirection.short
+      : TradeDirection.long;
+
+  String _conditionalOrderType(TradeDirection direction, double triggerPrice) {
+    final markPrice = config.markPrice;
+    final isStop = direction == TradeDirection.long
+        ? triggerPrice >= markPrice
+        : triggerPrice <= markPrice;
+    return isStop ? 'STOP' : 'TAKE_PROFIT';
   }
 
   void _resetLocalChartHistory() {
@@ -1448,7 +1630,7 @@ class AppController extends ChangeNotifier {
     return switch (value) {
       rust_interpreter.ActionKind.enter => TradeKind.enter,
       rust_interpreter.ActionKind.add => TradeKind.add,
-      rust_interpreter.ActionKind.reduce => null,
+      rust_interpreter.ActionKind.reduce => TradeKind.reduce,
       rust_interpreter.ActionKind.close => null,
       rust_interpreter.ActionKind.ignore => null,
     };
@@ -1462,6 +1644,33 @@ class AppController extends ChangeNotifier {
     };
   }
 
+  Future<void> _refreshExchangePositionForTelegramAction() async {
+    if (!_hasWeexCredentials) return;
+    final lastReconciled = _lastWeexReconciledAt;
+    if (lastReconciled != null &&
+        DateTime.now().difference(lastReconciled) <
+            _exchangeReconcileInterval) {
+      return;
+    }
+    await reconcileFromExchange();
+  }
+
+  TradeDirection? _inferredTelegramDirection() {
+    if (!position.isFlat) return position.direction;
+    for (final trade in tradeHistory) {
+      final side = trade.side.toLowerCase();
+      if (side.contains('short')) return TradeDirection.short;
+      if (side.contains('long')) return TradeDirection.long;
+    }
+    for (final order in orders) {
+      if (order.kind == TradeKind.reduce || order.kind == TradeKind.close) {
+        continue;
+      }
+      return order.direction;
+    }
+    return null;
+  }
+
   (double, SizeUnit)? _sizeFromParsed(rust_interpreter.Size? value) {
     return switch (value) {
       rust_interpreter.Size_Usd(:final field0) => (field0, SizeUnit.usdt),
@@ -1472,11 +1681,21 @@ class AppController extends ChangeNotifier {
     };
   }
 
+  double? _percentFromParsed(rust_interpreter.Size? value) {
+    return switch (value) {
+      rust_interpreter.Size_Pct(:final field0) => field0,
+      _ => null,
+    };
+  }
+
   String _parsedActionSummary(rust_interpreter.Action action) {
     final kind = action.kind.name.toUpperCase();
     final direction = action.direction?.name.toUpperCase();
     final size = _parsedSizeLabel(action.size);
-    return [kind, ?direction, ?size].join(' ');
+    final trigger = action.triggerPrice == null
+        ? null
+        : 'LIMIT TRIGGER ${action.triggerPrice!.toStringAsFixed(2)} USDT';
+    return [kind, ?direction, ?size, ?trigger].join(' ');
   }
 
   String _parsedActionDebug(rust_interpreter.Action action) {
@@ -1484,6 +1703,7 @@ class AppController extends ChangeNotifier {
       'kind=${action.kind.name}',
       'direction=${action.direction?.name ?? 'none'}',
       'size=${_parsedSizeLabel(action.size) ?? 'none'}',
+      'trigger_price=${action.triggerPrice?.toStringAsFixed(2) ?? 'none'}',
       'confidence_high=${action.confidenceHigh}',
       'needs_approval=${action.needsApproval}',
     ].join(', ');
@@ -1512,7 +1732,10 @@ class AppController extends ChangeNotifier {
   }
 
   String _describe(PlannedOrder order) {
-    return '${order.direction.name.toUpperCase()} ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)';
+    final trigger = order.triggerPrice == null
+        ? ''
+        : ' limit trigger ${order.triggerPrice!.toStringAsFixed(2)} USDT';
+    return '${order.direction.name.toUpperCase()} ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)$trigger';
   }
 
   @override

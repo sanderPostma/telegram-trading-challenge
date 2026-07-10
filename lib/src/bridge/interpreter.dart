@@ -12,6 +12,7 @@ class Action {
   final ActionKind kind;
   final Direction? direction;
   final Size? size;
+  final double? triggerPrice;
   final bool confidenceHigh;
   final bool needsApproval;
   final String rawText;
@@ -20,6 +21,7 @@ class Action {
     required this.kind,
     this.direction,
     this.size,
+    this.triggerPrice,
     required this.confidenceHigh,
     required this.needsApproval,
     required this.rawText,
@@ -30,6 +32,7 @@ class Action {
       kind.hashCode ^
       direction.hashCode ^
       size.hashCode ^
+      triggerPrice.hashCode ^
       confidenceHigh.hashCode ^
       needsApproval.hashCode ^
       rawText.hashCode;
@@ -42,6 +45,7 @@ class Action {
           kind == other.kind &&
           direction == other.direction &&
           size == other.size &&
+          triggerPrice == other.triggerPrice &&
           confidenceHigh == other.confidenceHigh &&
           needsApproval == other.needsApproval &&
           rawText == other.rawText;

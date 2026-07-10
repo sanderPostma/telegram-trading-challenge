@@ -46,6 +46,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiResultAction dco_decode_api_result_action(dynamic raw);
 
   @protected
+  ApiResultActions dco_decode_api_result_actions(dynamic raw);
+
+  @protected
   ApiResultScaledOrder dco_decode_api_result_scaled_order(dynamic raw);
 
   @protected
@@ -97,6 +100,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAccountRequest dco_decode_box_autoadd_weex_account_request(dynamic raw);
 
   @protected
+  WeexAlgoOrderRequest dco_decode_box_autoadd_weex_algo_order_request(dynamic raw);
+
+  @protected
   WeexMarketOrderAck dco_decode_box_autoadd_weex_market_order_ack(dynamic raw);
 
   @protected
@@ -116,6 +122,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 dco_decode_i_64(dynamic raw);
+
+  @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
+  List<Action> dco_decode_list_action(dynamic raw);
 
   @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
@@ -163,6 +175,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexMarketOrderAck? dco_decode_opt_box_autoadd_weex_market_order_ack(dynamic raw);
 
   @protected
+  List<Action>? dco_decode_opt_list_action(dynamic raw);
+
+  @protected
   PriceTick dco_decode_price_tick(dynamic raw);
 
   @protected
@@ -187,9 +202,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TelegramMessageEvent dco_decode_telegram_message_event(dynamic raw);
 
   @protected
-  int dco_decode_u_32(dynamic raw);
-
-  @protected
   int dco_decode_u_8(dynamic raw);
 
   @protected
@@ -203,6 +215,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WeexAccountRequest dco_decode_weex_account_request(dynamic raw);
+
+  @protected
+  WeexAlgoOrderRequest dco_decode_weex_algo_order_request(dynamic raw);
 
   @protected
   WeexExecutionSnapshot dco_decode_weex_execution_snapshot(dynamic raw);
@@ -238,6 +253,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   ApiResultAction sse_decode_api_result_action(SseDeserializer deserializer);
+
+  @protected
+  ApiResultActions sse_decode_api_result_actions(SseDeserializer deserializer);
 
   @protected
   ApiResultScaledOrder sse_decode_api_result_scaled_order(SseDeserializer deserializer);
@@ -301,6 +319,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAccountRequest sse_decode_box_autoadd_weex_account_request(SseDeserializer deserializer);
 
   @protected
+  WeexAlgoOrderRequest sse_decode_box_autoadd_weex_algo_order_request(SseDeserializer deserializer);
+
+  @protected
   WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(SseDeserializer deserializer);
 
   @protected
@@ -322,6 +343,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
+
+  @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
+  List<Action> sse_decode_list_action(SseDeserializer deserializer);
 
   @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
@@ -375,6 +402,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  List<Action>? sse_decode_opt_list_action(SseDeserializer deserializer);
+
+  @protected
   PriceTick sse_decode_price_tick(SseDeserializer deserializer);
 
   @protected
@@ -399,9 +429,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   TelegramMessageEvent sse_decode_telegram_message_event(SseDeserializer deserializer);
 
   @protected
-  int sse_decode_u_32(SseDeserializer deserializer);
-
-  @protected
   int sse_decode_u_8(SseDeserializer deserializer);
 
   @protected
@@ -415,6 +442,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WeexAccountRequest sse_decode_weex_account_request(SseDeserializer deserializer);
+
+  @protected
+  WeexAlgoOrderRequest sse_decode_weex_algo_order_request(SseDeserializer deserializer);
 
   @protected
   WeexExecutionSnapshot sse_decode_weex_execution_snapshot(SseDeserializer deserializer);
@@ -454,6 +484,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_api_result_action(ApiResultAction self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_result_actions(ApiResultActions self, SseSerializer serializer);
 
   @protected
   void sse_encode_api_result_scaled_order(ApiResultScaledOrder self, SseSerializer serializer);
@@ -531,6 +564,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_weex_algo_order_request(
+    WeexAlgoOrderRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_weex_market_order_ack(
     WeexMarketOrderAck self,
     SseSerializer serializer,
@@ -556,6 +595,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_action(List<Action> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
@@ -615,6 +660,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_list_action(List<Action>? self, SseSerializer serializer);
+
+  @protected
   void sse_encode_price_tick(PriceTick self, SseSerializer serializer);
 
   @protected
@@ -639,9 +687,6 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_telegram_message_event(TelegramMessageEvent self, SseSerializer serializer);
 
   @protected
-  void sse_encode_u_32(int self, SseSerializer serializer);
-
-  @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
 
   @protected
@@ -658,6 +703,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_weex_account_request(WeexAccountRequest self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weex_algo_order_request(WeexAlgoOrderRequest self, SseSerializer serializer);
 
   @protected
   void sse_encode_weex_execution_snapshot(WeexExecutionSnapshot self, SseSerializer serializer);

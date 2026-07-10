@@ -87,8 +87,7 @@ class TelegramMessageEvent {
   final PlatformInt64 channelId;
   final String channelTitle;
   final int messageId;
-  final int actionOrdinal;
-  final String dedupKey;
+  final List<String> dedupKeys;
   final String text;
   final PlatformInt64 receivedAtMs;
   final String? error;
@@ -98,8 +97,7 @@ class TelegramMessageEvent {
     required this.channelId,
     required this.channelTitle,
     required this.messageId,
-    required this.actionOrdinal,
-    required this.dedupKey,
+    required this.dedupKeys,
     required this.text,
     required this.receivedAtMs,
     this.error,
@@ -111,8 +109,7 @@ class TelegramMessageEvent {
       channelId.hashCode ^
       channelTitle.hashCode ^
       messageId.hashCode ^
-      actionOrdinal.hashCode ^
-      dedupKey.hashCode ^
+      dedupKeys.hashCode ^
       text.hashCode ^
       receivedAtMs.hashCode ^
       error.hashCode;
@@ -126,8 +123,7 @@ class TelegramMessageEvent {
           channelId == other.channelId &&
           channelTitle == other.channelTitle &&
           messageId == other.messageId &&
-          actionOrdinal == other.actionOrdinal &&
-          dedupKey == other.dedupKey &&
+          dedupKeys == other.dedupKeys &&
           text == other.text &&
           receivedAtMs == other.receivedAtMs &&
           error == other.error;

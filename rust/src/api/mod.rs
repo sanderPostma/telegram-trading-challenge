@@ -3,7 +3,7 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::{
     interpreter::{interpret, Action, InterpreterState},
-    patterns::{default_rules, match_first},
+    patterns::{default_rules, match_actions, match_first},
     scaling::{scale_order, ScaleInput, ScaledOrder},
     telegram, weex, Size,
 };
@@ -26,6 +26,13 @@ pub struct ApiResultString {
 pub struct ApiResultAction {
     pub ok: bool,
     pub value: Option<Action>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResultActions {
+    pub ok: bool,
+    pub value: Option<Vec<Action>>,
     pub error: Option<String>,
 }
 
@@ -253,6 +260,28 @@ pub async fn weex_submit_market_order(
     }
 }
 
+pub async fn weex_submit_algo_order(
+    request: weex::WeexAlgoOrderRequest,
+) -> ApiResultWeexMarketOrderAck {
+    match weex::submit_algo_order(request).await {
+        Ok(value) if value.success => ApiResultWeexMarketOrderAck {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Ok(value) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            error: Some(weex_rejection_message(&value)),
+            value: Some(value),
+        },
+        Err(error) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
 pub fn record_chart_snapshot(timestamp_ms: i64, balance: f64, equity: f64, cumulative_pnl: f64) {
     if timestamp_ms <= 0
         || !balance.is_finite()
@@ -320,6 +349,51 @@ pub fn classify_message(text: String) -> ApiResultAction {
             value: None,
             error: Some(error.to_string()),
         },
+    }
+}
+
+pub fn classify_message_actions(text: String) -> ApiResultActions {
+    let rules = default_rules();
+    match match_actions(&text, &rules) {
+        Ok(hits) => {
+            let actions = if hits.is_empty() {
+                vec![interpret(&text, None, &InterpreterState::default())]
+            } else {
+                hits.into_iter()
+                    .map(|hit| interpret(&text, Some(hit), &InterpreterState::default()))
+                    .collect()
+            };
+            ApiResultActions {
+                ok: true,
+                value: Some(actions),
+                error: None,
+            }
+        }
+        Err(error) => ApiResultActions {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+fn weex_rejection_message(value: &weex::WeexMarketOrderAck) -> String {
+    if value.error_message.is_empty() && value.error_code.is_empty() {
+        if value.order_id.is_empty() {
+            "WEEX order rejected: no order id or rejection reason was returned".to_string()
+        } else {
+            format!(
+                "WEEX order rejected for order {} without a rejection reason",
+                value.order_id
+            )
+        }
+    } else if value.error_message.is_empty() {
+        format!("WEEX order rejected {}", value.error_code)
+    } else {
+        format!(
+            "WEEX order rejected {}: {}",
+            value.error_code, value.error_message
+        )
     }
 }
 
