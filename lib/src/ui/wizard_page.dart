@@ -22,6 +22,8 @@ class _WizardPageState extends State<WizardPage> {
   late final TextEditingController _phone;
   late final TextEditingController _apiId;
   late final TextEditingController _apiHash;
+  late final TextEditingController _telegramCode;
+  late final TextEditingController _telegramPassword;
   late final TextEditingController _tmgBalance;
   late final TextEditingController _myBalance;
 
@@ -35,6 +37,8 @@ class _WizardPageState extends State<WizardPage> {
     _phone = TextEditingController(text: c.telegramPhone);
     _apiId = TextEditingController(text: c.telegramApiId);
     _apiHash = TextEditingController(text: c.telegramApiHash);
+    _telegramCode = TextEditingController();
+    _telegramPassword = TextEditingController();
     _tmgBalance = TextEditingController(
       text: c.masterBalanceUsd.toStringAsFixed(0),
     );
@@ -49,6 +53,8 @@ class _WizardPageState extends State<WizardPage> {
     _phone.dispose();
     _apiId.dispose();
     _apiHash.dispose();
+    _telegramCode.dispose();
+    _telegramPassword.dispose();
     _tmgBalance.dispose();
     _myBalance.dispose();
     super.dispose();
@@ -152,6 +158,66 @@ class _WizardPageState extends State<WizardPage> {
               _field(_phone, 'Phone'),
               _field(_apiId, 'API ID'),
               _secretField(_apiHash, 'API hash'),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  FilledButton.icon(
+                    onPressed: () async {
+                      await _save(silent: true);
+                      await widget.controller.requestTelegramCode();
+                    },
+                    icon: const Icon(Icons.sms_outlined),
+                    label: const Text('Request Telegram code'),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: TextField(
+                      controller: _telegramCode,
+                      decoration: const InputDecoration(
+                        labelText: 'Login code',
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await _save(silent: true);
+                      await widget.controller.submitTelegramCode(
+                        _telegramCode.text,
+                      );
+                    },
+                    icon: const Icon(Icons.login),
+                    label: const Text('Sign in'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 260,
+                    child: _RevealTextField(
+                      controller: _telegramPassword,
+                      label: 'Telegram 2FA password',
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      await _save(silent: true);
+                      await widget.controller.submitTelegramPassword(
+                        _telegramPassword.text,
+                      );
+                    },
+                    icon: const Icon(Icons.lock_open),
+                    label: const Text('Submit 2FA'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),

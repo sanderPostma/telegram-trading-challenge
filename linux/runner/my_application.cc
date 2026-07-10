@@ -1,15 +1,247 @@
 #include "my_application.h"
 
 #include <flutter_linux/flutter_linux.h>
+#include <gio/gio.h>
+#include <unistd.h>
 #ifdef GDK_WINDOWING_X11
 #include <gdk/gdkx.h>
 #endif
 
 #include "flutter/generated_plugin_registrant.h"
 
+namespace {
+
+const gchar kStatusNotifierXml[] =
+    "<node>"
+    "<interface name='org.kde.StatusNotifierItem'>"
+    "<property name='Category' type='s' access='read'/>"
+    "<property name='Id' type='s' access='read'/>"
+    "<property name='Title' type='s' access='read'/>"
+    "<property name='Status' type='s' access='read'/>"
+    "<property name='WindowId' type='u' access='read'/>"
+    "<property name='IconName' type='s' access='read'/>"
+    "<property name='IconPixmap' type='a(iiay)' access='read'/>"
+    "<property name='ToolTip' type='(sa(iiay)ss)' access='read'/>"
+    "<property name='ItemIsMenu' type='b' access='read'/>"
+    "<property name='Menu' type='o' access='read'/>"
+    "<method name='Activate'><arg name='x' type='i' direction='in'/>"
+    "<arg name='y' type='i' direction='in'/></method>"
+    "<method name='SecondaryActivate'><arg name='x' type='i' direction='in'/>"
+    "<arg name='y' type='i' direction='in'/></method>"
+    "<method name='ContextMenu'><arg name='x' type='i' direction='in'/>"
+    "<arg name='y' type='i' direction='in'/></method>"
+    "<signal name='NewIcon'/><signal name='NewTitle'/><signal name='NewToolTip'/>"
+    "</interface>"
+    "</node>";
+
+struct TrayIndicator {
+  GtkWindow* window = nullptr;
+  GdkPixbuf* icon = nullptr;
+  GDBusConnection* connection = nullptr;
+  gchar* service_name = nullptr;
+  guint object_registration_id = 0;
+  guint name_owner_id = 0;
+};
+
+GVariant* empty_icon_pixmaps() {
+  GVariantBuilder builder;
+  g_variant_builder_init(&builder, G_VARIANT_TYPE("a(iiay)"));
+  return g_variant_builder_end(&builder);
+}
+
+GVariant* tray_icon_pixmaps(GdkPixbuf* pixbuf) {
+  if (pixbuf == nullptr) return empty_icon_pixmaps();
+
+  const gint width = gdk_pixbuf_get_width(pixbuf);
+  const gint height = gdk_pixbuf_get_height(pixbuf);
+  const gint rowstride = gdk_pixbuf_get_rowstride(pixbuf);
+  const gint channels = gdk_pixbuf_get_n_channels(pixbuf);
+  const gboolean has_alpha = gdk_pixbuf_get_has_alpha(pixbuf);
+  const guchar* source = gdk_pixbuf_get_pixels(pixbuf);
+  g_autofree guchar* pixels =
+      static_cast<guchar*>(g_malloc(static_cast<gsize>(width) * height * 4));
+
+  gsize offset = 0;
+  for (gint row = 0; row < height; ++row) {
+    const guchar* cursor = source + row * rowstride;
+    for (gint column = 0; column < width; ++column) {
+      pixels[offset++] = has_alpha ? cursor[3] : 255;
+      pixels[offset++] = cursor[0];
+      pixels[offset++] = cursor[1];
+      pixels[offset++] = cursor[2];
+      cursor += channels;
+    }
+  }
+
+  GVariantBuilder array;
+  g_variant_builder_init(&array, G_VARIANT_TYPE("a(iiay)"));
+  GVariantBuilder entry;
+  g_variant_builder_init(&entry, G_VARIANT_TYPE("(iiay)"));
+  g_variant_builder_add(&entry, "i", width);
+  g_variant_builder_add(&entry, "i", height);
+  g_variant_builder_add_value(
+      &entry,
+      g_variant_new_fixed_array(
+          G_VARIANT_TYPE_BYTE, pixels, static_cast<gsize>(width) * height * 4, sizeof(guchar)));
+  g_variant_builder_add_value(&array, g_variant_builder_end(&entry));
+  return g_variant_builder_end(&array);
+}
+
+void show_tray_window(TrayIndicator* tray) {
+  if (tray == nullptr || tray->window == nullptr) return;
+  gtk_window_deiconify(tray->window);
+  gtk_widget_show(GTK_WIDGET(tray->window));
+  gtk_window_present(tray->window);
+}
+
+void on_tray_method_call(GDBusConnection*, const gchar*, const gchar*, const gchar*,
+                         const gchar* method_name, GVariant*,
+                         GDBusMethodInvocation* invocation, gpointer user_data) {
+  auto* tray = static_cast<TrayIndicator*>(user_data);
+  if (g_strcmp0(method_name, "Activate") == 0 ||
+      g_strcmp0(method_name, "SecondaryActivate") == 0) {
+    show_tray_window(tray);
+  }
+  g_dbus_method_invocation_return_value(invocation, nullptr);
+}
+
+GVariant* on_tray_property_get(GDBusConnection*, const gchar*, const gchar*, const gchar*,
+                               const gchar* property_name, GError** error,
+                               gpointer user_data) {
+  auto* tray = static_cast<TrayIndicator*>(user_data);
+  if (g_strcmp0(property_name, "Category") == 0) {
+    return g_variant_new_string("ApplicationStatus");
+  }
+  if (g_strcmp0(property_name, "Id") == 0) {
+    return g_variant_new_string("trading-challenge");
+  }
+  if (g_strcmp0(property_name, "Title") == 0) {
+    return g_variant_new_string("Trading Challenge");
+  }
+  if (g_strcmp0(property_name, "Status") == 0) {
+    return g_variant_new_string("Active");
+  }
+  if (g_strcmp0(property_name, "WindowId") == 0) {
+    return g_variant_new_uint32(0);
+  }
+  if (g_strcmp0(property_name, "IconName") == 0) {
+    return g_variant_new_string("");
+  }
+  if (g_strcmp0(property_name, "IconPixmap") == 0) {
+    return tray_icon_pixmaps(tray == nullptr ? nullptr : tray->icon);
+  }
+  if (g_strcmp0(property_name, "ToolTip") == 0) {
+    return g_variant_new("(s@a(iiay)ss)", "", empty_icon_pixmaps(),
+                         "Trading Challenge", "Telegram WEEX copy-trader");
+  }
+  if (g_strcmp0(property_name, "ItemIsMenu") == 0) {
+    return g_variant_new_boolean(FALSE);
+  }
+  if (g_strcmp0(property_name, "Menu") == 0) {
+    return g_variant_new_object_path("/");
+  }
+
+  *error = g_error_new(G_DBUS_ERROR, G_DBUS_ERROR_UNKNOWN_PROPERTY,
+                       "Unknown property: %s", property_name);
+  return nullptr;
+}
+
+void register_tray_with_watcher(GDBusConnection* connection, const gchar* service_name) {
+  constexpr const gchar* watchers[] = {
+      "org.kde.StatusNotifierWatcher",
+      "com.canonical.StatusNotifierWatcher",
+      nullptr,
+  };
+  for (const gchar* const* watcher = watchers; *watcher != nullptr; ++watcher) {
+    g_autoptr(GError) error = nullptr;
+    g_autoptr(GVariant) reply = g_dbus_connection_call_sync(
+        connection, *watcher, "/StatusNotifierWatcher", *watcher,
+        "RegisterStatusNotifierItem", g_variant_new("(s)", service_name), nullptr,
+        G_DBUS_CALL_FLAGS_NONE, 1000, nullptr, &error);
+    if (reply != nullptr) return;
+  }
+  g_warning("No StatusNotifier watcher is available; the tray icon may be hidden.");
+}
+
+void on_tray_name_acquired(GDBusConnection* connection, const gchar* name, gpointer) {
+  register_tray_with_watcher(connection, name);
+}
+
+TrayIndicator* create_tray_indicator(GtkWindow* window) {
+  g_autoptr(GError) error = nullptr;
+  GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
+  if (connection == nullptr) {
+    g_warning("Could not create a system tray connection: %s",
+              error == nullptr ? "unknown error" : error->message);
+    return nullptr;
+  }
+
+  g_autoptr(GDBusNodeInfo) node_info =
+      g_dbus_node_info_new_for_xml(kStatusNotifierXml, &error);
+  if (node_info == nullptr) {
+    g_warning("Could not create the system tray interface: %s",
+              error == nullptr ? "unknown error" : error->message);
+    g_object_unref(connection);
+    return nullptr;
+  }
+
+  auto* tray = new TrayIndicator();
+  tray->window = window;
+  tray->connection = connection;
+  tray->service_name = g_strdup_printf(
+      "org.kde.StatusNotifierItem-%d-tradingchallenge", static_cast<gint>(getpid()));
+
+  g_autofree gchar* executable_path = g_file_read_link("/proc/self/exe", nullptr);
+  if (executable_path != nullptr) {
+    g_autofree gchar* bundle_dir = g_path_get_dirname(executable_path);
+    g_autofree gchar* icon_path = g_build_filename(
+        bundle_dir, "data", "flutter_assets", "assets", "app-logo.jpg", nullptr);
+    tray->icon = gdk_pixbuf_new_from_file(icon_path, nullptr);
+  }
+
+  static const GDBusInterfaceVTable vtable = {
+      &on_tray_method_call,
+      &on_tray_property_get,
+      nullptr,
+  };
+  GDBusInterfaceInfo* interface = g_dbus_node_info_lookup_interface(
+      node_info, "org.kde.StatusNotifierItem");
+  tray->object_registration_id = g_dbus_connection_register_object(
+      connection, "/StatusNotifierItem", interface, &vtable, tray, nullptr, &error);
+  if (tray->object_registration_id == 0) {
+    g_warning("Could not register the system tray icon: %s",
+              error == nullptr ? "unknown error" : error->message);
+    if (tray->icon != nullptr) g_object_unref(tray->icon);
+    g_free(tray->service_name);
+    g_object_unref(connection);
+    delete tray;
+    return nullptr;
+  }
+
+  tray->name_owner_id = g_bus_own_name_on_connection(
+      connection, tray->service_name, G_BUS_NAME_OWNER_FLAGS_NONE,
+      &on_tray_name_acquired, nullptr, tray, nullptr);
+  return tray;
+}
+
+void destroy_tray_indicator(TrayIndicator* tray) {
+  if (tray == nullptr) return;
+  if (tray->name_owner_id != 0) g_bus_unown_name(tray->name_owner_id);
+  if (tray->connection != nullptr && tray->object_registration_id != 0) {
+    g_dbus_connection_unregister_object(tray->connection, tray->object_registration_id);
+  }
+  if (tray->icon != nullptr) g_object_unref(tray->icon);
+  if (tray->connection != nullptr) g_object_unref(tray->connection);
+  g_free(tray->service_name);
+  delete tray;
+}
+
+}  // namespace
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
+  TrayIndicator* tray_indicator;
 };
 
 G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
@@ -61,7 +293,7 @@ static void my_application_activate(GApplication* application) {
     if (self_path != nullptr) {
       g_autofree gchar* bundle_dir = g_path_get_dirname(self_path);
       g_autofree gchar* icon_path = g_build_filename(
-          bundle_dir, "data", "flutter_assets", "assets", "chart-advantage-logo.jpg", nullptr);
+          bundle_dir, "data", "flutter_assets", "assets", "app-logo.jpg", nullptr);
       if (g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
         gtk_window_set_icon_from_file(window, icon_path, nullptr);
       }
@@ -90,6 +322,7 @@ static void my_application_activate(GApplication* application) {
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
+  self->tray_indicator = create_tray_indicator(window);
 }
 
 // Implements GApplication::local_command_line.
@@ -134,6 +367,8 @@ static void my_application_shutdown(GApplication* application) {
 // Implements GObject::dispose.
 static void my_application_dispose(GObject* object) {
   MyApplication* self = MY_APPLICATION(object);
+  destroy_tray_indicator(self->tray_indicator);
+  self->tray_indicator = nullptr;
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
@@ -147,7 +382,9 @@ static void my_application_class_init(MyApplicationClass* klass) {
   G_OBJECT_CLASS(klass)->dispose = my_application_dispose;
 }
 
-static void my_application_init(MyApplication* self) {}
+static void my_application_init(MyApplication* self) {
+  self->tray_indicator = nullptr;
+}
 
 MyApplication* my_application_new() {
   // Set the program name to the application ID, which helps various systems

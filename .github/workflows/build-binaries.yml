@@ -5,6 +5,8 @@ on:
     branches:
       - main
       - master
+    tags:
+      - 'v*'
   pull_request:
   workflow_dispatch:
 
@@ -92,3 +94,32 @@ jobs:
           name: trading-challenge-${{ matrix.platform.name }}
           path: ${{ matrix.platform.artifact_path }}
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download desktop bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Package release assets
+        run: |
+          mkdir release
+          tar -C dist/trading-challenge-linux -czf release/trading-challenge-linux-x64.tar.gz .
+          (
+            cd dist
+            zip -r ../release/trading-challenge-windows-x64.zip trading-challenge-windows
+            zip -r ../release/trading-challenge-macos.zip trading-challenge-macos
+          )
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*

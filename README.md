@@ -4,6 +4,12 @@
 
 A high-performance, automated copy-trading desktop application designed to monitor Telegram channels for trading signals and perfectly mirror them on the WEEX exchange. Built with a sleek Flutter interface and powered by a lightning-fast Rust core.
 
+## Risk Disclaimer
+
+This software does not provide financial, investment, legal, or tax advice. Trading, including automated and copy trading, can result in substantial losses. You are solely responsible for your trading decisions, API credentials, exchange configuration, and any orders submitted through this application. Use it at your own risk.
+
+Before using real funds, independently review and test the application, its configuration, and its order behavior. You may use any AI coding agent and/or a qualified software-security or financial professional to vet the application. Nothing in this repository guarantees signal quality, trade execution, profitability, or protection from loss.
+
 ## 🚀 Features
 
 - **Automated Telegram Monitoring:** Connects directly to Telegram to instantly intercept and parse incoming trade signals (Entries, Adds, Reduces, Closes, Take Profits, Stop Losses).

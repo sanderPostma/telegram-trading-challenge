@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../platform/linux_tray_controller.dart';
 import '../theme.dart';
 
 PreferredSizeWidget tmgAppBar({
@@ -153,7 +156,7 @@ class _WindowControlsState extends State<_WindowControls> with WindowListener {
           icon: Icons.remove,
           tooltip: 'Minimize',
           color: widget.foreground,
-          onPressed: () => windowManager.minimize(),
+          onPressed: LinuxTrayController.instance.minimizeToTray,
         ),
         _WindowButton(
           icon: _max ? Icons.filter_none : Icons.crop_square,
@@ -169,15 +172,41 @@ class _WindowControlsState extends State<_WindowControls> with WindowListener {
           },
         ),
         _WindowButton(
-          icon: Icons.close,
-          tooltip: 'Close',
+          icon: Icons.power_settings_new,
+          tooltip: 'Exit',
           color: widget.foreground,
           hoverColor: Colors.red.shade600,
           hoverForeground: Colors.white,
-          onPressed: () => windowManager.close(),
+          onPressed: () => unawaited(_confirmExit(context)),
         ),
       ],
     );
+  }
+
+  Future<void> _confirmExit(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Exit Trading Challenge?'),
+        content: const Text(
+          'This stops the Telegram monitor and live WEEX price connection.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.power_settings_new),
+            label: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await LinuxTrayController.instance.exitApplication();
+    }
   }
 }
 

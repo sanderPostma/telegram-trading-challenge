@@ -6,6 +6,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'src/bridge/frb_generated.dart';
 import 'src/logging/app_log.dart';
+import 'src/platform/linux_tray_controller.dart';
 import 'src/state/app_controller.dart';
 import 'src/theme.dart';
 import 'src/ui/app_shell.dart';
@@ -44,6 +45,7 @@ Future<void> _main() async {
     return true;
   };
   await windowManager.ensureInitialized();
+  await LinuxTrayController.instance.initialize();
   WindowOptions windowOptions = const WindowOptions(
     size: Size(1100, 800),
     center: true,
