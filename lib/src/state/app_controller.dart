@@ -83,14 +83,14 @@ class AppController extends ChangeNotifier {
     const PatternRule(
       name: 'add_usd',
       regex:
-          r'(?i)\bADDED\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?',
+          r'(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?',
       action: TradeKind.add,
       priority: 20,
     ),
     const PatternRule(
       name: 'add_btc',
       regex:
-          r'(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?',
+          r'(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?',
       action: TradeKind.add,
       priority: 21,
     ),

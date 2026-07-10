@@ -32,7 +32,7 @@ class PatternsPage extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'These are regular expressions. If the Telegram wording changes, any AI assistant can help generate or adjust them from sample messages.',
+              'These are regular expressions. If the Telegram wording changes, any AI assistant can help generate or adjust them from sample messages. Separate instructions joined by AND are evaluated as separate actions.',
               style: TextStyle(fontSize: 12.5, color: Colors.white54),
             ),
             const SizedBox(height: 16),
@@ -141,6 +141,14 @@ class _PatternCardState extends State<_PatternCard> {
               maxLines: 3,
               decoration: const InputDecoration(labelText: 'Regex'),
             ),
+            if (widget.rule.name == 'add_usd' || widget.rule.name == 'add_btc')
+              const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Supports ADDED or ADDING, optional LONG/SHORT, and optional LIMIT TRIGGER AT price. Example: ADDED \$5000 AND ADDING \$5000 TO LIMIT TRIGGER AT 64,300.',
+                  style: TextStyle(fontSize: 12, color: Colors.white54),
+                ),
+              ),
             const SizedBox(height: 12),
             Align(
               alignment: Alignment.centerRight,
