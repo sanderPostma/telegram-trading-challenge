@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../models/trading.dart';
@@ -21,6 +19,8 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _phone;
   late final TextEditingController _tgApiId;
   late final TextEditingController _tgApiHash;
+  late final TextEditingController _tgCode;
+  late final TextEditingController _tgPassword;
 
   @override
   void initState() {
@@ -32,6 +32,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _phone = TextEditingController(text: c.telegramPhone);
     _tgApiId = TextEditingController(text: c.telegramApiId);
     _tgApiHash = TextEditingController(text: c.telegramApiHash);
+    _tgCode = TextEditingController();
+    _tgPassword = TextEditingController();
   }
 
   @override
@@ -42,6 +44,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _phone.dispose();
     _tgApiId.dispose();
     _tgApiHash.dispose();
+    _tgCode.dispose();
+    _tgPassword.dispose();
     super.dispose();
   }
 
@@ -61,6 +65,56 @@ class _SettingsPageState extends State<SettingsPage> {
           _field(_phone, 'Phone'),
           _field(_tgApiId, 'API ID'),
           _field(_tgApiHash, 'API hash', reveal: true),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              FilledButton.icon(
+                onPressed: () async {
+                  await _save();
+                  await widget.controller.requestTelegramCode();
+                },
+                icon: const Icon(Icons.sms_outlined),
+                label: const Text('Request Telegram code'),
+              ),
+              SizedBox(
+                width: 180,
+                child: TextField(
+                  controller: _tgCode,
+                  decoration: const InputDecoration(labelText: 'Login code'),
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    widget.controller.submitTelegramCode(_tgCode.text),
+                icon: const Icon(Icons.login),
+                label: const Text('Sign in'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: 260,
+                child: _RevealTextField(
+                  controller: _tgPassword,
+                  label: 'Telegram 2FA password',
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    widget.controller.submitTelegramPassword(_tgPassword.text),
+                icon: const Icon(Icons.lock_open),
+                label: const Text('Submit 2FA'),
+              ),
+            ],
+          ),
         ]),
         _section('Behavior', [
           SwitchListTile(
@@ -84,7 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
             const SizedBox(width: 12),
             FilledButton.icon(
-              onPressed: _save,
+              onPressed: () => _save(),
               icon: const Icon(Icons.save),
               label: const Text('Save Settings'),
             ),
@@ -126,25 +180,23 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  void _save() {
+  Future<void> _save() async {
     final current = widget.controller.config;
-    unawaited(
-      widget.controller.saveConfig(
-        AppConfig(
-          weexApiKey: _apiKey.text,
-          weexSecret: _secret.text,
-          weexPassphrase: _passphrase.text,
-          telegramPhone: _phone.text,
-          telegramApiId: _tgApiId.text,
-          telegramApiHash: _tgApiHash.text,
-          masterBalanceUsd: current.masterBalanceUsd,
-          myBalanceUsd: current.myBalanceUsd,
-          markPrice: current.markPrice,
-          autoUpdateMaster: current.autoUpdateMaster,
-          autoApprove: current.autoApprove,
-          simulationMode: current.simulationMode,
-          minimizeToTray: false,
-        ),
+    await widget.controller.saveConfig(
+      AppConfig(
+        weexApiKey: _apiKey.text,
+        weexSecret: _secret.text,
+        weexPassphrase: _passphrase.text,
+        telegramPhone: _phone.text,
+        telegramApiId: _tgApiId.text,
+        telegramApiHash: _tgApiHash.text,
+        masterBalanceUsd: current.masterBalanceUsd,
+        myBalanceUsd: current.myBalanceUsd,
+        markPrice: current.markPrice,
+        autoUpdateMaster: current.autoUpdateMaster,
+        autoApprove: current.autoApprove,
+        simulationMode: current.simulationMode,
+        minimizeToTray: false,
       ),
     );
   }

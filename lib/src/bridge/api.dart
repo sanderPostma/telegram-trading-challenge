@@ -7,14 +7,39 @@ import 'frb_generated.dart';
 import 'interpreter.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'scaling.dart';
+import 'telegram.dart';
 import 'weex.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chart_history`, `push_point`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `StateView`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
-Stream<PriceTick> weexPublicPriceStream() =>
-    RustLib.instance.api.crateApiWeexPublicPriceStream();
+Stream<PriceTick> weexPublicPriceStream() => RustLib.instance.api.crateApiWeexPublicPriceStream();
+
+Stream<TelegramMessageEvent> telegramMessageStream({required TelegramClientRequest request}) =>
+    RustLib.instance.api.crateApiTelegramMessageStream(request: request);
+
+Future<ApiResultTelegramLoginStatus> telegramRequestCode({
+  required TelegramClientRequest request,
+}) => RustLib.instance.api.crateApiTelegramRequestCode(request: request);
+
+Future<ApiResultTelegramLoginStatus> telegramSignIn({required String code}) =>
+    RustLib.instance.api.crateApiTelegramSignIn(code: code);
+
+Future<ApiResultTelegramLoginStatus> telegramCheckPassword({required String password}) =>
+    RustLib.instance.api.crateApiTelegramCheckPassword(password: password);
+
+Future<ApiResultString> telegramFinalizeAction({
+  required String statePath,
+  required String dedupKey,
+  required TelegramActionStatus status,
+  String? orderId,
+}) => RustLib.instance.api.crateApiTelegramFinalizeAction(
+  statePath: statePath,
+  dedupKey: dedupKey,
+  status: status,
+  orderId: orderId,
+);
 
 Future<ApiResultWeexAccountReconciliation> weexReconcileAccount({
   required WeexAccountRequest request,
@@ -38,21 +63,17 @@ Future<void> recordChartSnapshot({
 
 Future<ChartData> getChartData() => RustLib.instance.api.crateApiGetChartData();
 
-Future<List<SeriesPoint>> getBalanceHistory() =>
-    RustLib.instance.api.crateApiGetBalanceHistory();
+Future<List<SeriesPoint>> getBalanceHistory() => RustLib.instance.api.crateApiGetBalanceHistory();
 
-Future<List<SeriesPoint>> getEquityHistory() =>
-    RustLib.instance.api.crateApiGetEquityHistory();
+Future<List<SeriesPoint>> getEquityHistory() => RustLib.instance.api.crateApiGetEquityHistory();
 
-Future<List<SeriesPoint>> getPnlHistory() =>
-    RustLib.instance.api.crateApiGetPnlHistory();
+Future<List<SeriesPoint>> getPnlHistory() => RustLib.instance.api.crateApiGetPnlHistory();
 
 Future<ApiResultAction> classifyMessage({required String text}) =>
     RustLib.instance.api.crateApiClassifyMessage(text: text);
 
-Future<ApiResultScaledOrder> scaleManualOrder({
-  required ManualScaleRequest request,
-}) => RustLib.instance.api.crateApiScaleManualOrder(request: request);
+Future<ApiResultScaledOrder> scaleManualOrder({required ManualScaleRequest request}) =>
+    RustLib.instance.api.crateApiScaleManualOrder(request: request);
 
 Future<ApiResultString> weexSignPreview({
   required String secret,
@@ -132,16 +153,32 @@ class ApiResultString {
           error == other.error;
 }
 
+class ApiResultTelegramLoginStatus {
+  final bool ok;
+  final TelegramLoginStatus? value;
+  final String? error;
+
+  const ApiResultTelegramLoginStatus({required this.ok, this.value, this.error});
+
+  @override
+  int get hashCode => ok.hashCode ^ value.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiResultTelegramLoginStatus &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          value == other.value &&
+          error == other.error;
+}
+
 class ApiResultWeexAccountReconciliation {
   final bool ok;
   final WeexAccountReconciliation? value;
   final String? error;
 
-  const ApiResultWeexAccountReconciliation({
-    required this.ok,
-    this.value,
-    this.error,
-  });
+  const ApiResultWeexAccountReconciliation({required this.ok, this.value, this.error});
 
   @override
   int get hashCode => ok.hashCode ^ value.hashCode ^ error.hashCode;
@@ -181,14 +218,9 @@ class ChartData {
   final List<SeriesPoint> equity;
   final List<SeriesPoint> pnl;
 
-  const ChartData({
-    required this.balance,
-    required this.equity,
-    required this.pnl,
-  });
+  const ChartData({required this.balance, required this.equity, required this.pnl});
 
-  static Future<ChartData> default_() =>
-      RustLib.instance.api.crateApiChartDataDefault();
+  static Future<ChartData> default_() => RustLib.instance.api.crateApiChartDataDefault();
 
   @override
   int get hashCode => balance.hashCode ^ equity.hashCode ^ pnl.hashCode;

@@ -11,6 +11,7 @@ import 'frb_generated.dart';
 import 'interpreter.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated_io.dart';
 import 'scaling.dart';
+import 'telegram.dart';
 import 'weex.dart';
 
 abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
@@ -26,6 +27,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   RustStreamSink<PriceTick> dco_decode_StreamSink_price_tick_Sse(dynamic raw);
+
+  @protected
+  RustStreamSink<TelegramMessageEvent> dco_decode_StreamSink_telegram_message_event_Sse(
+    dynamic raw,
+  );
 
   @protected
   String dco_decode_String(dynamic raw);
@@ -46,13 +52,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiResultString dco_decode_api_result_string(dynamic raw);
 
   @protected
-  ApiResultWeexAccountReconciliation
-  dco_decode_api_result_weex_account_reconciliation(dynamic raw);
+  ApiResultTelegramLoginStatus dco_decode_api_result_telegram_login_status(dynamic raw);
 
   @protected
-  ApiResultWeexMarketOrderAck dco_decode_api_result_weex_market_order_ack(
-    dynamic raw,
-  );
+  ApiResultWeexAccountReconciliation dco_decode_api_result_weex_account_reconciliation(dynamic raw);
+
+  @protected
+  ApiResultWeexMarketOrderAck dco_decode_api_result_weex_market_order_ack(dynamic raw);
 
   @protected
   bool dco_decode_bool(dynamic raw);
@@ -79,9 +85,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Size dco_decode_box_autoadd_size(dynamic raw);
 
   @protected
-  WeexAccountReconciliation dco_decode_box_autoadd_weex_account_reconciliation(
-    dynamic raw,
-  );
+  TelegramClientRequest dco_decode_box_autoadd_telegram_client_request(dynamic raw);
+
+  @protected
+  TelegramLoginStatus dco_decode_box_autoadd_telegram_login_status(dynamic raw);
+
+  @protected
+  WeexAccountReconciliation dco_decode_box_autoadd_weex_account_reconciliation(dynamic raw);
 
   @protected
   WeexAccountRequest dco_decode_box_autoadd_weex_account_request(dynamic raw);
@@ -90,9 +100,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexMarketOrderAck dco_decode_box_autoadd_weex_market_order_ack(dynamic raw);
 
   @protected
-  WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(
-    dynamic raw,
-  );
+  WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(dynamic raw);
 
   @protected
   ChartData dco_decode_chart_data(dynamic raw);
@@ -116,9 +124,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SeriesPoint> dco_decode_list_series_point(dynamic raw);
 
   @protected
-  List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(
-    dynamic raw,
-  );
+  List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(dynamic raw);
 
   @protected
   ManualScaleRequest dco_decode_manual_scale_request(dynamic raw);
@@ -148,13 +154,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Size? dco_decode_opt_box_autoadd_size(dynamic raw);
 
   @protected
-  WeexAccountReconciliation?
-  dco_decode_opt_box_autoadd_weex_account_reconciliation(dynamic raw);
+  TelegramLoginStatus? dco_decode_opt_box_autoadd_telegram_login_status(dynamic raw);
 
   @protected
-  WeexMarketOrderAck? dco_decode_opt_box_autoadd_weex_market_order_ack(
-    dynamic raw,
-  );
+  WeexAccountReconciliation? dco_decode_opt_box_autoadd_weex_account_reconciliation(dynamic raw);
+
+  @protected
+  WeexMarketOrderAck? dco_decode_opt_box_autoadd_weex_market_order_ack(dynamic raw);
 
   @protected
   PriceTick dco_decode_price_tick(dynamic raw);
@@ -167,6 +173,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Size dco_decode_size(dynamic raw);
+
+  @protected
+  TelegramActionStatus dco_decode_telegram_action_status(dynamic raw);
+
+  @protected
+  TelegramClientRequest dco_decode_telegram_client_request(dynamic raw);
+
+  @protected
+  TelegramLoginStatus dco_decode_telegram_login_status(dynamic raw);
+
+  @protected
+  TelegramMessageEvent dco_decode_telegram_message_event(dynamic raw);
+
+  @protected
+  int dco_decode_u_32(dynamic raw);
 
   @protected
   int dco_decode_u_8(dynamic raw);
@@ -199,7 +220,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
 
   @protected
-  RustStreamSink<PriceTick> sse_decode_StreamSink_price_tick_Sse(
+  RustStreamSink<PriceTick> sse_decode_StreamSink_price_tick_Sse(SseDeserializer deserializer);
+
+  @protected
+  RustStreamSink<TelegramMessageEvent> sse_decode_StreamSink_telegram_message_event_Sse(
     SseDeserializer deserializer,
   );
 
@@ -216,16 +240,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiResultAction sse_decode_api_result_action(SseDeserializer deserializer);
 
   @protected
-  ApiResultScaledOrder sse_decode_api_result_scaled_order(
-    SseDeserializer deserializer,
-  );
+  ApiResultScaledOrder sse_decode_api_result_scaled_order(SseDeserializer deserializer);
 
   @protected
   ApiResultString sse_decode_api_result_string(SseDeserializer deserializer);
 
   @protected
-  ApiResultWeexAccountReconciliation
-  sse_decode_api_result_weex_account_reconciliation(
+  ApiResultTelegramLoginStatus sse_decode_api_result_telegram_login_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  ApiResultWeexAccountReconciliation sse_decode_api_result_weex_account_reconciliation(
     SseDeserializer deserializer,
   );
 
@@ -250,9 +276,7 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
-  ManualScaleRequest sse_decode_box_autoadd_manual_scale_request(
-    SseDeserializer deserializer,
-  );
+  ManualScaleRequest sse_decode_box_autoadd_manual_scale_request(SseDeserializer deserializer);
 
   @protected
   ScaledOrder sse_decode_box_autoadd_scaled_order(SseDeserializer deserializer);
@@ -261,19 +285,23 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Size sse_decode_box_autoadd_size(SseDeserializer deserializer);
 
   @protected
+  TelegramClientRequest sse_decode_box_autoadd_telegram_client_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  TelegramLoginStatus sse_decode_box_autoadd_telegram_login_status(SseDeserializer deserializer);
+
+  @protected
   WeexAccountReconciliation sse_decode_box_autoadd_weex_account_reconciliation(
     SseDeserializer deserializer,
   );
 
   @protected
-  WeexAccountRequest sse_decode_box_autoadd_weex_account_request(
-    SseDeserializer deserializer,
-  );
+  WeexAccountRequest sse_decode_box_autoadd_weex_account_request(SseDeserializer deserializer);
 
   @protected
-  WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(
-    SseDeserializer deserializer,
-  );
+  WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(SseDeserializer deserializer);
 
   @protected
   WeexMarketOrderRequest sse_decode_box_autoadd_weex_market_order_request(
@@ -302,14 +330,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SeriesPoint> sse_decode_list_series_point(SseDeserializer deserializer);
 
   @protected
-  List<WeexExecutionSnapshot> sse_decode_list_weex_execution_snapshot(
-    SseDeserializer deserializer,
-  );
+  List<WeexExecutionSnapshot> sse_decode_list_weex_execution_snapshot(SseDeserializer deserializer);
 
   @protected
-  ManualScaleRequest sse_decode_manual_scale_request(
-    SseDeserializer deserializer,
-  );
+  ManualScaleRequest sse_decode_manual_scale_request(SseDeserializer deserializer);
 
   @protected
   ManualSizeUnit sse_decode_manual_size_unit(SseDeserializer deserializer);
@@ -330,16 +354,18 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
-  ScaledOrder? sse_decode_opt_box_autoadd_scaled_order(
-    SseDeserializer deserializer,
-  );
+  ScaledOrder? sse_decode_opt_box_autoadd_scaled_order(SseDeserializer deserializer);
 
   @protected
   Size? sse_decode_opt_box_autoadd_size(SseDeserializer deserializer);
 
   @protected
-  WeexAccountReconciliation?
-  sse_decode_opt_box_autoadd_weex_account_reconciliation(
+  TelegramLoginStatus? sse_decode_opt_box_autoadd_telegram_login_status(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeexAccountReconciliation? sse_decode_opt_box_autoadd_weex_account_reconciliation(
     SseDeserializer deserializer,
   );
 
@@ -361,55 +387,59 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Size sse_decode_size(SseDeserializer deserializer);
 
   @protected
+  TelegramActionStatus sse_decode_telegram_action_status(SseDeserializer deserializer);
+
+  @protected
+  TelegramClientRequest sse_decode_telegram_client_request(SseDeserializer deserializer);
+
+  @protected
+  TelegramLoginStatus sse_decode_telegram_login_status(SseDeserializer deserializer);
+
+  @protected
+  TelegramMessageEvent sse_decode_telegram_message_event(SseDeserializer deserializer);
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer);
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer);
 
   @protected
   void sse_decode_unit(SseDeserializer deserializer);
 
   @protected
-  WeexAccountBalance sse_decode_weex_account_balance(
-    SseDeserializer deserializer,
-  );
+  WeexAccountBalance sse_decode_weex_account_balance(SseDeserializer deserializer);
 
   @protected
-  WeexAccountReconciliation sse_decode_weex_account_reconciliation(
-    SseDeserializer deserializer,
-  );
+  WeexAccountReconciliation sse_decode_weex_account_reconciliation(SseDeserializer deserializer);
 
   @protected
-  WeexAccountRequest sse_decode_weex_account_request(
-    SseDeserializer deserializer,
-  );
+  WeexAccountRequest sse_decode_weex_account_request(SseDeserializer deserializer);
 
   @protected
-  WeexExecutionSnapshot sse_decode_weex_execution_snapshot(
-    SseDeserializer deserializer,
-  );
+  WeexExecutionSnapshot sse_decode_weex_execution_snapshot(SseDeserializer deserializer);
 
   @protected
-  WeexMarketOrderAck sse_decode_weex_market_order_ack(
-    SseDeserializer deserializer,
-  );
+  WeexMarketOrderAck sse_decode_weex_market_order_ack(SseDeserializer deserializer);
 
   @protected
-  WeexMarketOrderRequest sse_decode_weex_market_order_request(
-    SseDeserializer deserializer,
-  );
+  WeexMarketOrderRequest sse_decode_weex_market_order_request(SseDeserializer deserializer);
 
   @protected
-  WeexPositionSnapshot sse_decode_weex_position_snapshot(
-    SseDeserializer deserializer,
-  );
+  WeexPositionSnapshot sse_decode_weex_position_snapshot(SseDeserializer deserializer);
 
   @protected
-  void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  );
+  void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
 
   @protected
   void sse_encode_StreamSink_price_tick_Sse(
     RustStreamSink<PriceTick> self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_StreamSink_telegram_message_event_Sse(
+    RustStreamSink<TelegramMessageEvent> self,
     SseSerializer serializer,
   );
 
@@ -423,20 +453,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_action_kind(ActionKind self, SseSerializer serializer);
 
   @protected
-  void sse_encode_api_result_action(
-    ApiResultAction self,
-    SseSerializer serializer,
-  );
+  void sse_encode_api_result_action(ApiResultAction self, SseSerializer serializer);
 
   @protected
-  void sse_encode_api_result_scaled_order(
-    ApiResultScaledOrder self,
-    SseSerializer serializer,
-  );
+  void sse_encode_api_result_scaled_order(ApiResultScaledOrder self, SseSerializer serializer);
 
   @protected
-  void sse_encode_api_result_string(
-    ApiResultString self,
+  void sse_encode_api_result_string(ApiResultString self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_api_result_telegram_login_status(
+    ApiResultTelegramLoginStatus self,
     SseSerializer serializer,
   );
 
@@ -459,19 +486,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_action(Action self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_direction(
-    Direction self,
-    SseSerializer serializer,
-  );
+  void sse_encode_box_autoadd_direction(Direction self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_f_64(double self, SseSerializer serializer);
 
   @protected
-  void sse_encode_box_autoadd_i_64(
-    PlatformInt64 self,
-    SseSerializer serializer,
-  );
+  void sse_encode_box_autoadd_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_manual_scale_request(
@@ -480,13 +501,22 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_box_autoadd_scaled_order(
-    ScaledOrder self,
+  void sse_encode_box_autoadd_scaled_order(ScaledOrder self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_size(Size self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_telegram_client_request(
+    TelegramClientRequest self,
     SseSerializer serializer,
   );
 
   @protected
-  void sse_encode_box_autoadd_size(Size self, SseSerializer serializer);
+  void sse_encode_box_autoadd_telegram_login_status(
+    TelegramLoginStatus self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_box_autoadd_weex_account_reconciliation(
@@ -528,16 +558,10 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_prim_u_8_strict(
-    Uint8List self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer);
 
   @protected
-  void sse_encode_list_series_point(
-    List<SeriesPoint> self,
-    SseSerializer serializer,
-  );
+  void sse_encode_list_series_point(List<SeriesPoint> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_weex_execution_snapshot(
@@ -546,49 +570,37 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_manual_scale_request(
-    ManualScaleRequest self,
-    SseSerializer serializer,
-  );
+  void sse_encode_manual_scale_request(ManualScaleRequest self, SseSerializer serializer);
 
   @protected
-  void sse_encode_manual_size_unit(
-    ManualSizeUnit self,
-    SseSerializer serializer,
-  );
+  void sse_encode_manual_size_unit(ManualSizeUnit self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_String(String? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_action(
-    Action? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_action(Action? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_direction(
-    Direction? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_direction(Direction? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_f_64(double? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_i_64(
-    PlatformInt64? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer);
 
   @protected
-  void sse_encode_opt_box_autoadd_scaled_order(
-    ScaledOrder? self,
-    SseSerializer serializer,
-  );
+  void sse_encode_opt_box_autoadd_scaled_order(ScaledOrder? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_size(Size? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_telegram_login_status(
+    TelegramLoginStatus? self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_opt_box_autoadd_weex_account_reconciliation(
@@ -615,16 +627,28 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_size(Size self, SseSerializer serializer);
 
   @protected
+  void sse_encode_telegram_action_status(TelegramActionStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_telegram_client_request(TelegramClientRequest self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_telegram_login_status(TelegramLoginStatus self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_telegram_message_event(TelegramMessageEvent self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer);
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer);
 
   @protected
   void sse_encode_unit(void self, SseSerializer serializer);
 
   @protected
-  void sse_encode_weex_account_balance(
-    WeexAccountBalance self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_account_balance(WeexAccountBalance self, SseSerializer serializer);
 
   @protected
   void sse_encode_weex_account_reconciliation(
@@ -633,34 +657,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
-  void sse_encode_weex_account_request(
-    WeexAccountRequest self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_account_request(WeexAccountRequest self, SseSerializer serializer);
 
   @protected
-  void sse_encode_weex_execution_snapshot(
-    WeexExecutionSnapshot self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_execution_snapshot(WeexExecutionSnapshot self, SseSerializer serializer);
 
   @protected
-  void sse_encode_weex_market_order_ack(
-    WeexMarketOrderAck self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_market_order_ack(WeexMarketOrderAck self, SseSerializer serializer);
 
   @protected
-  void sse_encode_weex_market_order_request(
-    WeexMarketOrderRequest self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_market_order_request(WeexMarketOrderRequest self, SseSerializer serializer);
 
   @protected
-  void sse_encode_weex_position_snapshot(
-    WeexPositionSnapshot self,
-    SseSerializer serializer,
-  );
+  void sse_encode_weex_position_snapshot(WeexPositionSnapshot self, SseSerializer serializer);
 }
 
 // Section: wire_class
@@ -670,10 +679,8 @@ class RustLibWire implements BaseWire {
       RustLibWire(lib.ffiDynamicLibrary);
 
   /// Holds the symbol lookup function.
-  final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
-  _lookup;
+  final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
-  RustLibWire(ffi.DynamicLibrary dynamicLibrary)
-    : _lookup = dynamicLibrary.lookup;
+  RustLibWire(ffi.DynamicLibrary dynamicLibrary) : _lookup = dynamicLibrary.lookup;
 }

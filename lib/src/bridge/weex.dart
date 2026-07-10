@@ -111,10 +111,7 @@ class WeexAccountReconciliation {
 
   @override
   int get hashCode =>
-      balance.hashCode ^
-      position.hashCode ^
-      recentExecutions.hashCode ^
-      timestampMs.hashCode;
+      balance.hashCode ^ position.hashCode ^ recentExecutions.hashCode ^ timestampMs.hashCode;
 
   @override
   bool operator ==(Object other) =>

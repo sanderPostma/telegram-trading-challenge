@@ -7,7 +7,9 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bridge/api.dart' as rust;
+import '../bridge/interpreter.dart' as rust_interpreter;
 import '../bridge/scaling.dart' as rust_scaling;
+import '../bridge/telegram.dart' as rust_telegram;
 import '../bridge/weex.dart' as rust_weex;
 import '../logging/app_log.dart';
 import '../models/trading.dart';
@@ -24,9 +26,11 @@ class AppController extends ChangeNotifier {
   static const _exchangeHistoryLookback = Duration(days: 30);
   static const _historicalCandleCacheFreshFor = Duration(minutes: 10);
   static const _weexPriceStaleAfter = Duration(seconds: 20);
+  static const _telegramChannelId = -1003766320116;
 
   final bool useRustBridge;
   StreamSubscription? _weexPriceSubscription;
+  StreamSubscription? _telegramSubscription;
   Timer? _weexRestPollTimer;
   Timer? _weexReconcileTimer;
   Timer? _chartSnapshotTimer;
@@ -77,13 +81,15 @@ class AppController extends ChangeNotifier {
     ),
     const PatternRule(
       name: 'add_usd',
-      regex: r'(?i)\bADDED\b\s*\$(?P<usd>[\d,]+)',
+      regex:
+          r'(?i)\bADDED\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?',
       action: TradeKind.add,
       priority: 20,
     ),
     const PatternRule(
       name: 'add_btc',
-      regex: r'(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC',
+      regex:
+          r'(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?',
       action: TradeKind.add,
       priority: 21,
     ),
@@ -103,13 +109,13 @@ class AppController extends ChangeNotifier {
   ];
 
   final List<String> eventLog = [
-    'Telegram monitor is running. Simulation mode logs orders locally instead of submitting to WEEX.',
+    'Telegram monitor starts automatically after Telegram sign-in.',
   ];
   final List<PlannedOrder> orders = [];
   List<TradeHistoryEntry> tradeHistory = const [];
   final Set<String> _reservedIds = {};
 
-  bool monitorRunning = true;
+  bool monitorRunning = false;
   bool weexPriceConnected = false;
   bool weexAccountConnected = false;
   WeexPriceStatus weexPriceStatus = WeexPriceStatus.idle;
@@ -240,6 +246,167 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  Future<void> handleIncomingTelegramMessage({
+    required String text,
+    String channel = 'Telegram',
+    int? messageId,
+    String? dedupKey,
+  }) async {
+    final rawText = text.trim();
+    if (rawText.isEmpty) {
+      await AppLog.write('Telegram incoming ignored: empty message.');
+      await _finalizeTelegramDedup(
+        dedupKey,
+        rust_telegram.TelegramActionStatus.rejected,
+      );
+      return;
+    }
+
+    await AppLog.write(
+      'Telegram incoming: channel="$channel"${messageId == null ? '' : ', message_id=$messageId'}\n$rawText',
+    );
+
+    if (!useRustBridge) {
+      _log('Telegram parse skipped: Rust bridge unavailable.');
+      await _finalizeTelegramDedup(
+        dedupKey,
+        rust_telegram.TelegramActionStatus.failed,
+      );
+      return;
+    }
+
+    try {
+      final result = await rust.classifyMessage(text: rawText);
+      final action = result.value;
+      if (!result.ok || action == null) {
+        await AppLog.write(
+          'Telegram parse failed: ${result.error ?? 'no action returned'}',
+        );
+        _log('Telegram parse failed: ${result.error ?? 'no action returned'}.');
+        await _finalizeTelegramDedup(
+          dedupKey,
+          rust_telegram.TelegramActionStatus.failed,
+        );
+        return;
+      }
+
+      await AppLog.write(
+        'Telegram parse result: ${_parsedActionDebug(action)}',
+      );
+      final status = await _handleParsedTelegramAction(
+        action,
+        channel: channel,
+      );
+      await _finalizeTelegramDedup(dedupKey, status);
+    } catch (error, stackTrace) {
+      _log(
+        'Telegram parse failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      await _finalizeTelegramDedup(
+        dedupKey,
+        rust_telegram.TelegramActionStatus.failed,
+      );
+    }
+  }
+
+  Future<rust_telegram.TelegramActionStatus> _handleParsedTelegramAction(
+    rust_interpreter.Action action, {
+    required String channel,
+  }) async {
+    final summary = _parsedActionSummary(action);
+    if (action.kind == rust_interpreter.ActionKind.ignore) {
+      _log('Telegram ignored: $summary.');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+
+    if (!action.confidenceHigh || action.needsApproval) {
+      _log('Telegram needs review: $summary.');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+
+    final kind = _tradeKindFromParsed(action.kind);
+    if (kind == null) {
+      _log('Telegram parsed but not automated: $summary.');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+
+    final direction = _tradeDirectionFromParsed(action.direction);
+    final parsedSize = _sizeFromParsed(action.size);
+    if (direction == null || parsedSize == null) {
+      _log('Telegram needs review: $summary.');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+    if (config.markPrice <= 0) {
+      _log('Telegram trade skipped: waiting for live WEEX BTC price.');
+      return rust_telegram.TelegramActionStatus.failed;
+    }
+
+    final order = _buildOrder(
+      kind: kind,
+      direction: direction,
+      sourceAmount: parsedSize.$1,
+      sourceUnit: parsedSize.$2,
+      source: 'Telegram $channel: $summary',
+      status: TradeStatus.pendingApproval,
+    );
+    if (order.scaledBtc <= 0 || order.scaledNotionalUsd <= 0) {
+      await AppLog.write(
+        'Telegram scaled order rejected: ${_describe(order)} from $summary.',
+      );
+      _log('Telegram trade skipped: scaled size is zero.');
+      return rust_telegram.TelegramActionStatus.failed;
+    }
+
+    await AppLog.write(
+      'Telegram scaled order: ${_describe(order)}, auto_approve=${config.autoApprove}, simulation=${config.simulationMode}.',
+    );
+    if (config.autoApprove) {
+      _log('Telegram auto-approved: ${_describe(order)}.');
+      final placedStatus = await _place(order);
+      return switch (placedStatus) {
+        TradeStatus.simulated => rust_telegram.TelegramActionStatus.simulated,
+        TradeStatus.placed => rust_telegram.TelegramActionStatus.submitted,
+        TradeStatus.failed => rust_telegram.TelegramActionStatus.failed,
+        TradeStatus.rejected => rust_telegram.TelegramActionStatus.rejected,
+        TradeStatus.pendingApproval =>
+          rust_telegram.TelegramActionStatus.pending,
+      };
+    } else {
+      pendingApproval = order;
+      orders.insert(0, order);
+      _log('Telegram approval required: ${_describe(order)}.');
+      notifyListeners();
+      return rust_telegram.TelegramActionStatus.pending;
+    }
+  }
+
+  Future<void> _finalizeTelegramDedup(
+    String? dedupKey,
+    rust_telegram.TelegramActionStatus status,
+  ) async {
+    if (dedupKey == null || dedupKey.isEmpty || !useRustBridge) return;
+    try {
+      final result = await rust.telegramFinalizeAction(
+        statePath: AppLog.telegramStatePath,
+        dedupKey: dedupKey,
+        status: status,
+      );
+      if (!result.ok) {
+        _log(
+          'Telegram dedup finalize failed: ${result.error ?? 'unknown error'}',
+        );
+      }
+    } catch (error, stackTrace) {
+      _log(
+        'Telegram dedup finalize failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
   Future<rust_scaling.ScaledOrder?> _scaleWithRust({
     required double amount,
     required SizeUnit unit,
@@ -299,6 +466,163 @@ class AppController extends ChangeNotifier {
       },
     );
     _log('WEEX public price stream connecting.');
+  }
+
+  void startTelegramMonitor() {
+    if (_telegramSubscription != null) return;
+    if (!useRustBridge) {
+      monitorRunning = false;
+      _log('Telegram monitor unavailable: Rust bridge is unavailable.');
+      notifyListeners();
+      return;
+    }
+    final request = _telegramRequest(logMissing: false);
+    if (request == null) {
+      monitorRunning = false;
+      _log(
+        'Telegram monitor waiting for API ID, API hash, phone, and sign-in.',
+      );
+      notifyListeners();
+      return;
+    }
+
+    monitorRunning = true;
+    _log('Telegram monitor connecting via grammers.');
+    _telegramSubscription = rust
+        .telegramMessageStream(request: request)
+        .listen(
+          (event) {
+            if (!event.ok) {
+              monitorRunning = false;
+              _log(
+                'Telegram monitor stopped: ${event.error ?? 'unknown error'}',
+              );
+              notifyListeners();
+              return;
+            }
+            unawaited(
+              handleIncomingTelegramMessage(
+                text: event.text,
+                channel: event.channelTitle,
+                messageId: event.messageId,
+                dedupKey: event.dedupKey,
+              ),
+            );
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            monitorRunning = false;
+            _log(
+              'Telegram monitor failed: $error',
+              error: error,
+              stackTrace: stackTrace,
+            );
+            notifyListeners();
+          },
+          onDone: () {
+            monitorRunning = false;
+            _telegramSubscription = null;
+            _log('Telegram monitor disconnected.');
+            notifyListeners();
+          },
+        );
+    _log('Telegram monitor live via grammers.');
+    notifyListeners();
+  }
+
+  Future<void> requestTelegramCode() async {
+    final request = _telegramRequest();
+    if (request == null) return;
+    try {
+      final result = await rust.telegramRequestCode(request: request);
+      final status = result.value;
+      if (!result.ok || status == null) {
+        _log(
+          'Telegram code request failed: ${result.error ?? 'unknown error'}',
+        );
+        return;
+      }
+      _log(status.message);
+      if (status.authorized) startTelegramMonitor();
+    } catch (error, stackTrace) {
+      _log(
+        'Telegram code request failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> submitTelegramCode(String code) async {
+    final value = code.trim();
+    if (value.isEmpty) {
+      _log('Telegram sign-in needs the code from Telegram.');
+      return;
+    }
+    try {
+      final result = await rust.telegramSignIn(code: value);
+      final status = result.value;
+      if (!result.ok || status == null) {
+        _log('Telegram sign-in failed: ${result.error ?? 'unknown error'}');
+        return;
+      }
+      _log(status.message);
+      if (status.authorized) startTelegramMonitor();
+    } catch (error, stackTrace) {
+      _log(
+        'Telegram sign-in failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> submitTelegramPassword(String password) async {
+    if (password.isEmpty) {
+      _log('Telegram 2FA sign-in needs your password.');
+      return;
+    }
+    try {
+      final result = await rust.telegramCheckPassword(password: password);
+      final status = result.value;
+      if (!result.ok || status == null) {
+        _log('Telegram 2FA sign-in failed: ${result.error ?? 'unknown error'}');
+        return;
+      }
+      _log(status.message);
+      if (status.authorized) startTelegramMonitor();
+    } catch (error, stackTrace) {
+      _log(
+        'Telegram 2FA sign-in failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  rust_telegram.TelegramClientRequest? _telegramRequest({
+    bool logMissing = true,
+  }) {
+    if (!useRustBridge) {
+      if (logMissing) _log('Telegram unavailable: Rust bridge is unavailable.');
+      return null;
+    }
+    final apiId = int.tryParse(config.telegramApiId.trim());
+    if (apiId == null ||
+        config.telegramApiHash.trim().isEmpty ||
+        config.telegramPhone.trim().isEmpty) {
+      if (logMissing) {
+        _log('Telegram needs numeric API ID, API hash, and phone first.');
+      }
+      return null;
+    }
+    return rust_telegram.TelegramClientRequest(
+      apiId: apiId,
+      apiHash: config.telegramApiHash,
+      phone: config.telegramPhone,
+      channelId: _telegramChannelId,
+      sessionPath: AppLog.telegramSessionPath,
+      statePath: AppLog.telegramStatePath,
+    );
   }
 
   void _startWeexReconciliation() {
@@ -526,6 +850,7 @@ class AppController extends ChangeNotifier {
     if (log) _log('Settings updated.');
     unawaited(_snapshotChartState(force: true, notify: false));
     _startWeexReconciliation();
+    startTelegramMonitor();
     notifyListeners();
     await _persistConfig();
   }
@@ -712,7 +1037,7 @@ class AppController extends ChangeNotifier {
     return (value / step).floorToDouble() * step;
   }
 
-  Future<void> _place(PlannedOrder order) async {
+  Future<TradeStatus> _place(PlannedOrder order) async {
     if (!config.simulationMode) {
       _replaceOrder(order.copyWith(status: TradeStatus.pendingApproval));
       notifyListeners();
@@ -721,16 +1046,15 @@ class AppController extends ChangeNotifier {
       if (ack == null) {
         _replaceOrder(order.copyWith(status: TradeStatus.failed));
         notifyListeners();
-        return;
+        return TradeStatus.failed;
       }
       _log('WEEX accepted order ${ack.orderId}. Waiting for reconciliation.');
     }
 
-    final placed = order.copyWith(
-      status: config.simulationMode
-          ? TradeStatus.simulated
-          : TradeStatus.placed,
-    );
+    final status = config.simulationMode
+        ? TradeStatus.simulated
+        : TradeStatus.placed;
+    final placed = order.copyWith(status: status);
     _replaceOrder(placed);
     position = PositionView(
       direction: placed.direction,
@@ -746,6 +1070,7 @@ class AppController extends ChangeNotifier {
       unawaited(reconcileFromExchange());
     }
     notifyListeners();
+    return status;
   }
 
   Future<rust_weex.WeexMarketOrderAck?> _submitLiveOrder(
@@ -1119,6 +1444,64 @@ class AppController extends ChangeNotifier {
     };
   }
 
+  TradeKind? _tradeKindFromParsed(rust_interpreter.ActionKind value) {
+    return switch (value) {
+      rust_interpreter.ActionKind.enter => TradeKind.enter,
+      rust_interpreter.ActionKind.add => TradeKind.add,
+      rust_interpreter.ActionKind.reduce => null,
+      rust_interpreter.ActionKind.close => null,
+      rust_interpreter.ActionKind.ignore => null,
+    };
+  }
+
+  TradeDirection? _tradeDirectionFromParsed(rust_interpreter.Direction? value) {
+    return switch (value) {
+      rust_interpreter.Direction.long => TradeDirection.long,
+      rust_interpreter.Direction.short => TradeDirection.short,
+      null => null,
+    };
+  }
+
+  (double, SizeUnit)? _sizeFromParsed(rust_interpreter.Size? value) {
+    return switch (value) {
+      rust_interpreter.Size_Usd(:final field0) => (field0, SizeUnit.usdt),
+      rust_interpreter.Size_Btc(:final field0) => (field0, SizeUnit.btc),
+      rust_interpreter.Size_Pct() => null,
+      rust_interpreter.Size_FullClose() => null,
+      null => null,
+    };
+  }
+
+  String _parsedActionSummary(rust_interpreter.Action action) {
+    final kind = action.kind.name.toUpperCase();
+    final direction = action.direction?.name.toUpperCase();
+    final size = _parsedSizeLabel(action.size);
+    return [kind, ?direction, ?size].join(' ');
+  }
+
+  String _parsedActionDebug(rust_interpreter.Action action) {
+    return [
+      'kind=${action.kind.name}',
+      'direction=${action.direction?.name ?? 'none'}',
+      'size=${_parsedSizeLabel(action.size) ?? 'none'}',
+      'confidence_high=${action.confidenceHigh}',
+      'needs_approval=${action.needsApproval}',
+    ].join(', ');
+  }
+
+  String? _parsedSizeLabel(rust_interpreter.Size? value) {
+    return switch (value) {
+      rust_interpreter.Size_Usd(:final field0) =>
+        '${field0.toStringAsFixed(2)} USDT',
+      rust_interpreter.Size_Btc(:final field0) =>
+        '${field0.toStringAsFixed(4)} BTC',
+      rust_interpreter.Size_Pct(:final field0) =>
+        '${(field0 * 100).toStringAsFixed(0)}%',
+      rust_interpreter.Size_FullClose() => 'full close',
+      null => null,
+    };
+  }
+
   void _log(String message, {Object? error, StackTrace? stackTrace}) {
     eventLog.insert(
       0,
@@ -1135,6 +1518,7 @@ class AppController extends ChangeNotifier {
   @override
   void dispose() {
     _weexPriceSubscription?.cancel();
+    _telegramSubscription?.cancel();
     _weexRestPollTimer?.cancel();
     _weexReconcileTimer?.cancel();
     _chartSnapshotTimer?.cancel();

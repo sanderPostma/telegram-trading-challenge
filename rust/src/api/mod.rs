@@ -5,7 +5,7 @@ use crate::{
     interpreter::{interpret, Action, InterpreterState},
     patterns::{default_rules, match_first},
     scaling::{scale_order, ScaleInput, ScaledOrder},
-    weex, Size,
+    telegram, weex, Size,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -47,6 +47,13 @@ pub struct ApiResultWeexAccountReconciliation {
 pub struct ApiResultWeexMarketOrderAck {
     pub ok: bool,
     pub value: Option<weex::WeexMarketOrderAck>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResultTelegramLoginStatus {
+    pub ok: bool,
+    pub value: Option<telegram::TelegramLoginStatus>,
     pub error: Option<String>,
 }
 
@@ -102,6 +109,7 @@ fn push_point(series: &mut Vec<SeriesPoint>, point: SeriesPoint) {
     }
 }
 
+pub use crate::telegram::{TelegramActionStatus, TelegramClientRequest, TelegramMessageEvent};
 pub use crate::weex::PriceTick;
 
 pub async fn weex_public_price_stream(sink: crate::frb_generated::StreamSink<PriceTick>) {
@@ -111,6 +119,80 @@ pub async fn weex_public_price_stream(sink: crate::frb_generated::StreamSink<Pri
         sink,
     )
     .await;
+}
+
+pub async fn telegram_message_stream(
+    request: telegram::TelegramClientRequest,
+    sink: crate::frb_generated::StreamSink<telegram::TelegramMessageEvent>,
+) {
+    telegram::stream_channel_messages(request, sink).await;
+}
+
+pub async fn telegram_request_code(
+    request: telegram::TelegramClientRequest,
+) -> ApiResultTelegramLoginStatus {
+    match telegram::request_code(request).await {
+        Ok(value) => ApiResultTelegramLoginStatus {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Err(error) => ApiResultTelegramLoginStatus {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub async fn telegram_sign_in(code: String) -> ApiResultTelegramLoginStatus {
+    match telegram::sign_in(code).await {
+        Ok(value) => ApiResultTelegramLoginStatus {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Err(error) => ApiResultTelegramLoginStatus {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub async fn telegram_check_password(password: String) -> ApiResultTelegramLoginStatus {
+    match telegram::check_password(password).await {
+        Ok(value) => ApiResultTelegramLoginStatus {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Err(error) => ApiResultTelegramLoginStatus {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub fn telegram_finalize_action(
+    state_path: String,
+    dedup_key: String,
+    status: telegram::TelegramActionStatus,
+    order_id: Option<String>,
+) -> ApiResultString {
+    match telegram::finalize_action(state_path, dedup_key, status, order_id) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: Some("ok".to_string()),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
 }
 
 pub async fn weex_reconcile_account(

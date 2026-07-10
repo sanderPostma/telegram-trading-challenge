@@ -7,11 +7,11 @@ import 'api.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
-import 'frb_generated.io.dart'
-    if (dart.library.js_interop) 'frb_generated.web.dart';
+import 'frb_generated.io.dart' if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'interpreter.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'scaling.dart';
+import 'telegram.dart';
 import 'weex.dart';
 
 /// Main entrypoint of the Rust API
@@ -49,12 +49,10 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   static void dispose() => instance.disposeImpl();
 
   @override
-  ApiImplConstructor<RustLibApiImpl, RustLibWire> get apiImplConstructor =>
-      RustLibApiImpl.new;
+  ApiImplConstructor<RustLibApiImpl, RustLibWire> get apiImplConstructor => RustLibApiImpl.new;
 
   @override
-  WireConstructor<RustLibWire> get wireConstructor =>
-      RustLibWire.fromExternalLibrary;
+  WireConstructor<RustLibWire> get wireConstructor => RustLibWire.fromExternalLibrary;
 
   @override
   Future<void> executeRustInitializers() async {}
@@ -67,15 +65,14 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -1239971917;
+  int get rustContentHash => 878231375;
 
-  static const kDefaultExternalLibraryLoaderConfig =
-      ExternalLibraryLoaderConfig(
-        stem: 'trading_challenge_core',
-        ioDirectory: 'rust/target/release/',
-        webPrefix: 'pkg/',
-        wasmBindgenName: 'wasm_bindgen',
-      );
+  static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
+    stem: 'trading_challenge_core',
+    ioDirectory: 'rust/target/release/',
+    webPrefix: 'pkg/',
+    wasmBindgenName: 'wasm_bindgen',
+  );
 }
 
 abstract class RustLibApi extends BaseApi {
@@ -100,9 +97,26 @@ abstract class RustLibApi extends BaseApi {
     required double cumulativePnl,
   });
 
-  Future<ApiResultScaledOrder> crateApiScaleManualOrder({
-    required ManualScaleRequest request,
+  Future<ApiResultScaledOrder> crateApiScaleManualOrder({required ManualScaleRequest request});
+
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramCheckPassword({required String password});
+
+  Future<ApiResultString> crateApiTelegramFinalizeAction({
+    required String statePath,
+    required String dedupKey,
+    required TelegramActionStatus status,
+    String? orderId,
   });
+
+  Stream<TelegramMessageEvent> crateApiTelegramMessageStream({
+    required TelegramClientRequest request,
+  });
+
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramRequestCode({
+    required TelegramClientRequest request,
+  });
+
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramSignIn({required String code});
 
   Stream<PriceTick> crateApiWeexPublicPriceStream();
 
@@ -138,17 +152,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 1,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 1, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_chart_data,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_chart_data, decodeErrorData: null),
         constMeta: kCrateApiChartDataDefaultConstMeta,
         argValues: [],
         apiImpl: this,
@@ -166,17 +172,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(text, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 2,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 2, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_api_result_action,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_action, decodeErrorData: null),
         constMeta: kCrateApiClassifyMessageConstMeta,
         argValues: [text],
         apiImpl: this,
@@ -193,17 +191,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 3,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 3, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_list_series_point,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetBalanceHistoryConstMeta,
         argValues: [],
         apiImpl: this,
@@ -220,17 +210,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 4,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 4, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_chart_data,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_chart_data, decodeErrorData: null),
         constMeta: kCrateApiGetChartDataConstMeta,
         argValues: [],
         apiImpl: this,
@@ -247,17 +229,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 5,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 5, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_list_series_point,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetEquityHistoryConstMeta,
         argValues: [],
         apiImpl: this,
@@ -274,17 +248,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 6,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_list_series_point,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetPnlHistoryConstMeta,
         argValues: [],
         apiImpl: this,
@@ -301,17 +267,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 7,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_String,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_String, decodeErrorData: null),
         constMeta: kCrateApiHelloConstMeta,
         argValues: [],
         apiImpl: this,
@@ -337,17 +295,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(balance, serializer);
           sse_encode_f_64(equity, serializer);
           sse_encode_f_64(cumulativePnl, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 8,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_unit,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
         constMeta: kCrateApiRecordChartSnapshotConstMeta,
         argValues: [timestampMs, balance, equity, cumulativePnl],
         apiImpl: this,
@@ -355,27 +305,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiRecordChartSnapshotConstMeta =>
-      const TaskConstMeta(
-        debugName: "record_chart_snapshot",
-        argNames: ["timestampMs", "balance", "equity", "cumulativePnl"],
-      );
+  TaskConstMeta get kCrateApiRecordChartSnapshotConstMeta => const TaskConstMeta(
+    debugName: "record_chart_snapshot",
+    argNames: ["timestampMs", "balance", "equity", "cumulativePnl"],
+  );
 
   @override
-  Future<ApiResultScaledOrder> crateApiScaleManualOrder({
-    required ManualScaleRequest request,
-  }) {
+  Future<ApiResultScaledOrder> crateApiScaleManualOrder({required ManualScaleRequest request}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_manual_scale_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 9,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_scaled_order,
@@ -388,10 +330,136 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     );
   }
 
-  TaskConstMeta get kCrateApiScaleManualOrderConstMeta => const TaskConstMeta(
-    debugName: "scale_manual_order",
-    argNames: ["request"],
+  TaskConstMeta get kCrateApiScaleManualOrderConstMeta =>
+      const TaskConstMeta(debugName: "scale_manual_order", argNames: ["request"]);
+
+  @override
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramCheckPassword({required String password}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(password, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_telegram_login_status,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTelegramCheckPasswordConstMeta,
+        argValues: [password],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTelegramCheckPasswordConstMeta =>
+      const TaskConstMeta(debugName: "telegram_check_password", argNames: ["password"]);
+
+  @override
+  Future<ApiResultString> crateApiTelegramFinalizeAction({
+    required String statePath,
+    required String dedupKey,
+    required TelegramActionStatus status,
+    String? orderId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(statePath, serializer);
+          sse_encode_String(dedupKey, serializer);
+          sse_encode_telegram_action_status(status, serializer);
+          sse_encode_opt_String(orderId, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiTelegramFinalizeActionConstMeta,
+        argValues: [statePath, dedupKey, status, orderId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTelegramFinalizeActionConstMeta => const TaskConstMeta(
+    debugName: "telegram_finalize_action",
+    argNames: ["statePath", "dedupKey", "status", "orderId"],
   );
+
+  @override
+  Stream<TelegramMessageEvent> crateApiTelegramMessageStream({
+    required TelegramClientRequest request,
+  }) {
+    final sink = RustStreamSink<TelegramMessageEvent>();
+    unawaited(
+      handler.executeNormal(
+        NormalTask(
+          callFfi: (port_) {
+            final serializer = SseSerializer(generalizedFrbRustBinding);
+            sse_encode_box_autoadd_telegram_client_request(request, serializer);
+            sse_encode_StreamSink_telegram_message_event_Sse(sink, serializer);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12, port: port_);
+          },
+          codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
+          constMeta: kCrateApiTelegramMessageStreamConstMeta,
+          argValues: [request, sink],
+          apiImpl: this,
+        ),
+      ),
+    );
+    return sink.stream;
+  }
+
+  TaskConstMeta get kCrateApiTelegramMessageStreamConstMeta =>
+      const TaskConstMeta(debugName: "telegram_message_stream", argNames: ["request", "sink"]);
+
+  @override
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramRequestCode({
+    required TelegramClientRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_telegram_client_request(request, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_telegram_login_status,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTelegramRequestCodeConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTelegramRequestCodeConstMeta =>
+      const TaskConstMeta(debugName: "telegram_request_code", argNames: ["request"]);
+
+  @override
+  Future<ApiResultTelegramLoginStatus> crateApiTelegramSignIn({required String code}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(code, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_telegram_login_status,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiTelegramSignInConstMeta,
+        argValues: [code],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiTelegramSignInConstMeta =>
+      const TaskConstMeta(debugName: "telegram_sign_in", argNames: ["code"]);
 
   @override
   Stream<PriceTick> crateApiWeexPublicPriceStream() {
@@ -402,17 +470,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           callFfi: (port_) {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_StreamSink_price_tick_Sse(sink, serializer);
-            pdeCallFfi(
-              generalizedFrbRustBinding,
-              serializer,
-              funcId: 10,
-              port: port_,
-            );
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15, port: port_);
           },
-          codec: SseCodec(
-            decodeSuccessData: sse_decode_unit,
-            decodeErrorData: null,
-          ),
+          codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
           constMeta: kCrateApiWeexPublicPriceStreamConstMeta,
           argValues: [sink],
           apiImpl: this,
@@ -423,10 +483,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiWeexPublicPriceStreamConstMeta =>
-      const TaskConstMeta(
-        debugName: "weex_public_price_stream",
-        argNames: ["sink"],
-      );
+      const TaskConstMeta(debugName: "weex_public_price_stream", argNames: ["sink"]);
 
   @override
   Future<ApiResultWeexAccountReconciliation> crateApiWeexReconcileAccount({
@@ -437,12 +494,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_account_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 11,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_account_reconciliation,
@@ -456,10 +508,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiWeexReconcileAccountConstMeta =>
-      const TaskConstMeta(
-        debugName: "weex_reconcile_account",
-        argNames: ["request"],
-      );
+      const TaskConstMeta(debugName: "weex_reconcile_account", argNames: ["request"]);
 
   @override
   Future<ApiResultString> crateApiWeexSignPreview({
@@ -480,17 +529,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(path, serializer);
           sse_encode_String(query, serializer);
           sse_encode_String(body, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 12,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17, port: port_);
         },
-        codec: SseCodec(
-          decodeSuccessData: sse_decode_api_result_string,
-          decodeErrorData: null,
-        ),
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiWeexSignPreviewConstMeta,
         argValues: [secret, timestamp, method, path, query, body],
         apiImpl: this,
@@ -512,12 +553,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_market_order_request(request, serializer);
-          pdeCallFfi(
-            generalizedFrbRustBinding,
-            serializer,
-            funcId: 13,
-            port: port_,
-          );
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -531,10 +567,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta get kCrateApiWeexSubmitMarketOrderConstMeta =>
-      const TaskConstMeta(
-        debugName: "weex_submit_market_order",
-        argNames: ["request"],
-      );
+      const TaskConstMeta(debugName: "weex_submit_market_order", argNames: ["request"]);
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -549,6 +582,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  RustStreamSink<TelegramMessageEvent> dco_decode_StreamSink_telegram_message_event_Sse(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    throw UnimplementedError();
+  }
+
+  @protected
   String dco_decode_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as String;
@@ -558,8 +599,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Action dco_decode_action(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return Action(
       kind: dco_decode_action_kind(arr[0]),
       direction: dco_decode_opt_box_autoadd_direction(arr[1]),
@@ -580,8 +620,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiResultAction dco_decode_api_result_action(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ApiResultAction(
       ok: dco_decode_bool(arr[0]),
       value: dco_decode_opt_box_autoadd_action(arr[1]),
@@ -593,8 +632,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiResultScaledOrder dco_decode_api_result_scaled_order(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ApiResultScaledOrder(
       ok: dco_decode_bool(arr[0]),
       value: dco_decode_opt_box_autoadd_scaled_order(arr[1]),
@@ -606,8 +644,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ApiResultString dco_decode_api_result_string(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ApiResultString(
       ok: dco_decode_bool(arr[0]),
       value: dco_decode_opt_String(arr[1]),
@@ -616,12 +653,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ApiResultWeexAccountReconciliation
-  dco_decode_api_result_weex_account_reconciliation(dynamic raw) {
+  ApiResultTelegramLoginStatus dco_decode_api_result_telegram_login_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ApiResultTelegramLoginStatus(
+      ok: dco_decode_bool(arr[0]),
+      value: dco_decode_opt_box_autoadd_telegram_login_status(arr[1]),
+      error: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
+  ApiResultWeexAccountReconciliation dco_decode_api_result_weex_account_reconciliation(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ApiResultWeexAccountReconciliation(
       ok: dco_decode_bool(arr[0]),
       value: dco_decode_opt_box_autoadd_weex_account_reconciliation(arr[1]),
@@ -630,13 +679,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ApiResultWeexMarketOrderAck dco_decode_api_result_weex_market_order_ack(
-    dynamic raw,
-  ) {
+  ApiResultWeexMarketOrderAck dco_decode_api_result_weex_market_order_ack(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ApiResultWeexMarketOrderAck(
       ok: dco_decode_bool(arr[0]),
       value: dco_decode_opt_box_autoadd_weex_market_order_ack(arr[1]),
@@ -693,9 +739,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountReconciliation dco_decode_box_autoadd_weex_account_reconciliation(
-    dynamic raw,
-  ) {
+  TelegramClientRequest dco_decode_box_autoadd_telegram_client_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_telegram_client_request(raw);
+  }
+
+  @protected
+  TelegramLoginStatus dco_decode_box_autoadd_telegram_login_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_telegram_login_status(raw);
+  }
+
+  @protected
+  WeexAccountReconciliation dco_decode_box_autoadd_weex_account_reconciliation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_weex_account_reconciliation(raw);
   }
@@ -713,9 +769,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(
-    dynamic raw,
-  ) {
+  WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_weex_market_order_request(raw);
   }
@@ -724,8 +778,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ChartData dco_decode_chart_data(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ChartData(
       balance: dco_decode_list_series_point(arr[0]),
       equity: dco_decode_list_series_point(arr[1]),
@@ -770,21 +823,16 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(
-    dynamic raw,
-  ) {
+  List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return (raw as List<dynamic>)
-        .map(dco_decode_weex_execution_snapshot)
-        .toList();
+    return (raw as List<dynamic>).map(dco_decode_weex_execution_snapshot).toList();
   }
 
   @protected
   ManualScaleRequest dco_decode_manual_scale_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return ManualScaleRequest(
       amount: dco_decode_f_64(arr[0]),
       unit: dco_decode_manual_size_unit(arr[1]),
@@ -844,30 +892,28 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountReconciliation?
-  dco_decode_opt_box_autoadd_weex_account_reconciliation(dynamic raw) {
+  TelegramLoginStatus? dco_decode_opt_box_autoadd_telegram_login_status(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null
-        ? null
-        : dco_decode_box_autoadd_weex_account_reconciliation(raw);
+    return raw == null ? null : dco_decode_box_autoadd_telegram_login_status(raw);
   }
 
   @protected
-  WeexMarketOrderAck? dco_decode_opt_box_autoadd_weex_market_order_ack(
-    dynamic raw,
-  ) {
+  WeexAccountReconciliation? dco_decode_opt_box_autoadd_weex_account_reconciliation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
-    return raw == null
-        ? null
-        : dco_decode_box_autoadd_weex_market_order_ack(raw);
+    return raw == null ? null : dco_decode_box_autoadd_weex_account_reconciliation(raw);
+  }
+
+  @protected
+  WeexMarketOrderAck? dco_decode_opt_box_autoadd_weex_market_order_ack(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_weex_market_order_ack(raw);
   }
 
   @protected
   PriceTick dco_decode_price_tick(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 9)
-      throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    if (arr.length != 9) throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
     return PriceTick(
       symbol: dco_decode_String(arr[0]),
       price: dco_decode_opt_box_autoadd_f_64(arr[1]),
@@ -885,8 +931,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ScaledOrder dco_decode_scaled_order(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 3)
-      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
     return ScaledOrder(
       ratio: dco_decode_f_64(arr[0]),
       qtyBtc: dco_decode_f_64(arr[1]),
@@ -898,12 +943,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   SeriesPoint dco_decode_series_point(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 2)
-      throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
-    return SeriesPoint(
-      timestampMs: dco_decode_i_64(arr[0]),
-      value: dco_decode_f_64(arr[1]),
-    );
+    if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return SeriesPoint(timestampMs: dco_decode_i_64(arr[0]), value: dco_decode_f_64(arr[1]));
   }
 
   @protected
@@ -924,6 +965,65 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TelegramActionStatus dco_decode_telegram_action_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return TelegramActionStatus.values[raw as int];
+  }
+
+  @protected
+  TelegramClientRequest dco_decode_telegram_client_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return TelegramClientRequest(
+      apiId: dco_decode_i_32(arr[0]),
+      apiHash: dco_decode_String(arr[1]),
+      phone: dco_decode_String(arr[2]),
+      channelId: dco_decode_i_64(arr[3]),
+      sessionPath: dco_decode_String(arr[4]),
+      statePath: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
+  TelegramLoginStatus dco_decode_telegram_login_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return TelegramLoginStatus(
+      ok: dco_decode_bool(arr[0]),
+      authorized: dco_decode_bool(arr[1]),
+      needsCode: dco_decode_bool(arr[2]),
+      needsPassword: dco_decode_bool(arr[3]),
+      message: dco_decode_String(arr[4]),
+    );
+  }
+
+  @protected
+  TelegramMessageEvent dco_decode_telegram_message_event(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 9) throw Exception('unexpected arr length: expect 9 but see ${arr.length}');
+    return TelegramMessageEvent(
+      ok: dco_decode_bool(arr[0]),
+      channelId: dco_decode_i_64(arr[1]),
+      channelTitle: dco_decode_String(arr[2]),
+      messageId: dco_decode_i_32(arr[3]),
+      actionOrdinal: dco_decode_u_32(arr[4]),
+      dedupKey: dco_decode_String(arr[5]),
+      text: dco_decode_String(arr[6]),
+      receivedAtMs: dco_decode_i_64(arr[7]),
+      error: dco_decode_opt_String(arr[8]),
+    );
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
+  }
+
+  @protected
   int dco_decode_u_8(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
@@ -939,8 +1039,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexAccountBalance dco_decode_weex_account_balance(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return WeexAccountBalance(
       asset: dco_decode_String(arr[0]),
       walletBalance: dco_decode_f_64(arr[1]),
@@ -952,13 +1051,10 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountReconciliation dco_decode_weex_account_reconciliation(
-    dynamic raw,
-  ) {
+  WeexAccountReconciliation dco_decode_weex_account_reconciliation(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 4)
-      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    if (arr.length != 4) throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
     return WeexAccountReconciliation(
       balance: dco_decode_weex_account_balance(arr[0]),
       position: dco_decode_weex_position_snapshot(arr[1]),
@@ -971,8 +1067,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexAccountRequest dco_decode_weex_account_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 6)
-      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return WeexAccountRequest(
       apiKey: dco_decode_String(arr[0]),
       apiSecret: dco_decode_String(arr[1]),
@@ -987,8 +1082,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexExecutionSnapshot dco_decode_weex_execution_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12)
-      throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 12) throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
     return WeexExecutionSnapshot(
       execId: dco_decode_String(arr[0]),
       orderId: dco_decode_String(arr[1]),
@@ -1009,8 +1103,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexMarketOrderAck dco_decode_weex_market_order_ack(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5)
-      throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
     return WeexMarketOrderAck(
       orderId: dco_decode_String(arr[0]),
       clientOrderId: dco_decode_opt_String(arr[1]),
@@ -1024,8 +1117,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexMarketOrderRequest dco_decode_weex_market_order_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 10) throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return WeexMarketOrderRequest(
       apiKey: dco_decode_String(arr[0]),
       apiSecret: dco_decode_String(arr[1]),
@@ -1044,8 +1136,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexPositionSnapshot dco_decode_weex_position_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 10)
-      throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
+    if (arr.length != 10) throw Exception('unexpected arr length: expect 10 but see ${arr.length}');
     return WeexPositionSnapshot(
       symbol: dco_decode_String(arr[0]),
       direction: dco_decode_String(arr[1]),
@@ -1068,7 +1159,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  RustStreamSink<PriceTick> sse_decode_StreamSink_price_tick_Sse(
+  RustStreamSink<PriceTick> sse_decode_StreamSink_price_tick_Sse(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    throw UnimplementedError('Unreachable ()');
+  }
+
+  @protected
+  RustStreamSink<TelegramMessageEvent> sse_decode_StreamSink_telegram_message_event_Sse(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1118,9 +1215,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ApiResultScaledOrder sse_decode_api_result_scaled_order(
-    SseDeserializer deserializer,
-  ) {
+  ApiResultScaledOrder sse_decode_api_result_scaled_order(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_ok = sse_decode_bool(deserializer);
     var var_value = sse_decode_opt_box_autoadd_scaled_order(deserializer);
@@ -1138,21 +1233,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ApiResultWeexAccountReconciliation
-  sse_decode_api_result_weex_account_reconciliation(
+  ApiResultTelegramLoginStatus sse_decode_api_result_telegram_login_status(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_ok = sse_decode_bool(deserializer);
-    var var_value = sse_decode_opt_box_autoadd_weex_account_reconciliation(
-      deserializer,
-    );
+    var var_value = sse_decode_opt_box_autoadd_telegram_login_status(deserializer);
     var var_error = sse_decode_opt_String(deserializer);
-    return ApiResultWeexAccountReconciliation(
-      ok: var_ok,
-      value: var_value,
-      error: var_error,
-    );
+    return ApiResultTelegramLoginStatus(ok: var_ok, value: var_value, error: var_error);
+  }
+
+  @protected
+  ApiResultWeexAccountReconciliation sse_decode_api_result_weex_account_reconciliation(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_value = sse_decode_opt_box_autoadd_weex_account_reconciliation(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return ApiResultWeexAccountReconciliation(ok: var_ok, value: var_value, error: var_error);
   }
 
   @protected
@@ -1161,15 +1260,9 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_ok = sse_decode_bool(deserializer);
-    var var_value = sse_decode_opt_box_autoadd_weex_market_order_ack(
-      deserializer,
-    );
+    var var_value = sse_decode_opt_box_autoadd_weex_market_order_ack(deserializer);
     var var_error = sse_decode_opt_String(deserializer);
-    return ApiResultWeexMarketOrderAck(
-      ok: var_ok,
-      value: var_value,
-      error: var_error,
-    );
+    return ApiResultWeexMarketOrderAck(ok: var_ok, value: var_value, error: var_error);
   }
 
   @protected
@@ -1203,17 +1296,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ManualScaleRequest sse_decode_box_autoadd_manual_scale_request(
-    SseDeserializer deserializer,
-  ) {
+  ManualScaleRequest sse_decode_box_autoadd_manual_scale_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_manual_scale_request(deserializer));
   }
 
   @protected
-  ScaledOrder sse_decode_box_autoadd_scaled_order(
-    SseDeserializer deserializer,
-  ) {
+  ScaledOrder sse_decode_box_autoadd_scaled_order(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_scaled_order(deserializer));
   }
@@ -1225,6 +1314,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TelegramClientRequest sse_decode_box_autoadd_telegram_client_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_telegram_client_request(deserializer));
+  }
+
+  @protected
+  TelegramLoginStatus sse_decode_box_autoadd_telegram_login_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_telegram_login_status(deserializer));
+  }
+
+  @protected
   WeexAccountReconciliation sse_decode_box_autoadd_weex_account_reconciliation(
     SseDeserializer deserializer,
   ) {
@@ -1233,17 +1336,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountRequest sse_decode_box_autoadd_weex_account_request(
-    SseDeserializer deserializer,
-  ) {
+  WeexAccountRequest sse_decode_box_autoadd_weex_account_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_weex_account_request(deserializer));
   }
 
   @protected
-  WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(
-    SseDeserializer deserializer,
-  ) {
+  WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_weex_market_order_ack(deserializer));
   }
@@ -1324,9 +1423,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ManualScaleRequest sse_decode_manual_scale_request(
-    SseDeserializer deserializer,
-  ) {
+  ManualScaleRequest sse_decode_manual_scale_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_amount = sse_decode_f_64(deserializer);
     var var_unit = sse_decode_manual_size_unit(deserializer);
@@ -1374,9 +1471,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  Direction? sse_decode_opt_box_autoadd_direction(
-    SseDeserializer deserializer,
-  ) {
+  Direction? sse_decode_opt_box_autoadd_direction(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     if (sse_decode_bool(deserializer)) {
@@ -1409,9 +1504,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  ScaledOrder? sse_decode_opt_box_autoadd_scaled_order(
-    SseDeserializer deserializer,
-  ) {
+  ScaledOrder? sse_decode_opt_box_autoadd_scaled_order(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     if (sse_decode_bool(deserializer)) {
@@ -1433,8 +1526,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountReconciliation?
-  sse_decode_opt_box_autoadd_weex_account_reconciliation(
+  TelegramLoginStatus? sse_decode_opt_box_autoadd_telegram_login_status(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_telegram_login_status(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  WeexAccountReconciliation? sse_decode_opt_box_autoadd_weex_account_reconciliation(
     SseDeserializer deserializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
@@ -1490,11 +1595,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var var_ratio = sse_decode_f_64(deserializer);
     var var_qtyBtc = sse_decode_f_64(deserializer);
     var var_notionalUsd = sse_decode_f_64(deserializer);
-    return ScaledOrder(
-      ratio: var_ratio,
-      qtyBtc: var_qtyBtc,
-      notionalUsd: var_notionalUsd,
-    );
+    return ScaledOrder(ratio: var_ratio, qtyBtc: var_qtyBtc, notionalUsd: var_notionalUsd);
   }
 
   @protected
@@ -1528,6 +1629,80 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  TelegramActionStatus sse_decode_telegram_action_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var inner = sse_decode_i_32(deserializer);
+    return TelegramActionStatus.values[inner];
+  }
+
+  @protected
+  TelegramClientRequest sse_decode_telegram_client_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_apiId = sse_decode_i_32(deserializer);
+    var var_apiHash = sse_decode_String(deserializer);
+    var var_phone = sse_decode_String(deserializer);
+    var var_channelId = sse_decode_i_64(deserializer);
+    var var_sessionPath = sse_decode_String(deserializer);
+    var var_statePath = sse_decode_String(deserializer);
+    return TelegramClientRequest(
+      apiId: var_apiId,
+      apiHash: var_apiHash,
+      phone: var_phone,
+      channelId: var_channelId,
+      sessionPath: var_sessionPath,
+      statePath: var_statePath,
+    );
+  }
+
+  @protected
+  TelegramLoginStatus sse_decode_telegram_login_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_authorized = sse_decode_bool(deserializer);
+    var var_needsCode = sse_decode_bool(deserializer);
+    var var_needsPassword = sse_decode_bool(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    return TelegramLoginStatus(
+      ok: var_ok,
+      authorized: var_authorized,
+      needsCode: var_needsCode,
+      needsPassword: var_needsPassword,
+      message: var_message,
+    );
+  }
+
+  @protected
+  TelegramMessageEvent sse_decode_telegram_message_event(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_channelId = sse_decode_i_64(deserializer);
+    var var_channelTitle = sse_decode_String(deserializer);
+    var var_messageId = sse_decode_i_32(deserializer);
+    var var_actionOrdinal = sse_decode_u_32(deserializer);
+    var var_dedupKey = sse_decode_String(deserializer);
+    var var_text = sse_decode_String(deserializer);
+    var var_receivedAtMs = sse_decode_i_64(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return TelegramMessageEvent(
+      ok: var_ok,
+      channelId: var_channelId,
+      channelTitle: var_channelTitle,
+      messageId: var_messageId,
+      actionOrdinal: var_actionOrdinal,
+      dedupKey: var_dedupKey,
+      text: var_text,
+      receivedAtMs: var_receivedAtMs,
+      error: var_error,
+    );
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
+  }
+
+  @protected
   int sse_decode_u_8(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8();
@@ -1539,9 +1714,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountBalance sse_decode_weex_account_balance(
-    SseDeserializer deserializer,
-  ) {
+  WeexAccountBalance sse_decode_weex_account_balance(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_asset = sse_decode_String(deserializer);
     var var_walletBalance = sse_decode_f_64(deserializer);
@@ -1560,15 +1733,11 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountReconciliation sse_decode_weex_account_reconciliation(
-    SseDeserializer deserializer,
-  ) {
+  WeexAccountReconciliation sse_decode_weex_account_reconciliation(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_balance = sse_decode_weex_account_balance(deserializer);
     var var_position = sse_decode_weex_position_snapshot(deserializer);
-    var var_recentExecutions = sse_decode_list_weex_execution_snapshot(
-      deserializer,
-    );
+    var var_recentExecutions = sse_decode_list_weex_execution_snapshot(deserializer);
     var var_timestampMs = sse_decode_i_64(deserializer);
     return WeexAccountReconciliation(
       balance: var_balance,
@@ -1579,9 +1748,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexAccountRequest sse_decode_weex_account_request(
-    SseDeserializer deserializer,
-  ) {
+  WeexAccountRequest sse_decode_weex_account_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_apiKey = sse_decode_String(deserializer);
     var var_apiSecret = sse_decode_String(deserializer);
@@ -1600,9 +1767,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexExecutionSnapshot sse_decode_weex_execution_snapshot(
-    SseDeserializer deserializer,
-  ) {
+  WeexExecutionSnapshot sse_decode_weex_execution_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_execId = sse_decode_String(deserializer);
     var var_orderId = sse_decode_String(deserializer);
@@ -1633,9 +1798,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexMarketOrderAck sse_decode_weex_market_order_ack(
-    SseDeserializer deserializer,
-  ) {
+  WeexMarketOrderAck sse_decode_weex_market_order_ack(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_orderId = sse_decode_String(deserializer);
     var var_clientOrderId = sse_decode_opt_String(deserializer);
@@ -1652,9 +1815,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexMarketOrderRequest sse_decode_weex_market_order_request(
-    SseDeserializer deserializer,
-  ) {
+  WeexMarketOrderRequest sse_decode_weex_market_order_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_apiKey = sse_decode_String(deserializer);
     var var_apiSecret = sse_decode_String(deserializer);
@@ -1681,9 +1842,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  WeexPositionSnapshot sse_decode_weex_position_snapshot(
-    SseDeserializer deserializer,
-  ) {
+  WeexPositionSnapshot sse_decode_weex_position_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_symbol = sse_decode_String(deserializer);
     var var_direction = sse_decode_String(deserializer);
@@ -1710,10 +1869,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_AnyhowException(
-    AnyhowException self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.message, serializer);
   }
@@ -1728,6 +1884,23 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       self.setupAndSerialize(
         codec: SseCodec(
           decodeSuccessData: sse_decode_price_tick,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+      ),
+      serializer,
+    );
+  }
+
+  @protected
+  void sse_encode_StreamSink_telegram_message_event_Sse(
+    RustStreamSink<TelegramMessageEvent> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(
+      self.setupAndSerialize(
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_telegram_message_event,
           decodeErrorData: sse_decode_AnyhowException,
         ),
       ),
@@ -1759,10 +1932,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_api_result_action(
-    ApiResultAction self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_api_result_action(ApiResultAction self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.ok, serializer);
     sse_encode_opt_box_autoadd_action(self.value, serializer);
@@ -1770,10 +1940,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_api_result_scaled_order(
-    ApiResultScaledOrder self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_api_result_scaled_order(ApiResultScaledOrder self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.ok, serializer);
     sse_encode_opt_box_autoadd_scaled_order(self.value, serializer);
@@ -1781,13 +1948,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_api_result_string(
-    ApiResultString self,
+  void sse_encode_api_result_string(ApiResultString self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_opt_String(self.value, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_api_result_telegram_login_status(
+    ApiResultTelegramLoginStatus self,
     SseSerializer serializer,
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.ok, serializer);
-    sse_encode_opt_String(self.value, serializer);
+    sse_encode_opt_box_autoadd_telegram_login_status(self.value, serializer);
     sse_encode_opt_String(self.error, serializer);
   }
 
@@ -1798,10 +1973,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.ok, serializer);
-    sse_encode_opt_box_autoadd_weex_account_reconciliation(
-      self.value,
-      serializer,
-    );
+    sse_encode_opt_box_autoadd_weex_account_reconciliation(self.value, serializer);
     sse_encode_opt_String(self.error, serializer);
   }
 
@@ -1829,10 +2001,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_direction(
-    Direction self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_box_autoadd_direction(Direction self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_direction(self, serializer);
   }
@@ -1844,10 +2013,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_i_64(
-    PlatformInt64 self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_box_autoadd_i_64(PlatformInt64 self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_64(self, serializer);
   }
@@ -1862,10 +2028,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_box_autoadd_scaled_order(
-    ScaledOrder self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_box_autoadd_scaled_order(ScaledOrder self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_scaled_order(self, serializer);
   }
@@ -1874,6 +2037,24 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_size(Size self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_size(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_telegram_client_request(
+    TelegramClientRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_telegram_client_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_telegram_login_status(
+    TelegramLoginStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_telegram_login_status(self, serializer);
   }
 
   @protected
@@ -1945,20 +2126,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_list_prim_u_8_strict(
-    Uint8List self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_list_prim_u_8_strict(Uint8List self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     serializer.buffer.putUint8List(self);
   }
 
   @protected
-  void sse_encode_list_series_point(
-    List<SeriesPoint> self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_list_series_point(List<SeriesPoint> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
@@ -1979,10 +2154,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_manual_scale_request(
-    ManualScaleRequest self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_manual_scale_request(ManualScaleRequest self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_f_64(self.amount, serializer);
     sse_encode_manual_size_unit(self.unit, serializer);
@@ -1993,10 +2165,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_manual_size_unit(
-    ManualSizeUnit self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_manual_size_unit(ManualSizeUnit self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.index, serializer);
   }
@@ -2012,10 +2181,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_action(
-    Action? self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_opt_box_autoadd_action(Action? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
@@ -2025,10 +2191,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_direction(
-    Direction? self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_opt_box_autoadd_direction(Direction? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
@@ -2048,10 +2211,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_i_64(
-    PlatformInt64? self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_opt_box_autoadd_i_64(PlatformInt64? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
@@ -2061,10 +2221,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_opt_box_autoadd_scaled_order(
-    ScaledOrder? self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_opt_box_autoadd_scaled_order(ScaledOrder? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
     sse_encode_bool(self != null, serializer);
@@ -2080,6 +2237,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self != null, serializer);
     if (self != null) {
       sse_encode_box_autoadd_size(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_opt_box_autoadd_telegram_login_status(
+    TelegramLoginStatus? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_telegram_login_status(self, serializer);
     }
   }
 
@@ -2157,6 +2327,53 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_telegram_action_status(TelegramActionStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.index, serializer);
+  }
+
+  @protected
+  void sse_encode_telegram_client_request(TelegramClientRequest self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.apiId, serializer);
+    sse_encode_String(self.apiHash, serializer);
+    sse_encode_String(self.phone, serializer);
+    sse_encode_i_64(self.channelId, serializer);
+    sse_encode_String(self.sessionPath, serializer);
+    sse_encode_String(self.statePath, serializer);
+  }
+
+  @protected
+  void sse_encode_telegram_login_status(TelegramLoginStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_bool(self.authorized, serializer);
+    sse_encode_bool(self.needsCode, serializer);
+    sse_encode_bool(self.needsPassword, serializer);
+    sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_telegram_message_event(TelegramMessageEvent self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_i_64(self.channelId, serializer);
+    sse_encode_String(self.channelTitle, serializer);
+    sse_encode_i_32(self.messageId, serializer);
+    sse_encode_u_32(self.actionOrdinal, serializer);
+    sse_encode_String(self.dedupKey, serializer);
+    sse_encode_String(self.text, serializer);
+    sse_encode_i_64(self.receivedAtMs, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
+  }
+
+  @protected
   void sse_encode_u_8(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self);
@@ -2168,10 +2385,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_account_balance(
-    WeexAccountBalance self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_account_balance(WeexAccountBalance self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.asset, serializer);
     sse_encode_f_64(self.walletBalance, serializer);
@@ -2194,10 +2408,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_account_request(
-    WeexAccountRequest self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_account_request(WeexAccountRequest self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.apiKey, serializer);
     sse_encode_String(self.apiSecret, serializer);
@@ -2208,10 +2419,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_execution_snapshot(
-    WeexExecutionSnapshot self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_execution_snapshot(WeexExecutionSnapshot self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.execId, serializer);
     sse_encode_String(self.orderId, serializer);
@@ -2228,10 +2436,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_market_order_ack(
-    WeexMarketOrderAck self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_market_order_ack(WeexMarketOrderAck self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.orderId, serializer);
     sse_encode_opt_String(self.clientOrderId, serializer);
@@ -2241,10 +2446,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_market_order_request(
-    WeexMarketOrderRequest self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_market_order_request(WeexMarketOrderRequest self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.apiKey, serializer);
     sse_encode_String(self.apiSecret, serializer);
@@ -2259,10 +2461,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
-  void sse_encode_weex_position_snapshot(
-    WeexPositionSnapshot self,
-    SseSerializer serializer,
-  ) {
+  void sse_encode_weex_position_snapshot(WeexPositionSnapshot self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.symbol, serializer);
     sse_encode_String(self.direction, serializer);

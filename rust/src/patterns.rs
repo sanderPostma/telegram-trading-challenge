@@ -40,13 +40,13 @@ pub fn default_rules() -> Vec<PatternRule> {
         ),
         rule(
             "add_usd",
-            r"(?i)\bADDED\b\s*\$(?P<usd>[\d,]+)",
+            r"(?i)\bADDED\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?",
             RuleAction::Add,
             20,
         ),
         rule(
             "add_btc",
-            r"(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC",
+            r"(?i)\bADDED\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s*(?:TO\s*)?(?P<dir>SHORT|LONG)\b)?",
             RuleAction::Add,
             21,
         ),
@@ -161,7 +161,13 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(add.action, RuleAction::Add);
+        assert_eq!(add.direction, Some(Direction::Short));
         assert_eq!(add.size, Some(Size::Usd(5000.0)));
+
+        let add_without_to = match_first("ADDED $5000 SHORT", &rules).unwrap().unwrap();
+        assert_eq!(add_without_to.action, RuleAction::Add);
+        assert_eq!(add_without_to.direction, Some(Direction::Short));
+        assert_eq!(add_without_to.size, Some(Size::Usd(5000.0)));
 
         let noise = match_first("CHAT TEST", &rules).unwrap().unwrap();
         assert_eq!(noise.action, RuleAction::Ignore);

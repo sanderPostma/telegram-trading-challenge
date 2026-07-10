@@ -74,6 +74,7 @@ Future<void> _main() async {
   await controller.loadConfig();
   await controller.loadChartData();
   controller.startWeexPriceStream();
+  controller.startTelegramMonitor();
   runApp(TradingChallengeApp(controller: controller));
 }
 

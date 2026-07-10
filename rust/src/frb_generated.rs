@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1239971917;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 878231375;
 
 // Section: executor
 
@@ -348,6 +348,204 @@ fn wire__crate__api__scale_manual_order_impl(
         },
     )
 }
+fn wire__crate__api__telegram_check_password_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "telegram_check_password",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_password = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::telegram_check_password(api_password).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__telegram_finalize_action_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "telegram_finalize_action",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_state_path = <String>::sse_decode(&mut deserializer);
+            let api_dedup_key = <String>::sse_decode(&mut deserializer);
+            let api_status = <crate::telegram::TelegramActionStatus>::sse_decode(&mut deserializer);
+            let api_order_id = <Option<String>>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::telegram_finalize_action(
+                        api_state_path,
+                        api_dedup_key,
+                        api_status,
+                        api_order_id,
+                    ))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__telegram_message_stream_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "telegram_message_stream",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::telegram::TelegramClientRequest>::sse_decode(&mut deserializer);
+            let api_sink = <StreamSink<
+                crate::telegram::TelegramMessageEvent,
+                flutter_rust_bridge::for_generated::SseCodec,
+            >>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok({
+                            crate::api::telegram_message_stream(api_request, api_sink).await;
+                        })?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__telegram_request_code_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "telegram_request_code",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request =
+                <crate::telegram::TelegramClientRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::telegram_request_code(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__telegram_sign_in_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "telegram_sign_in",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_code = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok =
+                            Result::<_, ()>::Ok(crate::api::telegram_sign_in(api_code).await)?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__weex_public_price_stream_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -531,6 +729,19 @@ impl SseDecode
     }
 }
 
+impl SseDecode
+    for StreamSink<
+        crate::telegram::TelegramMessageEvent,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <String>::sse_decode(deserializer);
+        return StreamSink::deserialize(inner);
+    }
+}
+
 impl SseDecode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -609,6 +820,21 @@ impl SseDecode for crate::api::ApiResultString {
         let mut var_value = <Option<String>>::sse_decode(deserializer);
         let mut var_error = <Option<String>>::sse_decode(deserializer);
         return crate::api::ApiResultString {
+            ok: var_ok,
+            value: var_value,
+            error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::api::ApiResultTelegramLoginStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ok = <bool>::sse_decode(deserializer);
+        let mut var_value =
+            <Option<crate::telegram::TelegramLoginStatus>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::ApiResultTelegramLoginStatus {
             ok: var_ok,
             value: var_value,
             error: var_error,
@@ -846,6 +1072,19 @@ impl SseDecode for Option<crate::interpreter::Size> {
     }
 }
 
+impl SseDecode for Option<crate::telegram::TelegramLoginStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::telegram::TelegramLoginStatus>::sse_decode(
+                deserializer,
+            ));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<crate::weex::WeexAccountReconciliation> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -946,6 +1185,92 @@ impl SseDecode for crate::interpreter::Size {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseDecode for crate::telegram::TelegramActionStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::telegram::TelegramActionStatus::Pending,
+            1 => crate::telegram::TelegramActionStatus::Simulated,
+            2 => crate::telegram::TelegramActionStatus::Submitted,
+            3 => crate::telegram::TelegramActionStatus::Failed,
+            4 => crate::telegram::TelegramActionStatus::Rejected,
+            _ => unreachable!("Invalid variant for TelegramActionStatus: {}", inner),
+        };
+    }
+}
+
+impl SseDecode for crate::telegram::TelegramClientRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_apiId = <i32>::sse_decode(deserializer);
+        let mut var_apiHash = <String>::sse_decode(deserializer);
+        let mut var_phone = <String>::sse_decode(deserializer);
+        let mut var_channelId = <i64>::sse_decode(deserializer);
+        let mut var_sessionPath = <String>::sse_decode(deserializer);
+        let mut var_statePath = <String>::sse_decode(deserializer);
+        return crate::telegram::TelegramClientRequest {
+            api_id: var_apiId,
+            api_hash: var_apiHash,
+            phone: var_phone,
+            channel_id: var_channelId,
+            session_path: var_sessionPath,
+            state_path: var_statePath,
+        };
+    }
+}
+
+impl SseDecode for crate::telegram::TelegramLoginStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ok = <bool>::sse_decode(deserializer);
+        let mut var_authorized = <bool>::sse_decode(deserializer);
+        let mut var_needsCode = <bool>::sse_decode(deserializer);
+        let mut var_needsPassword = <bool>::sse_decode(deserializer);
+        let mut var_message = <String>::sse_decode(deserializer);
+        return crate::telegram::TelegramLoginStatus {
+            ok: var_ok,
+            authorized: var_authorized,
+            needs_code: var_needsCode,
+            needs_password: var_needsPassword,
+            message: var_message,
+        };
+    }
+}
+
+impl SseDecode for crate::telegram::TelegramMessageEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ok = <bool>::sse_decode(deserializer);
+        let mut var_channelId = <i64>::sse_decode(deserializer);
+        let mut var_channelTitle = <String>::sse_decode(deserializer);
+        let mut var_messageId = <i32>::sse_decode(deserializer);
+        let mut var_actionOrdinal = <u32>::sse_decode(deserializer);
+        let mut var_dedupKey = <String>::sse_decode(deserializer);
+        let mut var_text = <String>::sse_decode(deserializer);
+        let mut var_receivedAtMs = <i64>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::telegram::TelegramMessageEvent {
+            ok: var_ok,
+            channel_id: var_channelId,
+            channel_title: var_channelTitle,
+            message_id: var_messageId,
+            action_ordinal: var_actionOrdinal,
+            dedup_key: var_dedupKey,
+            text: var_text,
+            received_at_ms: var_receivedAtMs,
+            error: var_error,
+        };
+    }
+}
+
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
     }
 }
 
@@ -1142,10 +1467,15 @@ fn pde_ffi_dispatcher_primary_impl(
         7 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
         8 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
         9 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1265,6 +1595,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultString>
     for crate::api::ApiResultString
 {
     fn into_into_dart(self) -> crate::api::ApiResultString {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ApiResultTelegramLoginStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ok.into_into_dart().into_dart(),
+            self.value.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ApiResultTelegramLoginStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultTelegramLoginStatus>
+    for crate::api::ApiResultTelegramLoginStatus
+{
+    fn into_into_dart(self) -> crate::api::ApiResultTelegramLoginStatus {
         self
     }
 }
@@ -1473,6 +1825,107 @@ impl flutter_rust_bridge::IntoIntoDart<crate::interpreter::Size> for crate::inte
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::telegram::TelegramActionStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Pending => 0.into_dart(),
+            Self::Simulated => 1.into_dart(),
+            Self::Submitted => 2.into_dart(),
+            Self::Failed => 3.into_dart(),
+            Self::Rejected => 4.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::telegram::TelegramActionStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::telegram::TelegramActionStatus>
+    for crate::telegram::TelegramActionStatus
+{
+    fn into_into_dart(self) -> crate::telegram::TelegramActionStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::telegram::TelegramClientRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.api_id.into_into_dart().into_dart(),
+            self.api_hash.into_into_dart().into_dart(),
+            self.phone.into_into_dart().into_dart(),
+            self.channel_id.into_into_dart().into_dart(),
+            self.session_path.into_into_dart().into_dart(),
+            self.state_path.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::telegram::TelegramClientRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::telegram::TelegramClientRequest>
+    for crate::telegram::TelegramClientRequest
+{
+    fn into_into_dart(self) -> crate::telegram::TelegramClientRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::telegram::TelegramLoginStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ok.into_into_dart().into_dart(),
+            self.authorized.into_into_dart().into_dart(),
+            self.needs_code.into_into_dart().into_dart(),
+            self.needs_password.into_into_dart().into_dart(),
+            self.message.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::telegram::TelegramLoginStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::telegram::TelegramLoginStatus>
+    for crate::telegram::TelegramLoginStatus
+{
+    fn into_into_dart(self) -> crate::telegram::TelegramLoginStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::telegram::TelegramMessageEvent {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ok.into_into_dart().into_dart(),
+            self.channel_id.into_into_dart().into_dart(),
+            self.channel_title.into_into_dart().into_dart(),
+            self.message_id.into_into_dart().into_dart(),
+            self.action_ordinal.into_into_dart().into_dart(),
+            self.dedup_key.into_into_dart().into_dart(),
+            self.text.into_into_dart().into_dart(),
+            self.received_at_ms.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::telegram::TelegramMessageEvent
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::telegram::TelegramMessageEvent>
+    for crate::telegram::TelegramMessageEvent
+{
+    fn into_into_dart(self) -> crate::telegram::TelegramMessageEvent {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::weex::WeexAccountBalance {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -1675,6 +2128,18 @@ impl SseEncode
     }
 }
 
+impl SseEncode
+    for StreamSink<
+        crate::telegram::TelegramMessageEvent,
+        flutter_rust_bridge::for_generated::SseCodec,
+    >
+{
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        unimplemented!("")
+    }
+}
+
 impl SseEncode for String {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -1736,6 +2201,15 @@ impl SseEncode for crate::api::ApiResultString {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.ok, serializer);
         <Option<String>>::sse_encode(self.value, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::ApiResultTelegramLoginStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.ok, serializer);
+        <Option<crate::telegram::TelegramLoginStatus>>::sse_encode(self.value, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
     }
 }
@@ -1939,6 +2413,16 @@ impl SseEncode for Option<crate::interpreter::Size> {
     }
 }
 
+impl SseEncode for Option<crate::telegram::TelegramLoginStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::telegram::TelegramLoginStatus>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<crate::weex::WeexAccountReconciliation> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2014,6 +2498,70 @@ impl SseEncode for crate::interpreter::Size {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::telegram::TelegramActionStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::telegram::TelegramActionStatus::Pending => 0,
+                crate::telegram::TelegramActionStatus::Simulated => 1,
+                crate::telegram::TelegramActionStatus::Submitted => 2,
+                crate::telegram::TelegramActionStatus::Failed => 3,
+                crate::telegram::TelegramActionStatus::Rejected => 4,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
+    }
+}
+
+impl SseEncode for crate::telegram::TelegramClientRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.api_id, serializer);
+        <String>::sse_encode(self.api_hash, serializer);
+        <String>::sse_encode(self.phone, serializer);
+        <i64>::sse_encode(self.channel_id, serializer);
+        <String>::sse_encode(self.session_path, serializer);
+        <String>::sse_encode(self.state_path, serializer);
+    }
+}
+
+impl SseEncode for crate::telegram::TelegramLoginStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.ok, serializer);
+        <bool>::sse_encode(self.authorized, serializer);
+        <bool>::sse_encode(self.needs_code, serializer);
+        <bool>::sse_encode(self.needs_password, serializer);
+        <String>::sse_encode(self.message, serializer);
+    }
+}
+
+impl SseEncode for crate::telegram::TelegramMessageEvent {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.ok, serializer);
+        <i64>::sse_encode(self.channel_id, serializer);
+        <String>::sse_encode(self.channel_title, serializer);
+        <i32>::sse_encode(self.message_id, serializer);
+        <u32>::sse_encode(self.action_ordinal, serializer);
+        <String>::sse_encode(self.dedup_key, serializer);
+        <String>::sse_encode(self.text, serializer);
+        <i64>::sse_encode(self.received_at_ms, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 

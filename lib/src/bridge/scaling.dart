@@ -11,11 +11,7 @@ class ScaledOrder {
   final double qtyBtc;
   final double notionalUsd;
 
-  const ScaledOrder({
-    required this.ratio,
-    required this.qtyBtc,
-    required this.notionalUsd,
-  });
+  const ScaledOrder({required this.ratio, required this.qtyBtc, required this.notionalUsd});
 
   @override
   int get hashCode => ratio.hashCode ^ qtyBtc.hashCode ^ notionalUsd.hashCode;

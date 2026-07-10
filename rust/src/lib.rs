@@ -6,6 +6,7 @@ mod frb_generated;
 pub mod interpreter;
 pub mod patterns;
 pub mod scaling;
+pub mod telegram;
 pub mod weex;
 
 pub use interpreter::{Action, ActionKind, Direction, Size};

@@ -9,6 +9,8 @@ class AppLog {
   static String? _path;
 
   static String get path => _path ?? _defaultLogFilePath();
+  static String get telegramSessionPath => _pathInBase('telegram.session');
+  static String get telegramStatePath => _pathInBase('state.json');
 
   static Future<void> startSession() async {
     await write('App session started.');
@@ -57,9 +59,13 @@ class AppLog {
   }
 
   static String _defaultLogFilePath() {
+    return _pathInBase(_fileName);
+  }
+
+  static String _pathInBase(String fileName) {
     final separator = Platform.pathSeparator;
     final base = _baseLogDirectory();
-    return '$base$separator$_fileName';
+    return '$base$separator$fileName';
   }
 
   static String _baseLogDirectory() {
