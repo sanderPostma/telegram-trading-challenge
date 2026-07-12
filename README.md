@@ -10,6 +10,9 @@ This software does not provide financial, investment, legal, or tax advice. Trad
 
 Before using real funds, independently review and test the application, its configuration, and its order behavior. You may use any AI coding agent and/or a qualified software-security or financial professional to vet the application. Nothing in this repository guarantees signal quality, trade execution, profitability, or protection from loss.
 
+> [!CAUTION]
+> **Do not enable Auto-Approve on multiple devices at the same time.** Each device has its own local Telegram deduplication state; there is currently no shared cross-device lease. Multiple devices can therefore process the same Telegram message and submit duplicate trades to the same WEEX account.
+
 ## 🚀 Features
 
 - **Automated Telegram Monitoring:** Connects directly to Telegram to instantly intercept and parse incoming trade signals (Entries, Adds, Reduces, Closes, Take Profits, Stop Losses).

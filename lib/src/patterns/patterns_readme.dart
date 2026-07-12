@@ -13,6 +13,14 @@ available, and then merges telegram_patterns.local.yaml on top. A local rule
 with the same name replaces the remote rule; a new name is added. Remote
 updates therefore do not erase local changes.
 
+Danger: multiple devices
+------------------------
+
+Do not enable Auto-Approve on multiple devices at the same time. Each device
+has its own local Telegram deduplication state; there is currently no shared
+cross-device lease. Multiple devices can therefore process the same Telegram
+message and submit duplicate trades to the same WEEX account.
+
 Remote source:
 https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml
 
