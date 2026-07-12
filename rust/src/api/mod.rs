@@ -122,7 +122,7 @@ pub use crate::weex::PriceTick;
 pub async fn weex_public_price_stream(sink: crate::frb_generated::StreamSink<PriceTick>) {
     weex::stream_public_price(
         "BTCUSDT".to_string(),
-        "wss://ws-spot.weex.com/v3/ws/public".to_string(),
+        "wss://ws-contract.weex.com/v3/ws/public".to_string(),
         sink,
     )
     .await;

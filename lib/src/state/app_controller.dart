@@ -39,6 +39,11 @@ class AppController extends ChangeNotifier {
   bool _hasExchangePnlBaseline = false;
   String? _lastWeexPriceSource;
   DateTime? _lastWeexPriceAt;
+  DateTime? _lastWeexPriceLogAt;
+  DateTime? _lastWeexWsPriceAt;
+  int? _lastWeexRestExchangeTimeMs;
+  String? _lastWeexRestPriceSource;
+  int? _lastWeexWsEventTimeMs;
   DateTime? _lastWeexReconciledAt;
   DateTime? _lastChartSnapshotAt;
   double _exchangeRealizedPnlUsd = 0;
@@ -483,7 +488,11 @@ class AppController extends ChangeNotifier {
     _weexPriceSubscription = rust.weexPublicPriceStream().listen(
       (tick) {
         if (tick.ok && tick.price != null && tick.price! > 0) {
-          _applyWeexPrice(tick.price!, source: 'WEEX WebSocket ${tick.source}');
+          _applyWeexPrice(
+            tick.price!,
+            source: 'WEEX WebSocket ${tick.source}',
+            exchangeTimeMs: tick.eventTimeMs,
+          );
         } else {
           _handleWeexPriceFailure(
             tick.error ?? 'WEEX WebSocket price unavailable',
@@ -722,7 +731,13 @@ class AppController extends ChangeNotifier {
     try {
       final snapshot = await fetchWeexRestPrice();
       if (snapshot != null && snapshot.price > 0) {
-        _applyWeexPrice(snapshot.price, source: snapshot.source);
+        _applyWeexPrice(
+          snapshot.price,
+          source: snapshot.source,
+          exchangeTimeMs: snapshot.exchangeTimeMs,
+        );
+      } else {
+        _handleWeexPriceFailure('WEEX contract REST returned no BTCUSDT price');
       }
     } catch (error, stackTrace) {
       _log(
@@ -736,7 +751,45 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  void _applyWeexPrice(double price, {required String source}) {
+  void _applyWeexPrice(
+    double price, {
+    required String source,
+    int? exchangeTimeMs,
+  }) {
+    final isWebSocket = source.startsWith('WEEX WebSocket');
+    if (isWebSocket) {
+      final previousEventTime = _lastWeexWsEventTimeMs;
+      if (exchangeTimeMs != null &&
+          previousEventTime != null &&
+          exchangeTimeMs <= previousEventTime) {
+        return;
+      }
+      if (exchangeTimeMs != null) {
+        _lastWeexWsEventTimeMs = exchangeTimeMs;
+      }
+      _lastWeexWsPriceAt = DateTime.now();
+    } else {
+      final lastWebSocketPrice = _lastWeexWsPriceAt;
+      if (lastWebSocketPrice != null &&
+          DateTime.now().difference(lastWebSocketPrice) <
+              _weexPriceStaleAfter) {
+        return;
+      }
+      if (exchangeTimeMs != null) {
+        final previousExchangeTime = _lastWeexRestExchangeTimeMs;
+        if (source == _lastWeexRestPriceSource &&
+            previousExchangeTime != null &&
+            exchangeTimeMs <= previousExchangeTime) {
+          return;
+        }
+        _lastWeexRestExchangeTimeMs = exchangeTimeMs;
+        _lastWeexRestPriceSource = source;
+      } else if (price == config.markPrice && _lastWeexPriceAt != null) {
+        // A fallback response without an exchange timestamp must not keep a
+        // dead feed green forever when an intermediary serves cached JSON.
+        return;
+      }
+    }
     _lastWeexPriceAt = DateTime.now();
     config = config.copyWith(markPrice: price);
     _markPositionToMarket(price);
@@ -746,6 +799,17 @@ class AppController extends ChangeNotifier {
     if (_lastWeexPriceSource != source) {
       _lastWeexPriceSource = source;
       _log('WEEX BTC price live via $source.');
+    }
+    final now = DateTime.now();
+    final lastPriceLog = _lastWeexPriceLogAt;
+    if (lastPriceLog == null ||
+        now.difference(lastPriceLog) >= const Duration(minutes: 1)) {
+      _lastWeexPriceLogAt = now;
+      unawaited(
+        AppLog.write(
+          'WEEX BTC price update: ${price.toStringAsFixed(2)} USDT via $source.',
+        ),
+      );
     }
     unawaited(_snapshotChartState());
     notifyListeners();
@@ -1750,39 +1814,59 @@ class AppController extends ChangeNotifier {
 }
 
 class WeexPriceSnapshot {
-  const WeexPriceSnapshot({required this.price, required this.source});
+  const WeexPriceSnapshot({
+    required this.price,
+    required this.source,
+    this.exchangeTimeMs,
+  });
 
   final double price;
   final String source;
+  final int? exchangeTimeMs;
 }
 
 Future<WeexPriceSnapshot?> fetchWeexRestPrice() async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
   try {
-    final bookTicker = await _getJson(
-      client,
-      Uri.parse(
-        'https://api-spot.weex.com/api/v3/market/ticker/bookTicker?symbol=BTCUSDT',
-      ),
-    );
-    final bookPrice = parseWeexBookTickerPrice(bookTicker);
-    if (bookPrice != null) {
-      return WeexPriceSnapshot(
-        price: bookPrice,
-        source: 'WEEX REST bookTicker',
+    Object? lastError;
+    try {
+      final bookTicker = await _getJson(
+        client,
+        Uri.parse(
+          'https://api-contract.weex.com/capi/v3/market/ticker/bookTicker?symbol=BTCUSDT',
+        ),
       );
+      final bookPrice = parseWeexBookTickerPrice(bookTicker);
+      if (bookPrice != null) {
+        return WeexPriceSnapshot(
+          price: bookPrice,
+          source: 'WEEX contract REST bookTicker',
+          exchangeTimeMs: parseWeexBookTickerTimeMs(bookTicker),
+        );
+      }
+    } catch (error) {
+      lastError = error;
     }
 
-    final ticker = await _getJson(
-      client,
-      Uri.parse(
-        'https://api-spot.weex.com/api/v3/market/ticker/24hr?symbol=BTCUSDT',
-      ),
-    );
-    final tickerPrice = parseWeexTickerPrice(ticker);
-    if (tickerPrice != null) {
-      return WeexPriceSnapshot(price: tickerPrice, source: 'WEEX REST ticker');
+    try {
+      final ticker = await _getJson(
+        client,
+        Uri.parse(
+          'https://api-contract.weex.com/capi/v3/market/ticker/24hr?symbol=BTCUSDT',
+        ),
+      );
+      final tickerPrice = parseWeexTickerPrice(ticker);
+      if (tickerPrice != null) {
+        return WeexPriceSnapshot(
+          price: tickerPrice,
+          source: 'WEEX contract REST ticker',
+          exchangeTimeMs: parseWeexTickerTimeMs(ticker),
+        );
+      }
+    } catch (error) {
+      lastError = error;
     }
+    if (lastError != null) throw lastError;
     return null;
   } finally {
     client.close(force: true);
@@ -1813,12 +1897,23 @@ Future<List<PriceCandle>> fetchWeexHistoricalCandles() async {
 }
 
 Future<String> _getJson(HttpClient client, Uri uri) async {
-  final request = await client.getUrl(uri).timeout(const Duration(seconds: 8));
+  final request = await client
+      .getUrl(
+        uri.replace(
+          queryParameters: {
+            ...uri.queryParameters,
+            '_t': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+        ),
+      )
+      .timeout(const Duration(seconds: 8));
   request.headers.set(
     HttpHeaders.userAgentHeader,
     'trading-challenge-copytrader/1.0',
   );
   request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+  request.headers.set(HttpHeaders.cacheControlHeader, 'no-cache');
+  request.headers.set(HttpHeaders.pragmaHeader, 'no-cache');
   final response = await request.close().timeout(const Duration(seconds: 8));
   final body = await response.transform(utf8.decoder).join();
   if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -1830,18 +1925,44 @@ Future<String> _getJson(HttpClient client, Uri uri) async {
 @visibleForTesting
 double? parseWeexBookTickerPrice(String body) {
   final decoded = jsonDecode(body);
-  if (decoded is! Map<String, dynamic>) return null;
-  final bid = _jsonDouble(decoded['bidPrice']);
-  final ask = _jsonDouble(decoded['askPrice']);
+  final ticker = decoded is List && decoded.isNotEmpty
+      ? decoded.first
+      : decoded;
+  if (ticker is! Map<String, dynamic>) return null;
+  final bid = _jsonDouble(ticker['bidPrice']);
+  final ask = _jsonDouble(ticker['askPrice']);
   if (bid != null && ask != null) return (bid + ask) / 2;
   return bid ?? ask;
 }
 
 @visibleForTesting
+int? parseWeexBookTickerTimeMs(String body) {
+  final decoded = jsonDecode(body);
+  final ticker = decoded is List && decoded.isNotEmpty
+      ? decoded.first
+      : decoded;
+  if (ticker is! Map<String, dynamic>) return null;
+  return _jsonInt(ticker['time']);
+}
+
+@visibleForTesting
 double? parseWeexTickerPrice(String body) {
   final decoded = jsonDecode(body);
-  if (decoded is! Map<String, dynamic>) return null;
-  return _jsonDouble(decoded['lastPrice']);
+  final ticker = decoded is List && decoded.isNotEmpty
+      ? decoded.first
+      : decoded;
+  if (ticker is! Map<String, dynamic>) return null;
+  return _jsonDouble(ticker['lastPrice']) ?? _jsonDouble(ticker['markPrice']);
+}
+
+@visibleForTesting
+int? parseWeexTickerTimeMs(String body) {
+  final decoded = jsonDecode(body);
+  final ticker = decoded is List && decoded.isNotEmpty
+      ? decoded.first
+      : decoded;
+  if (ticker is! Map<String, dynamic>) return null;
+  return _jsonInt(ticker['time']) ?? _jsonInt(ticker['closeTime']);
 }
 
 @visibleForTesting

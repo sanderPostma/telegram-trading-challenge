@@ -10,12 +10,28 @@ void main() {
     expect(price, 62143.595);
   });
 
+  test('parses WEEX contract book ticker array price', () {
+    final price = parseWeexBookTickerPrice(
+      '[{"symbol":"BTCUSDT","bidPrice":"63994.0","askPrice":"63994.1"}]',
+    );
+
+    expect(price, 63994.05);
+  });
+
   test('parses WEEX 24hr ticker last price', () {
     final price = parseWeexTickerPrice(
       '{"symbol":"BTCUSDT","lastPrice":"62143.60"}',
     );
 
     expect(price, 62143.60);
+  });
+
+  test('parses WEEX contract 24hr ticker array last price', () {
+    final price = parseWeexTickerPrice(
+      '[{"symbol":"BTCUSDT","lastPrice":"63994.1","markPrice":"63994.1"}]',
+    );
+
+    expect(price, 63994.1);
   });
 
   test('parses WEEX mark price kline close prices', () {

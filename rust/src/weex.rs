@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::Sha256;
 use std::time::Duration as StdDuration;
-use tokio::time::{sleep, Duration};
+use tokio::time::{sleep, timeout, Duration};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::header::USER_AGENT, Message},
@@ -852,12 +852,14 @@ pub async fn stream_public_price(
     ws_public_url: String,
     sink: crate::frb_generated::StreamSink<PriceTick>,
 ) {
+    let mut retry_delay = Duration::from_secs(3);
     loop {
         match stream_public_price_once(&symbol, &ws_public_url, &sink).await {
-            Ok(()) => {}
+            Ok(()) => retry_delay = Duration::from_secs(3),
             Err(error) => {
                 let _ = sink.add(PriceTick::error(&symbol, error.to_string()));
-                sleep(Duration::from_secs(3)).await;
+                sleep(retry_delay).await;
+                retry_delay = (retry_delay * 2).min(Duration::from_secs(30));
             }
         }
     }
@@ -873,25 +875,30 @@ async fn stream_public_price_once(
         USER_AGENT,
         HeaderValue::from_static("trading-challenge-copytrader/1.0"),
     );
-    let (mut ws, _) = connect_async(request).await?;
-    ws.send(Message::Text(
-        json!({
-            "method": "SUBSCRIBE",
-            "params": [
-                format!("{symbol}@ticker"),
-                format!("{symbol}@bookTicker"),
-                format!("{symbol}@depth15"),
-                format!("{symbol}@trade")
-            ],
-            "id": 1
-        })
-        .to_string()
-        .into(),
-    ))
-    .await?;
+    let (mut ws, _) = timeout(Duration::from_secs(10), connect_async(request)).await??;
+    timeout(
+        Duration::from_secs(10),
+        ws.send(Message::Text(
+            json!({
+                "method": "SUBSCRIBE",
+                "params": [
+                    format!("{symbol}@ticker"),
+                    format!("{symbol}@depth15"),
+                    format!("{symbol}@trade")
+                ],
+                "id": 1
+            })
+            .to_string()
+            .into(),
+        )),
+    )
+    .await??;
 
-    while let Some(message) = ws.next().await {
-        match message? {
+    loop {
+        let message = timeout(Duration::from_secs(45), ws.next())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("WEEX public WebSocket ended"))??;
+        match message {
             Message::Text(text) => {
                 if is_ping(&text) {
                     ws.send(Message::Text(
@@ -899,6 +906,9 @@ async fn stream_public_price_once(
                     ))
                     .await?;
                     continue;
+                }
+                if let Some(error) = subscription_error(&text) {
+                    anyhow::bail!("WEEX public WebSocket subscription rejected: {error}");
                 }
                 if let Some(tick) = parse_price_tick(symbol, &text) {
                     if sink.add(tick).is_err() {
@@ -911,14 +921,26 @@ async fn stream_public_price_once(
             _ => {}
         }
     }
-
-    anyhow::bail!("WEEX public WebSocket ended")
 }
 
 fn is_ping(text: &str) -> bool {
-    serde_json::from_str::<Value>(text)
-        .ok()
-        .is_some_and(|v| v.get("event").and_then(Value::as_str) == Some("ping"))
+    serde_json::from_str::<Value>(text).ok().is_some_and(|v| {
+        v.get("event").and_then(Value::as_str) == Some("ping")
+            || v.get("type").and_then(Value::as_str) == Some("ping")
+    })
+}
+
+fn subscription_error(text: &str) -> Option<String> {
+    let value = serde_json::from_str::<Value>(text).ok()?;
+    if value.get("result").and_then(Value::as_bool) != Some(false) {
+        return None;
+    }
+    value
+        .get("msg")
+        .and_then(Value::as_str)
+        .or_else(|| value.get("error").and_then(Value::as_str))
+        .map(str::to_owned)
+        .or_else(|| Some("unknown subscription error".to_string()))
 }
 
 fn parse_price_tick(symbol: &str, text: &str) -> Option<PriceTick> {
@@ -932,20 +954,24 @@ fn parse_price_tick(symbol: &str, text: &str) -> Option<PriceTick> {
     let data = value.get("d")?;
 
     match event {
-        "24hrTicker" => Some(PriceTick {
-            symbol: symbol.to_string(),
-            price: data.get("c").and_then(parse_json_f64),
-            bid: data.get("b").and_then(parse_json_f64),
-            ask: data.get("a").and_then(parse_json_f64),
-            source: "ticker".to_string(),
-            event_time_ms,
-            received_at_ms: Utc::now().timestamp_millis(),
-            ok: true,
-            error: None,
-        }),
+        "ticker" | "24hrTicker" => {
+            let ticker = first_object(&data).unwrap_or(&data);
+            Some(PriceTick {
+                symbol: symbol.to_string(),
+                price: ticker.get("c").and_then(parse_json_f64),
+                bid: ticker.get("b").and_then(parse_json_f64),
+                ask: ticker.get("a").and_then(parse_json_f64),
+                source: "ticker".to_string(),
+                event_time_ms,
+                received_at_ms: Utc::now().timestamp_millis(),
+                ok: ticker.get("c").and_then(parse_json_f64).is_some(),
+                error: None,
+            })
+        }
         "bookTicker" => {
-            let bid = data.get("b").and_then(parse_json_f64);
-            let ask = data.get("a").and_then(parse_json_f64);
+            let book = first_object(&data).unwrap_or(&data);
+            let bid = book.get("b").and_then(parse_json_f64);
+            let ask = book.get("a").and_then(parse_json_f64);
             let price = match (bid, ask) {
                 (Some(b), Some(a)) => Some((b + a) / 2.0),
                 _ => None,
@@ -962,7 +988,7 @@ fn parse_price_tick(symbol: &str, text: &str) -> Option<PriceTick> {
                 error: None,
             })
         }
-        "depthSnapshot" | "depthUpdate" => {
+        "depth" | "depthSnapshot" | "depthUpdate" => {
             let bid = value
                 .get("b")
                 .and_then(Value::as_array)
@@ -1011,7 +1037,10 @@ fn parse_price_tick(symbol: &str, text: &str) -> Option<PriceTick> {
             })
         }
         "trade" => {
-            let price = data.get("p").and_then(parse_json_f64);
+            let price = first_object(&data)
+                .and_then(|trade| trade.get("p"))
+                .and_then(parse_json_f64)
+                .or_else(|| data.get("p").and_then(parse_json_f64));
             Some(PriceTick {
                 symbol: symbol.to_string(),
                 price,
@@ -1026,6 +1055,13 @@ fn parse_price_tick(symbol: &str, text: &str) -> Option<PriceTick> {
         }
         _ => None,
     }
+}
+
+fn first_object(value: &Value) -> Option<&Value> {
+    value
+        .as_array()
+        .and_then(|items| items.first())
+        .filter(|item| item.is_object())
 }
 
 fn parse_price_level(value: &Value) -> Option<f64> {
@@ -1173,6 +1209,18 @@ mod tests {
     }
 
     #[test]
+    fn parses_contract_ticker_array_price_tick() {
+        let tick = parse_price_tick(
+            "BTCUSDT",
+            r#"{"e":"ticker","E":1783857000000,"s":"BTCUSDT","d":[{"c":"63994.10","m":"63994.00","i":"64016.97"}]}"#,
+        )
+        .unwrap();
+        assert_eq!(tick.price, Some(63994.10));
+        assert_eq!(tick.source, "ticker");
+        assert!(tick.ok);
+    }
+
+    #[test]
     fn parses_depth_snapshot_price_tick() {
         let tick = parse_price_tick(
             "BTCUSDT",
@@ -1196,6 +1244,27 @@ mod tests {
         assert_eq!(tick.price, Some(62149.99));
         assert_eq!(tick.source, "tradeSnapshot");
         assert!(tick.ok);
+    }
+
+    #[test]
+    fn parses_contract_trade_array_price_tick() {
+        let tick = parse_price_tick(
+            "BTCUSDT",
+            r#"{"e":"trade","E":1783857000000,"s":"BTCUSDT","d":[{"T":1783857000000,"t":123,"p":"63994.10","q":"0.01","v":"639.941","m":false}]}"#,
+        )
+        .unwrap();
+        assert_eq!(tick.price, Some(63994.10));
+        assert_eq!(tick.source, "trade");
+        assert!(tick.ok);
+    }
+
+    #[test]
+    fn detects_rejected_public_subscription() {
+        assert_eq!(
+            subscription_error(r#"{"result":false,"id":1,"msg":"Invalid channel"}"#),
+            Some("Invalid channel".to_string())
+        );
+        assert_eq!(subscription_error(r#"{"result":true,"id":1}"#), None);
     }
 
     #[test]
