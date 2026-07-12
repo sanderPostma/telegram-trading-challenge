@@ -997,9 +997,10 @@ class AppController extends ChangeNotifier {
     weexPriceConnected = true;
     weexPriceStatus = WeexPriceStatus.live;
     weexPriceError = null;
-    if (_lastWeexPriceSource != source) {
-      _lastWeexPriceSource = source;
-      _log('WEEX BTC price live via $source.');
+    final sourceKind = isWebSocket ? 'WEEX WebSocket' : source;
+    if (_lastWeexPriceSource != sourceKind) {
+      _lastWeexPriceSource = sourceKind;
+      _log('WEEX BTC price live via $sourceKind.');
     }
     final now = DateTime.now();
     final lastPriceLog = _lastWeexPriceLogAt;
