@@ -10,7 +10,7 @@ import 'scaling.dart';
 import 'telegram.dart';
 import 'weex.dart';
 
-// These functions are ignored because they are not marked as `pub`: `chart_history`, `push_point`, `weex_rejection_message`
+// These functions are ignored because they are not marked as `pub`: `chart_history`, `classify_message_actions_with_rules`, `push_point`, `weex_rejection_message`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `StateView`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -77,6 +77,22 @@ Future<ApiResultAction> classifyMessage({required String text}) =>
 
 Future<ApiResultActions> classifyMessageActions({required String text}) =>
     RustLib.instance.api.crateApiClassifyMessageActions(text: text);
+
+Future<String> defaultPatternsYaml() => RustLib.instance.api.crateApiDefaultPatternsYaml();
+
+Future<ApiResultString> validatePatternsYaml({required String patternsYaml}) =>
+    RustLib.instance.api.crateApiValidatePatternsYaml(patternsYaml: patternsYaml);
+
+Future<ApiResultString> mergePatternsYaml({required String baseYaml, required String localYaml}) =>
+    RustLib.instance.api.crateApiMergePatternsYaml(baseYaml: baseYaml, localYaml: localYaml);
+
+Future<ApiResultActions> classifyMessageActionsWithPatterns({
+  required String text,
+  required String patternsYaml,
+}) => RustLib.instance.api.crateApiClassifyMessageActionsWithPatterns(
+  text: text,
+  patternsYaml: patternsYaml,
+);
 
 Future<ApiResultScaledOrder> scaleManualOrder({required ManualScaleRequest request}) =>
     RustLib.instance.api.crateApiScaleManualOrder(request: request);

@@ -1,0 +1,22 @@
+services:
+  telegram-patterns:
+    build:
+      context: ..
+      dockerfile: patterns_server/Dockerfile
+    image: telegram-patterns:latest
+    container_name: telegram-patterns
+    restart: unless-stopped
+    networks:
+      - frontend
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=frontend"
+      - "traefik.http.routers.telegram-patterns.rule=Host(`telegram-patterns.sander.dnsrouter.nl`)"
+      - "traefik.http.routers.telegram-patterns.entrypoints=websecure"
+      - "traefik.http.routers.telegram-patterns.tls=true"
+      - "traefik.http.routers.telegram-patterns.tls.certresolver=acmeresolver"
+      - "traefik.http.services.telegram-patterns.loadbalancer.server.port=80"
+
+networks:
+  frontend:
+    external: true

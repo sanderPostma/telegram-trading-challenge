@@ -11,6 +11,19 @@ class AppLog {
   static String get path => _path ?? _defaultLogFilePath();
   static String get telegramSessionPath => _pathInBase('telegram.session');
   static String get telegramStatePath => _pathInBase('state.json');
+  static String get telegramPatternsPath =>
+      _pathInBase('telegram_patterns.local.yaml');
+  static String get telegramPatternsRemotePath =>
+      _pathInBase('telegram_patterns.remote.yaml');
+  static String get telegramPatternsEmbeddedPath =>
+      _pathInBase('telegram_patterns.embedded.yaml');
+  static String get telegramPatternsLegacyPath =>
+      _pathInBase('telegram_patterns.yaml');
+  static String get telegramPatternsEtagPath =>
+      _pathInBase('telegram_patterns.remote.etag');
+  static String get telegramPatternsReadmePath =>
+      _pathInBase('telegram_patterns.README.txt');
+  static String get configDirectory => _baseLogDirectory();
 
   static Future<void> startSession() async {
     await write('App session started.');

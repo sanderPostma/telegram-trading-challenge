@@ -3,7 +3,9 @@ use std::sync::{Mutex, OnceLock};
 
 use crate::{
     interpreter::{interpret, Action, InterpreterState},
-    patterns::{default_rules, match_actions, match_first},
+    patterns::{
+        default_rules, match_actions, match_first, merge_pattern_documents, parse_pattern_document,
+    },
     scaling::{scale_order, ScaleInput, ScaledOrder},
     telegram, weex, Size,
 };
@@ -354,6 +356,61 @@ pub fn classify_message(text: String) -> ApiResultAction {
 
 pub fn classify_message_actions(text: String) -> ApiResultActions {
     let rules = default_rules();
+    classify_message_actions_with_rules(text, rules)
+}
+
+pub fn default_patterns_yaml() -> String {
+    crate::patterns::default_rules_yaml().to_string()
+}
+
+pub fn validate_patterns_yaml(patterns_yaml: String) -> ApiResultString {
+    match parse_pattern_document(&patterns_yaml) {
+        Ok(_) => ApiResultString {
+            ok: true,
+            value: Some("ok".to_string()),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub fn merge_patterns_yaml(base_yaml: String, local_yaml: String) -> ApiResultString {
+    match merge_pattern_documents(&base_yaml, &local_yaml) {
+        Ok(value) => ApiResultString {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub fn classify_message_actions_with_patterns(
+    text: String,
+    patterns_yaml: String,
+) -> ApiResultActions {
+    match parse_pattern_document(&patterns_yaml) {
+        Ok(rules) => classify_message_actions_with_rules(text, rules),
+        Err(error) => ApiResultActions {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+fn classify_message_actions_with_rules(
+    text: String,
+    rules: Vec<crate::patterns::PatternRule>,
+) -> ApiResultActions {
     match match_actions(&text, &rules) {
         Ok(hits) => {
             let actions = if hits.is_empty() {

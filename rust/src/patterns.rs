@@ -22,6 +22,12 @@ pub struct PatternRule {
     pub enabled: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PatternDocument {
+    pub version: u32,
+    pub patterns: Vec<PatternRule>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuleHit {
     pub rule_name: String,
@@ -32,44 +38,59 @@ pub struct RuleHit {
 }
 
 pub fn default_rules() -> Vec<PatternRule> {
-    vec![
-        rule(
-            "entry",
-            r"(?i)\bSTARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b",
-            RuleAction::Enter,
-            10,
-        ),
-        rule(
-            "add_usd",
-            r"(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?",
-            RuleAction::Add,
-            20,
-        ),
-        rule(
-            "add_btc",
-            r"(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?",
-            RuleAction::Add,
-            21,
-        ),
-        rule(
-            "reduce_pct",
-            r"(?i)\bREDUCE[D]?\b.*?(?P<pct>\d+)\s*%",
-            RuleAction::Reduce,
-            30,
-        ),
-        rule(
-            "close",
-            r"(?i)\b(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b",
-            RuleAction::Close,
-            40,
-        ),
-        rule(
-            "noop",
-            r"(?i)\b(TRADE UPDATE|CHAT TEST|NOTIFICATIONS|GOOD MORNING)\b",
-            RuleAction::Ignore,
-            90,
-        ),
-    ]
+    parse_pattern_document(default_rules_yaml()).expect("embedded pattern YAML is valid")
+}
+
+pub fn default_rules_yaml() -> &'static str {
+    include_str!("../../config/telegram_patterns.yaml")
+}
+
+pub fn parse_pattern_document(source: &str) -> anyhow::Result<Vec<PatternRule>> {
+    let document = parse_document(source)?;
+    if document.version != 1 {
+        anyhow::bail!("unsupported pattern document version {}", document.version);
+    }
+    if document.patterns.is_empty() {
+        anyhow::bail!("pattern document contains no patterns");
+    }
+    for pattern in &document.patterns {
+        Regex::new(&pattern.regex)
+            .map_err(|error| anyhow::anyhow!("invalid regex for {}: {error}", pattern.name))?;
+    }
+    Ok(document.patterns)
+}
+
+pub fn merge_pattern_documents(base: &str, local: &str) -> anyhow::Result<String> {
+    let mut base_document = parse_document(base)?;
+    let local_document = parse_document(local)?;
+    if base_document.version != 1 || local_document.version != 1 {
+        anyhow::bail!("unsupported pattern document version");
+    }
+
+    for local_pattern in local_document.patterns {
+        if let Some(existing) = base_document
+            .patterns
+            .iter_mut()
+            .find(|pattern| pattern.name == local_pattern.name)
+        {
+            *existing = local_pattern;
+        } else {
+            base_document.patterns.push(local_pattern);
+        }
+    }
+    if base_document.patterns.is_empty() {
+        anyhow::bail!("merged pattern document contains no patterns");
+    }
+    serde_yaml::to_string(&base_document).map_err(Into::into)
+}
+
+fn parse_document(source: &str) -> anyhow::Result<PatternDocument> {
+    let document: PatternDocument = serde_yaml::from_str(source)?;
+    for pattern in &document.patterns {
+        Regex::new(&pattern.regex)
+            .map_err(|error| anyhow::anyhow!("invalid regex for {}: {error}", pattern.name))?;
+    }
+    Ok(document)
 }
 
 pub fn match_first(text: &str, rules: &[PatternRule]) -> anyhow::Result<Option<RuleHit>> {
@@ -127,16 +148,6 @@ pub fn extract_trade_size(text: &str) -> Option<f64> {
         .captures(text)?
         .name("v")
         .and_then(|m| parse_number(m.as_str()))
-}
-
-fn rule(name: &str, regex: &str, action: RuleAction, priority: i32) -> PatternRule {
-    PatternRule {
-        name: name.to_string(),
-        regex: regex.to_string(),
-        action,
-        priority,
-        enabled: true,
-    }
 }
 
 fn parse_direction(value: &str) -> Option<Direction> {
@@ -213,5 +224,36 @@ mod tests {
             Some(10_000.0)
         );
         assert_eq!(extract_trade_size("Trade Size $31,000"), Some(31_000.0));
+    }
+
+    #[test]
+    fn merges_local_overrides_without_losing_remote_updates() {
+        let local = r#"
+version: 1
+patterns:
+  - name: close
+    regex: '(?i)\bCUSTOM CLOSE\b'
+    action: close
+    priority: 40
+    enabled: true
+  - name: custom_add
+    regex: '(?i)\bCUSTOM ADD\b'
+    action: add
+    priority: 50
+    enabled: true
+"#;
+        let merged = merge_pattern_documents(default_rules_yaml(), local).unwrap();
+        let rules = parse_pattern_document(&merged).unwrap();
+        assert_eq!(rules.len(), 7);
+        assert_eq!(
+            rules
+                .iter()
+                .find(|rule| rule.name == "close")
+                .unwrap()
+                .regex,
+            r"(?i)\bCUSTOM CLOSE\b"
+        );
+        assert!(rules.iter().any(|rule| rule.name == "entry"));
+        assert!(rules.iter().any(|rule| rule.name == "custom_add"));
     }
 }

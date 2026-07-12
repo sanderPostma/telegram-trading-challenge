@@ -1,0 +1,55 @@
+# Telegram message patterns for the Trading Challenge copy-trader.
+#
+# The application uses this file as its embedded fallback. It also writes a
+# copy to the user profile and refreshes that copy from:
+# https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml
+#
+# Each pattern is tested against the incoming Telegram text. Patterns are
+# ordered by match position and then priority. Regexes use Rust regex syntax.
+#
+# Supported actions are enter, add, reduce, close, and ignore. Named capture
+# groups can extract btc (BTC quantity), usd (USDT notional), pct (reduction
+# percentage), dir (LONG or SHORT), and trigger (limit trigger price).
+# Separate instructions joined by AND are evaluated as separate actions. For
+# example, "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT 64,300" creates a
+# market add followed by a conditional limit add. A LIMIT TRIGGER AT price
+# clause creates a limit order; without it the order is sent at market.
+#
+# When a new Telegram message does not match, give the complete message and
+# this file to a browser-based AI assistant such as ChatGPT, Claude, or Gemini.
+# Ask it to explain the mismatch and propose a minimal Rust-regex pattern that
+# preserves the named capture groups and action semantics above. Test the
+# resulting YAML against a real sample before publishing it.
+
+version: 1
+patterns:
+  - name: entry
+    regex: '(?i)\bSTARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 10
+    enabled: true
+  - name: add_usd
+    regex: '(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    action: add
+    priority: 20
+    enabled: true
+  - name: add_btc
+    regex: '(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    action: add
+    priority: 21
+    enabled: true
+  - name: reduce_pct
+    regex: '(?i)\bREDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+    action: reduce
+    priority: 30
+    enabled: true
+  - name: close
+    regex: '(?i)\b(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
+    action: close
+    priority: 40
+    enabled: true
+  - name: noop
+    regex: '(?i)\b(TRADE UPDATE|CHAT TEST|NOTIFICATIONS|GOOD MORNING)\b'
+    action: ignore
+    priority: 90
+    enabled: true

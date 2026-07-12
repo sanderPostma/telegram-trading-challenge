@@ -132,38 +132,6 @@ double _doubleValue(Object? value, double fallback) {
 bool _boolValue(Object? value, bool fallback) =>
     value is bool ? value : fallback;
 
-class PatternRule {
-  const PatternRule({
-    required this.name,
-    required this.regex,
-    required this.action,
-    required this.priority,
-    this.enabled = true,
-  });
-
-  final String name;
-  final String regex;
-  final TradeKind action;
-  final int priority;
-  final bool enabled;
-
-  PatternRule copyWith({
-    String? name,
-    String? regex,
-    TradeKind? action,
-    int? priority,
-    bool? enabled,
-  }) {
-    return PatternRule(
-      name: name ?? this.name,
-      regex: regex ?? this.regex,
-      action: action ?? this.action,
-      priority: priority ?? this.priority,
-      enabled: enabled ?? this.enabled,
-    );
-  }
-}
-
 class PlannedOrder {
   const PlannedOrder({
     required this.id,

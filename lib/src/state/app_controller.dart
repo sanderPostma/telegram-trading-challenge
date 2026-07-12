@@ -13,6 +13,8 @@ import '../bridge/telegram.dart' as rust_telegram;
 import '../bridge/weex.dart' as rust_weex;
 import '../logging/app_log.dart';
 import '../models/trading.dart';
+import '../patterns/default_patterns.dart';
+import '../patterns/patterns_readme.dart';
 
 enum WeexPriceStatus { idle, connecting, live, unavailable }
 
@@ -26,6 +28,9 @@ class AppController extends ChangeNotifier {
   static const _exchangeHistoryLookback = Duration(days: 30);
   static const _historicalCandleCacheFreshFor = Duration(minutes: 10);
   static const _weexPriceStaleAfter = Duration(seconds: 20);
+  static const _telegramPatternsUrl =
+      'https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml';
+  static const _telegramPatternsRequestTimeout = Duration(seconds: 8);
   static const _telegramChannelId = -1003766320116;
 
   final bool useRustBridge;
@@ -52,6 +57,13 @@ class AppController extends ChangeNotifier {
   Future<List<PriceCandle>>? _historicalCandleFetch;
   DateTime? _historicalCandleCacheLoadedAt;
   bool _historicalCandlePrefsLoaded = false;
+  Future<void>? _patternsInitialization;
+  Future<String>? _patternsRefresh;
+  String _embeddedPatternsYaml = embeddedTelegramPatternsYaml;
+  String _activePatternsYaml = embeddedTelegramPatternsYaml;
+  String _localPatternsYaml = localTelegramPatternsTemplate;
+  String? _remotePatternsYaml;
+  String? _patternsEtag;
   List<rust_weex.WeexExecutionSnapshot> _reconciledExecutionCache = const [];
   AppConfig config = const AppConfig();
   List<SeriesPoint> balanceHistory = const [];
@@ -76,43 +88,6 @@ class AppController extends ChangeNotifier {
     forceSetup = false;
     notifyListeners();
   }
-
-  final List<PatternRule> patterns = [
-    const PatternRule(
-      name: 'entry',
-      regex:
-          r'(?i)\bSTARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b',
-      action: TradeKind.enter,
-      priority: 10,
-    ),
-    const PatternRule(
-      name: 'add_usd',
-      regex:
-          r'(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?',
-      action: TradeKind.add,
-      priority: 20,
-    ),
-    const PatternRule(
-      name: 'add_btc',
-      regex:
-          r'(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?',
-      action: TradeKind.add,
-      priority: 21,
-    ),
-    const PatternRule(
-      name: 'reduce_pct',
-      regex: r'(?i)\bREDUCE[D]?\b.*?(?P<pct>\d+)\s*%',
-      action: TradeKind.reduce,
-      priority: 30,
-    ),
-    const PatternRule(
-      name: 'close',
-      regex:
-          r'(?i)\b(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b',
-      action: TradeKind.close,
-      priority: 40,
-    ),
-  ];
 
   final List<String> eventLog = [
     'Telegram monitor starts automatically after Telegram sign-in.',
@@ -139,15 +114,16 @@ class AppController extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_configPrefsKey);
-      if (raw == null || raw.isEmpty) return;
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) {
-        _log('Saved settings ignored: unexpected format.');
-        return;
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) {
+          _log('Saved settings ignored: unexpected format.');
+        } else {
+          config = AppConfig.fromPersistentJson(
+            Map<String, Object?>.from(decoded),
+          ).copyWith(autoUpdateMaster: true);
+        }
       }
-      config = AppConfig.fromPersistentJson(
-        Map<String, Object?>.from(decoded),
-      ).copyWith(autoUpdateMaster: true);
     } catch (error, stackTrace) {
       _log(
         'Saved settings could not be loaded: $error',
@@ -155,7 +131,234 @@ class AppController extends ChangeNotifier {
         stackTrace: stackTrace,
       );
     }
+    await _initializePatterns();
     _resetLocalChartHistory();
+  }
+
+  Future<void> _initializePatterns() {
+    return _patternsInitialization ??= _loadLocalPatterns();
+  }
+
+  Future<void> _loadLocalPatterns() async {
+    try {
+      final embeddedFile = File(AppLog.telegramPatternsEmbeddedPath);
+      final remoteFile = File(AppLog.telegramPatternsRemotePath);
+      final localFile = File(AppLog.telegramPatternsPath);
+      await localFile.parent.create(recursive: true);
+      final readmeFile = File(AppLog.telegramPatternsReadmePath);
+      if (!await readmeFile.exists()) {
+        await readmeFile.writeAsString(telegramPatternsReadme, flush: true);
+      }
+
+      var fallback = embeddedTelegramPatternsYaml;
+      if (useRustBridge) {
+        try {
+          fallback = await rust.defaultPatternsYaml();
+        } catch (error, stackTrace) {
+          await AppLog.write(
+            'Embedded Telegram patterns could not be loaded from Rust; using Dart fallback.',
+            error: error,
+            stackTrace: stackTrace,
+          );
+        }
+      }
+      _embeddedPatternsYaml = fallback;
+
+      await _writeIfChanged(embeddedFile, fallback);
+
+      // Migrate the pre-layered cache name as the remote layer. This avoids
+      // treating a previously downloaded remote document as a user override.
+      final legacyFile = File(AppLog.telegramPatternsLegacyPath);
+      if (!await remoteFile.exists() && await legacyFile.exists()) {
+        await legacyFile.rename(remoteFile.path);
+      }
+
+      if (await remoteFile.exists()) {
+        final remote = await remoteFile.readAsString();
+        if (await _validatePatterns(remote)) {
+          _remotePatternsYaml = remote;
+        } else {
+          await AppLog.write(
+            'Cached remote Telegram patterns are invalid; using embedded defaults.',
+          );
+        }
+      }
+
+      if (await localFile.exists()) {
+        final local = await localFile.readAsString();
+        if (await _mergePatterns(_remotePatternsYaml ?? fallback, local) !=
+            null) {
+          _localPatternsYaml = local;
+        } else {
+          await AppLog.write(
+            'Local Telegram pattern overrides are invalid; ignoring them.',
+          );
+        }
+      } else {
+        await _writeIfChanged(localFile, localTelegramPatternsTemplate);
+      }
+
+      final etagFile = File(AppLog.telegramPatternsEtagPath);
+      if (await etagFile.exists()) {
+        final etag = (await etagFile.readAsString()).trim();
+        _patternsEtag = etag.isEmpty ? null : etag;
+      }
+      _activePatternsYaml =
+          await _mergePatterns(_remotePatternsYaml ?? fallback, _localPatternsYaml) ??
+          fallback;
+    } catch (error, stackTrace) {
+      await AppLog.write(
+        'Telegram pattern cache could not be initialized; using embedded defaults.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      _activePatternsYaml = embeddedTelegramPatternsYaml;
+      _localPatternsYaml = localTelegramPatternsTemplate;
+    }
+  }
+
+  Future<bool> _validatePatterns(String source) async {
+    if (source.trim().isEmpty) return false;
+    if (!useRustBridge) return true;
+    try {
+      final result = await rust.validatePatternsYaml(patternsYaml: source);
+      return result.ok;
+    } catch (error, stackTrace) {
+      await AppLog.write(
+        'Telegram pattern validation failed.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return false;
+    }
+  }
+
+  Future<void> _replacePatternCache(String source, String? etag) async {
+    final file = File(AppLog.telegramPatternsRemotePath);
+    await _writeIfChanged(file, source);
+
+    final etagFile = File(AppLog.telegramPatternsEtagPath);
+    if (etag == null || etag.isEmpty) {
+      if (await etagFile.exists()) await etagFile.delete();
+    } else {
+      await etagFile.writeAsString(etag, flush: true);
+    }
+    _patternsEtag = etag;
+  }
+
+  Future<void> _writeIfChanged(File file, String source) async {
+    if (await file.exists() && await file.readAsString() == source) return;
+    await file.parent.create(recursive: true);
+    final temporary = File('${file.path}.tmp');
+    await temporary.writeAsString(source, flush: true);
+    await temporary.rename(file.path);
+  }
+
+  Future<String?> _mergePatterns(String base, String local) async {
+    if (!useRustBridge) return base;
+    try {
+      final result = await rust.mergePatternsYaml(
+        baseYaml: base,
+        localYaml: local,
+      );
+      return result.ok ? result.value : null;
+    } catch (error, stackTrace) {
+      await AppLog.write(
+        'Telegram pattern layers could not be merged.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return null;
+    }
+  }
+
+  Future<String> _patternsForMessage() async {
+    await _initializePatterns();
+    await _reloadLocalOverrides();
+    if (!useRustBridge) return _activePatternsYaml;
+
+    final inFlight = _patternsRefresh;
+    if (inFlight != null) return inFlight;
+    final refresh = _refreshPatterns();
+    _patternsRefresh = refresh;
+    try {
+      return await refresh;
+    } finally {
+      if (identical(_patternsRefresh, refresh)) _patternsRefresh = null;
+    }
+  }
+
+  Future<void> _reloadLocalOverrides() async {
+    final localFile = File(AppLog.telegramPatternsPath);
+    if (!await localFile.exists()) return;
+    try {
+      final local = await localFile.readAsString();
+      final merged = await _mergePatterns(
+        _remotePatternsYaml ?? _embeddedPatternsYaml,
+        local,
+      );
+      if (merged == null) {
+        await AppLog.write(
+          'Local Telegram pattern overrides are invalid; keeping the last valid version.',
+        );
+        return;
+      }
+      _localPatternsYaml = local;
+      _activePatternsYaml = merged;
+    } catch (error, stackTrace) {
+      await AppLog.write(
+        'Local Telegram pattern overrides could not be read.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<String> _refreshPatterns() async {
+    final client = HttpClient()..autoUncompress = true;
+    try {
+      final request = await client
+          .getUrl(Uri.parse(_telegramPatternsUrl))
+          .timeout(_telegramPatternsRequestTimeout);
+      final etag = _patternsEtag;
+      if (etag != null && etag.isNotEmpty) {
+        request.headers.set(HttpHeaders.ifNoneMatchHeader, etag);
+      }
+      final response = await request.close().timeout(
+        _telegramPatternsRequestTimeout,
+      );
+      if (response.statusCode == HttpStatus.notModified) {
+        return _activePatternsYaml;
+      }
+      if (response.statusCode != HttpStatus.ok) {
+        throw HttpException(
+          'pattern host returned HTTP ${response.statusCode}',
+          uri: Uri.parse(_telegramPatternsUrl),
+        );
+      }
+
+      final body = await utf8.decoder.bind(response).join();
+      if (!await _validatePatterns(body)) {
+        throw const FormatException('remote Telegram patterns are invalid');
+      }
+      final remoteEtag = response.headers.value(HttpHeaders.etagHeader);
+      await _replacePatternCache(body, remoteEtag);
+      _remotePatternsYaml = body;
+      _activePatternsYaml =
+          await _mergePatterns(body, _localPatternsYaml) ?? _activePatternsYaml;
+      await AppLog.write(
+        'Telegram patterns updated from remote host${remoteEtag == null ? '' : ' (ETag $remoteEtag)'}.',
+      );
+    } catch (error, stackTrace) {
+      await AppLog.write(
+        'Telegram pattern refresh failed; using cached patterns.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      client.close(force: true);
+    }
+    return _activePatternsYaml;
   }
 
   Future<void> loadChartData() async {
@@ -280,7 +483,11 @@ class AppController extends ChangeNotifier {
     }
 
     try {
-      final result = await rust.classifyMessageActions(text: rawText);
+      final patternsYaml = await _patternsForMessage();
+      final result = await rust.classifyMessageActionsWithPatterns(
+        text: rawText,
+        patternsYaml: patternsYaml,
+      );
       final actions = result.value;
       if (!result.ok || actions == null || actions.isEmpty) {
         await AppLog.write(
@@ -1085,12 +1292,6 @@ class AppController extends ChangeNotifier {
         stackTrace: stackTrace,
       );
     }
-  }
-
-  void updatePattern(int index, PatternRule rule) {
-    patterns[index] = rule;
-    _log('Pattern ${rule.name} saved.');
-    notifyListeners();
   }
 
   PlannedOrder _buildOrder({

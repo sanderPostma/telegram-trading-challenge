@@ -4,7 +4,6 @@ import '../models/trading.dart';
 import '../state/app_controller.dart';
 import '../theme.dart';
 import 'dashboard_page.dart';
-import 'patterns_page.dart';
 import 'settings_page.dart';
 import 'wizard_page.dart';
 import 'app_bar_desktop.dart';
@@ -49,7 +48,6 @@ class _AppShellState extends State<AppShell> {
         final pages = [
           DashboardPage(controller: widget.controller),
           SettingsPage(controller: widget.controller),
-          PatternsPage(controller: widget.controller),
         ];
 
         return LayoutBuilder(
@@ -105,11 +103,6 @@ class _AppShellState extends State<AppShell> {
                               selectedIcon: Icon(Icons.tune),
                               label: Text('Settings'),
                             ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.rule_outlined),
-                              selectedIcon: Icon(Icons.rule),
-                              label: Text('Patterns'),
-                            ),
                           ],
                         ),
                         const VerticalDivider(width: 1, color: Brand.border),
@@ -134,11 +127,6 @@ class _AppShellState extends State<AppShell> {
                           icon: Icon(Icons.tune_outlined),
                           activeIcon: Icon(Icons.tune),
                           label: 'Settings',
-                        ),
-                        BottomNavigationBarItem(
-                          icon: Icon(Icons.rule_outlined),
-                          activeIcon: Icon(Icons.rule),
-                          label: 'Patterns',
                         ),
                       ],
                     )
