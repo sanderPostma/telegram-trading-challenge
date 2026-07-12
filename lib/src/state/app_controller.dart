@@ -146,9 +146,7 @@ class AppController extends ChangeNotifier {
       final localFile = File(AppLog.telegramPatternsPath);
       await localFile.parent.create(recursive: true);
       final readmeFile = File(AppLog.telegramPatternsReadmePath);
-      if (!await readmeFile.exists()) {
-        await readmeFile.writeAsString(telegramPatternsReadme, flush: true);
-      }
+      await _writeIfChanged(readmeFile, telegramPatternsReadme);
 
       var fallback = embeddedTelegramPatternsYaml;
       if (useRustBridge) {
@@ -165,13 +163,6 @@ class AppController extends ChangeNotifier {
       _embeddedPatternsYaml = fallback;
 
       await _writeIfChanged(embeddedFile, fallback);
-
-      // Migrate the pre-layered cache name as the remote layer. This avoids
-      // treating a previously downloaded remote document as a user override.
-      final legacyFile = File(AppLog.telegramPatternsLegacyPath);
-      if (!await remoteFile.exists() && await legacyFile.exists()) {
-        await legacyFile.rename(remoteFile.path);
-      }
 
       if (await remoteFile.exists()) {
         final remote = await remoteFile.readAsString();
@@ -204,7 +195,10 @@ class AppController extends ChangeNotifier {
         _patternsEtag = etag.isEmpty ? null : etag;
       }
       _activePatternsYaml =
-          await _mergePatterns(_remotePatternsYaml ?? fallback, _localPatternsYaml) ??
+          await _mergePatterns(
+            _remotePatternsYaml ?? fallback,
+            _localPatternsYaml,
+          ) ??
           fallback;
     } catch (error, stackTrace) {
       await AppLog.write(

@@ -12,18 +12,18 @@ class AppLog {
   static String get telegramSessionPath => _pathInBase('telegram.session');
   static String get telegramStatePath => _pathInBase('state.json');
   static String get telegramPatternsPath =>
-      _pathInBase('telegram_patterns.local.yaml');
+      _pathInData('telegram_patterns.local.yaml');
   static String get telegramPatternsRemotePath =>
-      _pathInBase('telegram_patterns.remote.yaml');
+      _pathInData('telegram_patterns.remote.yaml');
   static String get telegramPatternsEmbeddedPath =>
-      _pathInBase('telegram_patterns.embedded.yaml');
-  static String get telegramPatternsLegacyPath =>
-      _pathInBase('telegram_patterns.yaml');
+      _pathInData('telegram_patterns.embedded.yaml');
   static String get telegramPatternsEtagPath =>
-      _pathInBase('telegram_patterns.remote.etag');
+      _pathInData('telegram_patterns.remote.etag');
   static String get telegramPatternsReadmePath =>
-      _pathInBase('telegram_patterns.README.txt');
-  static String get configDirectory => _baseLogDirectory();
+      _pathInData('telegram_patterns.README.txt');
+  static String get configDirectory => _baseDataDirectory();
+  static String get preferencesPath =>
+      _join(_baseDataDirectory(), 'shared_preferences.json');
 
   static Future<void> startSession() async {
     await write('App session started.');
@@ -80,6 +80,45 @@ class AppLog {
     final base = _baseLogDirectory();
     return '$base$separator$fileName';
   }
+
+  static String _pathInData(String fileName) {
+    final separator = Platform.pathSeparator;
+    final base = _baseDataDirectory();
+    return '$base$separator$fileName';
+  }
+
+  static String _baseDataDirectoryFor(String applicationId) {
+    final env = Platform.environment;
+    if (Platform.isLinux) {
+      final dataHome = env['XDG_DATA_HOME'];
+      if (dataHome != null && dataHome.isNotEmpty) {
+        return _join(dataHome, applicationId);
+      }
+      final home = env['HOME'];
+      if (home != null && home.isNotEmpty) {
+        return _join(_join(home, '.local'), _join('share', applicationId));
+      }
+    }
+    if (Platform.isMacOS) {
+      final home = env['HOME'];
+      if (home != null && home.isNotEmpty) {
+        return _join(
+          _join(_join(home, 'Library'), 'Application Support'),
+          applicationId,
+        );
+      }
+    }
+    if (Platform.isWindows) {
+      final appData = env['APPDATA'];
+      if (appData != null && appData.isNotEmpty) {
+        return _join(appData, applicationId);
+      }
+    }
+    return _join(Directory.systemTemp.path, applicationId);
+  }
+
+  static String _baseDataDirectory() =>
+      _baseDataDirectoryFor('com.atomicvoid.tradingchallenge');
 
   static String _baseLogDirectory() {
     final env = Platform.environment;

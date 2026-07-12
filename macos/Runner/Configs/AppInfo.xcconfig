@@ -8,7 +8,7 @@
 PRODUCT_NAME = trading_challenge
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.example.tmgChallenge
+PRODUCT_BUNDLE_IDENTIFIER = com.atomicvoid.tradingchallenge
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.example. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 Atomic Void. All rights reserved.

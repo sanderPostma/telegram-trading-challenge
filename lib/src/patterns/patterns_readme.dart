@@ -16,6 +16,22 @@ updates therefore do not erase local changes.
 Remote source:
 https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml
 
+Using an AI coding assistant
+----------------------------
+
+When a Telegram message is not recognized, give your chatbot the complete
+Telegram message text together with both of these files:
+
+telegram_patterns.README.txt
+telegram_patterns.local.yaml
+
+Ask ChatGPT, Claude, Gemini, or another coding agent to propose the smallest
+pattern addition or override that handles the message. Alternatively, point
+your coding agent directly at both files and provide the message as the test
+case. The README explains the supported YAML format, merge behavior, named
+capture groups, AND handling, and LIMIT TRIGGER AT handling. Review and test
+the result before publishing changes to the remote pattern host.
+
 The YAML document must contain a version and a patterns list. Each pattern has:
 
 - name: a stable descriptive name
