@@ -33,6 +33,7 @@ class AppConfig {
     this.markPrice = 0,
     this.autoUpdateMaster = true,
     this.autoApprove = false,
+    this.hasSeenAutoApproveWarning = false,
     this.simulationMode = true,
     this.minimizeToTray = false,
   });
@@ -48,6 +49,7 @@ class AppConfig {
   final double markPrice;
   final bool autoUpdateMaster;
   final bool autoApprove;
+  final bool hasSeenAutoApproveWarning;
   final bool simulationMode;
   final bool minimizeToTray;
 
@@ -66,6 +68,7 @@ class AppConfig {
       'myBalanceUsd': myBalanceUsd,
       'autoUpdateMaster': autoUpdateMaster,
       'autoApprove': autoApprove,
+      'hasSeenAutoApproveWarning': hasSeenAutoApproveWarning,
       'simulationMode': simulationMode,
       'minimizeToTray': minimizeToTray,
     };
@@ -83,6 +86,7 @@ class AppConfig {
       myBalanceUsd: _doubleValue(json['myBalanceUsd'], 2000),
       autoUpdateMaster: _boolValue(json['autoUpdateMaster'], true),
       autoApprove: _boolValue(json['autoApprove'], false),
+      hasSeenAutoApproveWarning: _boolValue(json['hasSeenAutoApproveWarning'], false),
       simulationMode: _boolValue(json['simulationMode'], true),
       minimizeToTray: false,
     );
@@ -100,6 +104,7 @@ class AppConfig {
     double? markPrice,
     bool? autoUpdateMaster,
     bool? autoApprove,
+    bool? hasSeenAutoApproveWarning,
     bool? simulationMode,
     bool? minimizeToTray,
   }) {
@@ -115,6 +120,7 @@ class AppConfig {
       markPrice: markPrice ?? this.markPrice,
       autoUpdateMaster: autoUpdateMaster ?? this.autoUpdateMaster,
       autoApprove: autoApprove ?? this.autoApprove,
+      hasSeenAutoApproveWarning: hasSeenAutoApproveWarning ?? this.hasSeenAutoApproveWarning,
       simulationMode: simulationMode ?? this.simulationMode,
       minimizeToTray: minimizeToTray ?? this.minimizeToTray,
     );

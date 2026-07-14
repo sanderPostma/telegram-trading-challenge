@@ -1158,6 +1158,12 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setHasSeenAutoApproveWarning(bool value) {
+    config = config.copyWith(hasSeenAutoApproveWarning: value);
+    unawaited(_persistConfig());
+    notifyListeners();
+  }
+
   void setSimulationMode(bool value) {
     config = config.copyWith(simulationMode: value);
     _log('Simulation mode ${value ? 'enabled' : 'disabled'}.');

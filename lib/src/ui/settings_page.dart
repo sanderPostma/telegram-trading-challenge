@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/trading.dart';
 import '../state/app_controller.dart';
+import 'auto_approve_dialog.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key, required this.controller});
@@ -124,7 +125,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           SwitchListTile(
             value: widget.controller.config.autoApprove,
-            onChanged: widget.controller.setAutoApprove,
+            onChanged: (value) => handleAutoApproveToggle(context, widget.controller, value),
             title: const Text('Auto-approve high-confidence parsed actions'),
           ),
         ]),

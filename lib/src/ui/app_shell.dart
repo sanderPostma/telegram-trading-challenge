@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/trading.dart';
 import '../state/app_controller.dart';
 import '../theme.dart';
+import 'app_bar_desktop.dart';
+import 'auto_approve_dialog.dart';
 import 'dashboard_page.dart';
 import 'settings_page.dart';
 import 'wizard_page.dart';
-import 'app_bar_desktop.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key, required this.controller});
@@ -75,7 +76,7 @@ class _AppShellState extends State<AppShell> {
                   if (!isMobile) Text('Auto-approve', style: labelStyle),
                   Switch(
                     value: widget.controller.config.autoApprove,
-                    onChanged: widget.controller.setAutoApprove,
+                    onChanged: (value) => handleAutoApproveToggle(context, widget.controller, value),
                     activeTrackColor: Brand.danger,
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
