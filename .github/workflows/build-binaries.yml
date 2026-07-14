@@ -44,6 +44,27 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install macOS Rust targets
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in aarch64-apple-darwin x86_64-apple-darwin; do
+            installed=false
+            for attempt in 1 2 3 4 5; do
+              if rustup target add --toolchain stable "$target"; then
+                installed=true
+                break
+              fi
+              echo "Rust target download failed for $target (attempt $attempt/5); retrying..."
+              sleep $((attempt * 10))
+            done
+            if [ "$installed" != true ]; then
+              echo "Could not install Rust target $target after 5 attempts." >&2
+              exit 1
+            fi
+          done
+
       - name: Cache Cargo
         uses: actions/cache@v4
         with:

@@ -58,40 +58,16 @@ class _DashboardPageState extends State<DashboardPage> {
           builder: (context, constraints) {
             final isDesktop = constraints.maxWidth >= 800;
             final controller = widget.controller;
-            final now = DateTime.now();
+            final nowMs = DateTime.now().millisecondsSinceEpoch;
             final rangeStartMs = switch (_timeframe) {
-              ChartTimeframe.day => DateTime(
-                now.year,
-                now.month,
-                now.day,
-              ).millisecondsSinceEpoch,
+              ChartTimeframe.day =>
+                nowMs - const Duration(hours: 24).inMilliseconds,
               ChartTimeframe.week =>
-                DateTime(now.year, now.month, now.day)
-                    .subtract(Duration(days: now.weekday - 1))
-                    .millisecondsSinceEpoch,
-              ChartTimeframe.month => DateTime(
-                now.year,
-                now.month,
-                1,
-              ).millisecondsSinceEpoch,
+                nowMs - const Duration(days: 7).inMilliseconds,
+              ChartTimeframe.month =>
+                nowMs - const Duration(days: 30).inMilliseconds,
             };
-            final rangeEndMs = switch (_timeframe) {
-              ChartTimeframe.day => DateTime(
-                now.year,
-                now.month,
-                now.day + 1,
-              ).millisecondsSinceEpoch,
-              ChartTimeframe.week =>
-                DateTime(now.year, now.month, now.day)
-                    .subtract(Duration(days: now.weekday - 1))
-                    .add(const Duration(days: 7))
-                    .millisecondsSinceEpoch,
-              ChartTimeframe.month => DateTime(
-                now.year,
-                now.month + 1,
-                1,
-              ).millisecondsSinceEpoch,
-            };
+            final rangeEndMs = nowMs;
             final balancePoints = _filterSeries(
               controller.balanceHistory,
               rangeStartMs,
