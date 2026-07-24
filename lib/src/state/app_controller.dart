@@ -18,6 +18,15 @@ import '../patterns/patterns_readme.dart';
 
 enum WeexPriceStatus { idle, connecting, live, unavailable }
 
+/// How a parsed Telegram CLOSE signal should be handled. CLOSE is never
+/// auto-executed: it is ignored entirely under auto-approve, and otherwise
+/// only queues a flatten when there is a live position to close.
+enum TelegramCloseDisposition {
+  ignoredAutoApprove,
+  ignoredNoPosition,
+  queueForApproval,
+}
+
 class AppController extends ChangeNotifier {
   AppController({this.useRustBridge = false});
 
@@ -528,7 +537,13 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.rejected;
     }
 
-    final kind = _tradeKindFromParsed(action.kind);
+    // CLOSE is never auto-executed. Under auto-approve it is ignored entirely;
+    // in manual mode it queues a full-flatten for the user to approve.
+    if (action.kind == rust_interpreter.ActionKind.close) {
+      return _handleParsedTelegramClose(summary: summary, channel: channel);
+    }
+
+    final kind = tradeKindFromParsed(action.kind);
     if (kind == null) {
       _log('Telegram parsed but not automated: $summary.');
       return rust_telegram.TelegramActionStatus.rejected;
@@ -554,7 +569,7 @@ class AppController extends ChangeNotifier {
     final order = switch (kind) {
       TradeKind.reduce => _buildParsedReductionOrder(
         direction: direction,
-        fraction: _percentFromParsed(action.size),
+        size: action.size,
         source: 'Telegram $channel: $summary',
       ),
       _ => _buildParsedEntryOrAddOrder(
@@ -603,6 +618,63 @@ class AppController extends ChangeNotifier {
       notifyListeners();
       return rust_telegram.TelegramActionStatus.pending;
     }
+  }
+
+  /// Handles a parsed CLOSE signal. A close never auto-executes: under
+  /// auto-approve it is ignored (exits stay under manual control), and in
+  /// manual mode it queues a reduce-only full flatten for the user to approve.
+  Future<rust_telegram.TelegramActionStatus> _handleParsedTelegramClose({
+    required String summary,
+    required String channel,
+  }) async {
+    // Auto-approve is checked before any exchange call: a CLOSE must never
+    // touch a live position while auto-approve is on.
+    if (closeDisposition(autoApprove: config.autoApprove, position: position) ==
+        TelegramCloseDisposition.ignoredAutoApprove) {
+      _log(
+        'Telegram CLOSE ignored under auto-approve: $summary. Use Flatten to exit manually.',
+      );
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+
+    await _refreshExchangePositionForTelegramAction();
+    if (closeDisposition(autoApprove: config.autoApprove, position: position) !=
+        TelegramCloseDisposition.queueForApproval) {
+      _log('Telegram CLOSE ignored: no open position to flatten ($summary).');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+    if (config.markPrice <= 0) {
+      _log('Telegram CLOSE skipped: waiting for live WEEX BTC price.');
+      return rust_telegram.TelegramActionStatus.failed;
+    }
+
+    final mark = config.markPrice;
+    final quantity = _roundDown(position.qtyBtc, 0.0001);
+    if (quantity <= 0) {
+      _log('Telegram CLOSE ignored: position smaller than one lot ($summary).');
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+    final order = PlannedOrder(
+      id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
+      kind: TradeKind.close,
+      direction: position.direction!,
+      sourceAmount: quantity,
+      sourceUnit: SizeUnit.btc,
+      scaledBtc: quantity,
+      scaledNotionalUsd: quantity * mark,
+      markPrice: mark,
+      createdAt: DateTime.now(),
+      status: TradeStatus.pendingApproval,
+      source: 'Telegram $channel: $summary, close position',
+    );
+    pendingApproval = order;
+    orders.insert(0, order);
+    await AppLog.write(
+      'Telegram CLOSE queued for approval: ${_describe(order)} (auto-approve is off).',
+    );
+    _log('Telegram CLOSE requires approval: ${_describe(order)}.');
+    notifyListeners();
+    return rust_telegram.TelegramActionStatus.pending;
   }
 
   Future<void> _finalizeTelegramDedup(
@@ -1358,34 +1430,61 @@ class AppController extends ChangeNotifier {
 
   PlannedOrder? _buildParsedReductionOrder({
     required TradeDirection? direction,
-    required double? fraction,
+    required rust_interpreter.Size? size,
     required String source,
   }) {
-    if (direction == null ||
-        fraction == null ||
-        fraction <= 0 ||
-        fraction > 1) {
-      return null;
-    }
+    if (direction == null) return null;
+    // A reduction only makes sense against a live position on the same side;
+    // a stray "REDUCED …" with no matching position never trades.
     if (position.isFlat ||
         position.direction != direction ||
         position.qtyBtc <= 0) {
       return null;
     }
-    final quantity = _roundDown(position.qtyBtc * fraction, 0.0001);
     final mark = config.markPrice;
+    // The channel expresses reductions as a percentage of the position, or as
+    // a dollar / BTC amount of the master's book. Dollar and BTC amounts are
+    // scaled like adds and capped at what we actually hold; percentages are
+    // relative to our own position and need no scaling. Reductions are always
+    // reduce-only, so overshooting simply flattens.
+    final (quantity, label) = switch (size) {
+      rust_interpreter.Size_Pct(:final field0)
+          when field0 > 0 && field0 <= 1 =>
+        (
+          _roundDown(position.qtyBtc * field0, 0.0001),
+          'reduce ${(field0 * 100).toStringAsFixed(0)}%',
+        ),
+      rust_interpreter.Size_Usd(:final field0) when field0 > 0 && mark > 0 =>
+        (
+          _roundDown(
+            min((field0 * config.scaleRatio) / mark, position.qtyBtc),
+            0.0001,
+          ),
+          'reduce \$${field0.toStringAsFixed(0)}',
+        ),
+      rust_interpreter.Size_Btc(:final field0) when field0 > 0 =>
+        (
+          _roundDown(
+            min(field0 * config.scaleRatio, position.qtyBtc),
+            0.0001,
+          ),
+          'reduce ${field0.toStringAsFixed(4)} BTC',
+        ),
+      _ => (0.0, ''),
+    };
+    if (quantity <= 0) return null;
     return PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
       kind: TradeKind.reduce,
       direction: direction,
-      sourceAmount: fraction * 100,
+      sourceAmount: quantity,
       sourceUnit: SizeUnit.btc,
       scaledBtc: quantity,
       scaledNotionalUsd: quantity * mark,
       markPrice: mark,
       createdAt: DateTime.now(),
       status: TradeStatus.pendingApproval,
-      source: '$source, reduce ${(fraction * 100).toStringAsFixed(0)}%',
+      source: '$source, $label',
     );
   }
 
@@ -1892,7 +1991,32 @@ class AppController extends ChangeNotifier {
     };
   }
 
-  TradeKind? _tradeKindFromParsed(rust_interpreter.ActionKind value) {
+  /// Maps a parsed action to an automatable trade kind. `close` and `ignore`
+  /// return null so a parsed CLOSE never flows through the generic
+  /// auto-approve path (the "close" verb is a common English word that appears
+  /// in commentary). CLOSE is instead handled by [_handleParsedTelegramClose],
+  /// which ignores it under auto-approve and otherwise queues a full flatten
+  /// for manual approval. Kept static and [visibleForTesting] so this guarantee
+  /// — CLOSE is never auto-executed — is locked by a unit test.
+  /// Decides how a CLOSE signal is handled. Auto-approve always wins first, so
+  /// a CLOSE can never auto-execute even against an open position. Pure and
+  /// [visibleForTesting] so the "no auto-close" guarantee is locked by a test.
+  @visibleForTesting
+  static TelegramCloseDisposition closeDisposition({
+    required bool autoApprove,
+    required PositionView position,
+  }) {
+    if (autoApprove) return TelegramCloseDisposition.ignoredAutoApprove;
+    if (position.isFlat ||
+        position.qtyBtc <= 0 ||
+        position.direction == null) {
+      return TelegramCloseDisposition.ignoredNoPosition;
+    }
+    return TelegramCloseDisposition.queueForApproval;
+  }
+
+  @visibleForTesting
+  static TradeKind? tradeKindFromParsed(rust_interpreter.ActionKind value) {
     return switch (value) {
       rust_interpreter.ActionKind.enter => TradeKind.enter,
       rust_interpreter.ActionKind.add => TradeKind.add,
@@ -1944,13 +2068,6 @@ class AppController extends ChangeNotifier {
       rust_interpreter.Size_Pct() => null,
       rust_interpreter.Size_FullClose() => null,
       null => null,
-    };
-  }
-
-  double? _percentFromParsed(rust_interpreter.Size? value) {
-    return switch (value) {
-      rust_interpreter.Size_Pct(:final field0) => field0,
-      _ => null,
     };
   }
 

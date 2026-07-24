@@ -72,7 +72,9 @@ pub fn interpret(text: &str, hit: Option<RuleHit>, state: &InterpreterState) -> 
         RuleAction::Add => ActionKind::Add,
         RuleAction::Reduce => ActionKind::Reduce,
         RuleAction::Close => ActionKind::Close,
-        RuleAction::Ignore => ActionKind::Ignore,
+        // Guard rules are vetoes filtered out in `match_actions`, so they never
+        // reach interpretation; Ignore keeps the match exhaustive and safe.
+        RuleAction::Ignore | RuleAction::Guard => ActionKind::Ignore,
     };
 
     let needs_direction = matches!(kind, ActionKind::Enter | ActionKind::Add);

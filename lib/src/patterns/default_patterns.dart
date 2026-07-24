@@ -1,39 +1,60 @@
 const embeddedTelegramPatternsYaml = r'''# Telegram message patterns for the Trading Challenge copy-trader.
 #
-# This is the fallback used when the remote pattern host is unavailable.
-# Supported actions are enter, add, reduce, close, and ignore. Named capture
-# groups can extract btc, usd, pct, dir, and trigger. Separate instructions
-# joined by AND are evaluated as separate actions. "ADDED $5000 AND ADDING
-# $5000 TO LIMIT TRIGGER AT 64,300" creates a market add and a conditional
-# limit add. A LIMIT TRIGGER AT price clause creates a limit order.
+# This is the fallback used when the remote pattern host is unavailable. It is
+# kept in sync with config/telegram_patterns.yaml (the Rust embedded copy).
+# Supported actions are enter, add, reduce, close, ignore, and guard. Named
+# capture groups can extract btc, usd, pct, dir, and trigger. Separate
+# instructions joined by AND are evaluated as separate actions. "ADDED $5000
+# AND ADDING $5000 TO LIMIT TRIGGER AT 64,300" creates a market add and a
+# conditional limit add. A LIMIT TRIGGER AT price clause creates a limit order.
+#
+# Past-tense / hypothetical safety: trade verbs are anchored to the start of a
+# line (real signals are terse commands), and a `guard` action vetoes the whole
+# message when conditional wording ("should have", "if I had", "for example")
+# is present, so commentary never trades. Rust regex has no lookbehind.
 # When a message does not match, give the complete message and this file to a
 # browser-based AI assistant such as ChatGPT, Claude, or Gemini and ask for a
 # minimal Rust-regex pattern that preserves these named groups and semantics.
 
 version: 1
 patterns:
+  - name: hypothetical
+    regex: '(?i)\b(?:should|would|could)(?:''ve|ve|\s+(?:have|of))\b|\bif\s+i\s+(?:had|would|were)\b|\bwish\s+i\b|\bimagine\b|\bfor\s+(?:example|instance)\b|\bwhat\s+if\b|\bhypothetical'
+    action: guard
+    priority: 1
+    enabled: true
   - name: entry
-    regex: '(?i)\bSTARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*STARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 10
     enabled: true
   - name: add_usd
-    regex: '(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 20
     enabled: true
   - name: add_btc
-    regex: '(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
-  - name: reduce_pct
-    regex: '(?i)\bREDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+  - name: reduce_usd
+    regex: '(?im)^\s*REDUCE[D]?\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
     action: reduce
     priority: 30
     enabled: true
+  - name: reduce_btc
+    regex: '(?im)^\s*REDUCE[D]?\b\s*(?P<btc>[\d.]+)\s*BTC'
+    action: reduce
+    priority: 31
+    enabled: true
+  - name: reduce_pct
+    regex: '(?im)^\s*REDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+    action: reduce
+    priority: 32
+    enabled: true
   - name: close
-    regex: '(?i)\b(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
+    regex: '(?im)^\s*(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
     action: close
     priority: 40
     enabled: true

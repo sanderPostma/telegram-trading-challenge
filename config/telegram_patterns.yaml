@@ -5,15 +5,34 @@
 # https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml
 #
 # Each pattern is tested against the incoming Telegram text. Patterns are
-# ordered by match position and then priority. Regexes use Rust regex syntax.
+# ordered by match position and then priority. Regexes use Rust regex syntax
+# (which has NO lookahead/lookbehind).
 #
-# Supported actions are enter, add, reduce, close, and ignore. Named capture
-# groups can extract btc (BTC quantity), usd (USDT notional), pct (reduction
-# percentage), dir (LONG or SHORT), and trigger (limit trigger price).
-# Separate instructions joined by AND are evaluated as separate actions. For
-# example, "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT 64,300" creates a
-# market add followed by a conditional limit add. A LIMIT TRIGGER AT price
-# clause creates a limit order; without it the order is sent at market.
+# Supported actions are enter, add, reduce, close, ignore, and guard. Named
+# capture groups can extract btc (BTC quantity), usd (USDT notional), pct
+# (reduction percentage), dir (LONG or SHORT), and trigger (limit trigger
+# price). Separate instructions joined by AND are evaluated as separate
+# actions. For example, "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT
+# 64,300" creates a market add followed by a conditional limit add. A LIMIT
+# TRIGGER AT price clause creates a limit order; without it the order is sent
+# at market.
+#
+# PAST-TENSE / HYPOTHETICAL SAFETY. The channel author reports in the past
+# tense ("STARTED", "ADDED", "REDUCED", "CLOSED"), so those verbs are real
+# signals. But the same words appear in commentary ("I should have added
+# $5000", "I think I added $20,000 to the eth trade", "close the trade at
+# break-even") that must NEVER trade. Two layers protect against that:
+#   1. Trade verbs (STARTED/ADDED/REDUCE(D)/CLOSE) are anchored to the START
+#      of a line (^) — real signals are terse commands on their own line,
+#      while narrative buries the verb mid-sentence. The one exception is the
+#      second half of an "... AND ADDING ..." compound, which is allowed.
+#   2. A `guard` action: if any enabled guard regex matches the message, the
+#      whole message is treated as discussion and produces NO automated
+#      action. This is the "negative match" layer for conditional wording
+#      ("should have", "would have", "if I had", "wish I", "imagine",
+#      "for example", "what if", "hypothetical").
+# Because Rust regex has no lookbehind, guards work at the message level, not
+# inline. No genuine signal in the reference channel contains a guard word.
 #
 # When a new Telegram message does not match, give the complete message and
 # this file to a browser-based AI assistant such as ChatGPT, Claude, or Gemini.
@@ -23,28 +42,45 @@
 
 version: 1
 patterns:
+  # --- Guard: message-level veto for hypothetical / discussion posts. --------
+  - name: hypothetical
+    regex: '(?i)\b(?:should|would|could)(?:''ve|ve|\s+(?:have|of))\b|\bif\s+i\s+(?:had|would|were)\b|\bwish\s+i\b|\bimagine\b|\bfor\s+(?:example|instance)\b|\bwhat\s+if\b|\bhypothetical'
+    action: guard
+    priority: 1
+    enabled: true
+  # --- Trade signals (verb anchored to line start). -------------------------
   - name: entry
-    regex: '(?i)\bSTARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*STARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 10
     enabled: true
   - name: add_usd
-    regex: '(?i)\bADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 20
     enabled: true
   - name: add_btc
-    regex: '(?i)\bADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
-  - name: reduce_pct
-    regex: '(?i)\bREDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+  - name: reduce_usd
+    regex: '(?im)^\s*REDUCE[D]?\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
     action: reduce
     priority: 30
     enabled: true
+  - name: reduce_btc
+    regex: '(?im)^\s*REDUCE[D]?\b\s*(?P<btc>[\d.]+)\s*BTC'
+    action: reduce
+    priority: 31
+    enabled: true
+  - name: reduce_pct
+    regex: '(?im)^\s*REDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+    action: reduce
+    priority: 32
+    enabled: true
   - name: close
-    regex: '(?i)\b(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
+    regex: '(?im)^\s*(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
     action: close
     priority: 40
     enabled: true

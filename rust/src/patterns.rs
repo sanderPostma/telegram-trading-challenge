@@ -11,6 +11,12 @@ pub enum RuleAction {
     Reduce,
     Close,
     Ignore,
+    /// A message-level veto. If any enabled guard rule matches, the whole
+    /// message is treated as discussion and produces no automated action.
+    /// This is how hypothetical/conditional wording ("should have added
+    /// $5000") is suppressed, since Rust regex has no lookbehind to express
+    /// it inline. Guard rules never produce a `RuleHit`.
+    Guard,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,8 +104,24 @@ pub fn match_first(text: &str, rules: &[PatternRule]) -> anyhow::Result<Option<R
 }
 
 pub fn match_actions(text: &str, rules: &[PatternRule]) -> anyhow::Result<Vec<RuleHit>> {
+    // A guard rule vetoes the entire message before any trade verb is
+    // considered. Hypothetical/discussion posts ("I should have added $5000",
+    // "for example, if you close the trade...") must never place an order.
+    for rule in rules
+        .iter()
+        .filter(|rule| rule.enabled && rule.action == RuleAction::Guard)
+    {
+        let re = Regex::new(&rule.regex)?;
+        if re.is_match(text) {
+            return Ok(Vec::new());
+        }
+    }
+
     let mut matches = Vec::new();
-    for rule in rules.iter().filter(|rule| rule.enabled) {
+    for rule in rules
+        .iter()
+        .filter(|rule| rule.enabled && rule.action != RuleAction::Guard)
+    {
         let re = Regex::new(&rule.regex)?;
         for caps in re.captures_iter(text) {
             let Some(full_match) = caps.get(0) else {
@@ -218,6 +240,116 @@ mod tests {
     }
 
     #[test]
+    fn narrative_past_tense_does_not_trade() {
+        let rules = default_rules();
+
+        // Real channel message id 114: the author recounts a *separate* eth
+        // trade ("This is not challenge"). The verb is buried mid-paragraph
+        // and the post is hypothetical/conditional, so it must produce no add.
+        let narrative = "The tiny loss on the challenge so far of $1700 is \
+             replaced with a $10,000 profit\n\nI think I added $20,000 of \
+             margin to take the trade\n\nWe're not even close to needing more \
+             margin nor would I use it";
+        let hits = match_actions(narrative, &rules).unwrap();
+        assert!(
+            hits.is_empty(),
+            "narrative recap must not produce any action, got {hits:?}"
+        );
+
+        // Line-anchoring alone: a buried verb without any guard word is still
+        // ignored because it is not a terse command on its own line.
+        let buried = "price action was ugly so I closed my other book and \
+             later I added $5000 to that position";
+        assert!(match_actions(buried, &rules).unwrap().is_empty());
+    }
+
+    #[test]
+    fn hypothetical_wording_is_vetoed() {
+        let rules = default_rules();
+        for text in [
+            "I should have added $5000 here",
+            "if I had added $5,000 we would be up",
+            "I wish I added $10,000 earlier",
+            "imagine if you STARTED 0.5BTC SHORT at the top",
+            "for example, REDUCE $5000 when it hits target",
+            "what if we CLOSED here",
+        ] {
+            assert!(
+                match_actions(text, &rules).unwrap().is_empty(),
+                "guarded message should produce no action: {text:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn terse_signals_still_match_after_anchoring() {
+        let rules = default_rules();
+
+        // Signal line followed by commentary (real message id 152 shape).
+        let with_comment = "ADDED $10000\n\nYes i know its playing with fire \
+             but the analysis says we are fine";
+        let add = match_first(with_comment, &rules).unwrap().unwrap();
+        assert_eq!(add.action, RuleAction::Add);
+        assert_eq!(add.size, Some(Size::Usd(10_000.0)));
+
+        // Compound: the second instruction after AND is still captured.
+        let compound = match_actions(
+            "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT 64,300",
+            &rules,
+        )
+        .unwrap();
+        assert_eq!(compound.len(), 2);
+        assert_eq!(compound[1].trigger_price, Some(64_300.0));
+    }
+
+    #[test]
+    fn reduce_supports_percent_dollars_and_btc() {
+        let rules = default_rules();
+
+        let pct = match_first("REDUCED 50% of the position", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(pct.action, RuleAction::Reduce);
+        assert_eq!(pct.size, Some(Size::Pct(0.5)));
+
+        let usd = match_first("REDUCE $5000", &rules).unwrap().unwrap();
+        assert_eq!(usd.action, RuleAction::Reduce);
+        assert_eq!(usd.size, Some(Size::Usd(5000.0)));
+
+        let btc = match_first("REDUCED 0.2 BTC", &rules).unwrap().unwrap();
+        assert_eq!(btc.action, RuleAction::Reduce);
+        assert_eq!(btc.size, Some(Size::Btc(0.2)));
+
+        // A stray percentage in prose is not a reduction.
+        assert!(match_first("we are down about 3% on the day", &rules)
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn close_only_matches_at_line_start() {
+        let rules = default_rules();
+
+        // Proximity / discussion uses of "close" must not classify as a close.
+        for text in [
+            "So close but did not trigger",
+            "the lines getting very very close to a bear cross",
+            "No plans to close, if you like you can use a stoploss",
+        ] {
+            let hit = match_first(text, &rules).unwrap();
+            assert_ne!(
+                hit.map(|h| h.action),
+                Some(RuleAction::Close),
+                "must not be a close: {text:?}"
+            );
+        }
+
+        // A real terse close signal still classifies.
+        let closed = match_first("CLOSED", &rules).unwrap().unwrap();
+        assert_eq!(closed.action, RuleAction::Close);
+    }
+
+    #[test]
     fn extracts_metadata_values() {
         assert_eq!(
             extract_master_balance("Account balance $10,000"),
@@ -244,7 +376,9 @@ patterns:
 "#;
         let merged = merge_pattern_documents(default_rules_yaml(), local).unwrap();
         let rules = parse_pattern_document(&merged).unwrap();
-        assert_eq!(rules.len(), 7);
+        // 9 default patterns (guard, entry, add_usd, add_btc, reduce_usd,
+        // reduce_btc, reduce_pct, close, noop) + the new custom_add override.
+        assert_eq!(rules.len(), 10);
         assert_eq!(
             rules
                 .iter()
