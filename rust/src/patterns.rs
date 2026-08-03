@@ -172,6 +172,33 @@ pub fn extract_trade_size(text: &str) -> Option<f64> {
         .and_then(|m| parse_number(m.as_str()))
 }
 
+/// Extracts an advisory full-close price target, e.g. "target for full close is
+/// 63600-63700". Returns `(low, high)` normalized so `low <= high`; a single
+/// value yields `high == low`. Returns `None` for hypothetical/guarded wording,
+/// mirroring the `hypothetical` guard used by the pattern engine.
+pub fn extract_close_target_range(text: &str) -> Option<(f64, f64)> {
+    // Same vocabulary as the YAML `hypothetical` guard: discussion, not a signal.
+    let guard = Regex::new(
+        r"(?i)\b(?:should|would|could)(?:'ve|ve|\s+(?:have|of))\b|\bif\s+i\s+(?:had|would|were)\b|\bwish\s+i\b|\bimagine\b|\bfor\s+(?:example|instance)\b|\bwhat\s+if\b|\bhypothetical",
+    )
+    .ok()?;
+    if guard.is_match(text) {
+        return None;
+    }
+
+    let re = Regex::new(
+        r"(?i)(?:full\s+close\s+target|target\s+(?:for|to)\s+(?:a\s+)?full\s+close(?:\s+is)?)\s*:?\s*\$?(?P<low>[\d,]+(?:\.\d+)?)(?:\s*(?:-|–|—|to)\s*\$?(?P<high>[\d,]+(?:\.\d+)?))?",
+    )
+    .ok()?;
+    let caps = re.captures(text)?;
+    let low = parse_number(caps.name("low")?.as_str())?;
+    let high = caps
+        .name("high")
+        .and_then(|m| parse_number(m.as_str()))
+        .unwrap_or(low);
+    Some((low.min(high), low.max(high)))
+}
+
 fn parse_direction(value: &str) -> Option<Direction> {
     match value.to_ascii_lowercase().as_str() {
         "long" => Some(Direction::Long),
@@ -417,6 +444,42 @@ mod tests {
             Some(10_000.0)
         );
         assert_eq!(extract_trade_size("Trade Size $31,000"), Some(31_000.0));
+    }
+
+    #[test]
+    fn extracts_close_target_range() {
+        // Range with the canonical channel phrasing.
+        assert_eq!(
+            extract_close_target_range("my target for full close is 63600-63700"),
+            Some((63_600.0, 63_700.0))
+        );
+        // "to" separator and a leading verb-first phrasing.
+        assert_eq!(
+            extract_close_target_range("full close target 63600 to 63700"),
+            Some((63_600.0, 63_700.0))
+        );
+        // En-dash separator and thousands separators / dollar sign.
+        assert_eq!(
+            extract_close_target_range("target for full close is $63,600–$63,700"),
+            Some((63_600.0, 63_700.0))
+        );
+        // Single value: high == low.
+        assert_eq!(
+            extract_close_target_range("target for full close is 63600"),
+            Some((63_600.0, 63_600.0))
+        );
+        // Reversed order normalizes so low <= high.
+        assert_eq!(
+            extract_close_target_range("target for full close is 63700-63600"),
+            Some((63_600.0, 63_700.0))
+        );
+        // Hypothetical wording must not arm anything.
+        assert_eq!(
+            extract_close_target_range("if I had a target for full close it would be 63600"),
+            None
+        );
+        // Unrelated prose does not match.
+        assert_eq!(extract_close_target_range("closed half, banked $300"), None);
     }
 
     #[test]
