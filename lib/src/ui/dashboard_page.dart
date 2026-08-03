@@ -795,10 +795,43 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Brand.danger),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Close Position'),
+          Tooltip(
+            message: 'Double-click to confirm',
+            child: InkWell(
+              onDoubleTap: () => Navigator.of(context).pop(true),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Please double-click the button to confirm.'),
+                  ),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Ink(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Brand.danger,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber, color: Brand.bg, size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Double-Click to Close',
+                      style: TextStyle(
+                        color: Brand.bg,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -890,19 +923,6 @@ class _PositionPanel extends StatelessWidget {
                 style: const TextStyle(color: Brand.danger, fontSize: 12),
               ),
             ],
-            const SizedBox(height: 18),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: () => _confirmFlatten(context, controller),
-                style: TextButton.styleFrom(
-                  foregroundColor: Brand.danger,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                icon: const Icon(Icons.close),
-                label: const Text('Flatten position'),
-              ),
-            ),
           ],
         ),
       ),
@@ -912,68 +932,6 @@ class _PositionPanel extends StatelessWidget {
   String _formatLeverage(double value) {
     if (!value.isFinite || value <= 0) return '--';
     return '${value.toStringAsFixed(2)}x';
-  }
-
-  Future<void> _confirmFlatten(
-    BuildContext context,
-    AppController controller,
-  ) async {
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Flatten Position'),
-        content: const Text(
-          'Are you sure you want to close this position immediately at market price?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          Tooltip(
-            message: 'Double-click to confirm',
-            child: InkWell(
-              onDoubleTap: () => Navigator.of(context).pop(true),
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please double-click the button to confirm.'),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Ink(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: Brand.danger,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.warning_amber, color: Brand.bg, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Double-Click to Flatten',
-                      style: TextStyle(
-                        color: Brand.bg,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (result == true) {
-      controller.manualFlatten();
-    }
   }
 }
 
