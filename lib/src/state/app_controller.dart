@@ -19,10 +19,10 @@ import '../patterns/patterns_readme.dart';
 enum WeexPriceStatus { idle, connecting, live, unavailable }
 
 /// How a parsed Telegram CLOSE signal should be handled. CLOSE is never
-/// auto-executed: it is ignored entirely under auto-approve, and otherwise
-/// only queues a flatten when there is a live position to close.
+/// auto-executed: whenever there is a live position it queues a full flatten
+/// for the user to confirm — in both manual and auto-approve mode — and does
+/// nothing when the book is already flat.
 enum TelegramCloseDisposition {
-  ignoredAutoApprove,
   ignoredNoPosition,
   queueForApproval,
 }
@@ -458,6 +458,94 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Reduce-only quantity (BTC, rounded to lot and capped at the open position)
+  /// for a manual dashboard reduction. Unlike the Telegram reduce path — which
+  /// scales the master's size to our book — a manual reduce acts directly on our
+  /// own position: a percentage is relative to what we hold, and USDT/BTC are
+  /// our own book units. Returns 0 when there is nothing to reduce.
+  double previewManualReduceBtc({
+    required double amount,
+    required SizeUnit unit,
+    required bool isPercent,
+  }) {
+    if (position.isFlat || position.qtyBtc <= 0 || amount <= 0) return 0;
+    final mark = config.markPrice;
+    final raw = isPercent
+        ? position.qtyBtc * (amount / 100)
+        : switch (unit) {
+            SizeUnit.usdt => mark > 0 ? amount / mark : 0.0,
+            SizeUnit.btc => amount,
+          };
+    return _roundDown(min(raw, position.qtyBtc), 0.0001);
+  }
+
+  /// Places a manual reduce-only order against the open position. A reduction
+  /// that covers the whole position is routed through [manualFlatten] so a live
+  /// exit is submitted (and simulation realizes PnL). Mirrors [openManualTrade]:
+  /// under auto-approve it places immediately, otherwise it queues for approval.
+  Future<void> manualReduce({
+    required double amount,
+    required SizeUnit unit,
+    required bool isPercent,
+  }) async {
+    if (position.isFlat || position.direction == null || position.qtyBtc <= 0) {
+      _log('Manual reduce ignored: no open position.');
+      notifyListeners();
+      return;
+    }
+    if (config.markPrice <= 0) {
+      _log('Manual reduce rejected: waiting for live WEEX BTC price.');
+      return;
+    }
+    final quantity = previewManualReduceBtc(
+      amount: amount,
+      unit: unit,
+      isPercent: isPercent,
+    );
+    if (quantity <= 0) {
+      _log(
+        'Manual reduce rejected: enter a positive amount within the open position.',
+      );
+      return;
+    }
+    // A reduction that reaches the whole position is a flatten; reuse the exit
+    // path so it submits live and realizes PnL in simulation.
+    if (quantity >= _roundDown(position.qtyBtc, 0.0001)) {
+      manualFlatten();
+      return;
+    }
+
+    final mark = config.markPrice;
+    final label = isPercent
+        ? 'reduce ${amount.toStringAsFixed(0)}%'
+        : unit == SizeUnit.btc
+        ? 'reduce ${amount.toStringAsFixed(4)} BTC'
+        : 'reduce \$${amount.toStringAsFixed(0)}';
+    final order = PlannedOrder(
+      id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
+      kind: TradeKind.reduce,
+      direction: position.direction!,
+      sourceAmount: quantity,
+      sourceUnit: SizeUnit.btc,
+      scaledBtc: quantity,
+      scaledNotionalUsd: quantity * mark,
+      markPrice: mark,
+      createdAt: DateTime.now(),
+      status: TradeStatus.pendingApproval,
+      source: 'Manual dashboard $label',
+    );
+
+    if (config.autoApprove) {
+      _log('Manual reduce auto-approved: ${_describe(order)}.');
+      await _place(order);
+    } else {
+      pendingApproval = order;
+      orders.insert(0, order);
+      _log('Manual reduce requires approval: ${_describe(order)}.');
+      notifyListeners();
+    }
+  }
+
   Future<void> handleIncomingTelegramMessage({
     required String text,
     String channel = 'Telegram',
@@ -537,8 +625,9 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.rejected;
     }
 
-    // CLOSE is never auto-executed. Under auto-approve it is ignored entirely;
-    // in manual mode it queues a full-flatten for the user to approve.
+    // CLOSE is never auto-executed. It always queues a full-flatten for the
+    // user to confirm via the approval dialog, in both manual and auto-approve
+    // mode.
     if (action.kind == rust_interpreter.ActionKind.close) {
       return _handleParsedTelegramClose(summary: summary, channel: channel);
     }
@@ -620,23 +709,14 @@ class AppController extends ChangeNotifier {
     }
   }
 
-  /// Handles a parsed CLOSE signal. A close never auto-executes: under
-  /// auto-approve it is ignored (exits stay under manual control), and in
-  /// manual mode it queues a reduce-only full flatten for the user to approve.
+  /// Handles a parsed CLOSE signal. A close never auto-executes: it always
+  /// queues a reduce-only full flatten for the user to confirm via the approval
+  /// dialog, in both manual and auto-approve mode. It does nothing when the
+  /// book is already flat.
   Future<rust_telegram.TelegramActionStatus> _handleParsedTelegramClose({
     required String summary,
     required String channel,
   }) async {
-    // Auto-approve is checked before any exchange call: a CLOSE must never
-    // touch a live position while auto-approve is on.
-    if (closeDisposition(autoApprove: config.autoApprove, position: position) ==
-        TelegramCloseDisposition.ignoredAutoApprove) {
-      _log(
-        'Telegram CLOSE ignored under auto-approve: $summary. Use Flatten to exit manually.',
-      );
-      return rust_telegram.TelegramActionStatus.rejected;
-    }
-
     await _refreshExchangePositionForTelegramAction();
     if (closeDisposition(autoApprove: config.autoApprove, position: position) !=
         TelegramCloseDisposition.queueForApproval) {
@@ -670,7 +750,8 @@ class AppController extends ChangeNotifier {
     pendingApproval = order;
     orders.insert(0, order);
     await AppLog.write(
-      'Telegram CLOSE queued for approval: ${_describe(order)} (auto-approve is off).',
+      'Telegram CLOSE queued for approval: ${_describe(order)} '
+      '(auto-approve=${config.autoApprove}; a close always requires confirmation).',
     );
     _log('Telegram CLOSE requires approval: ${_describe(order)}.');
     notifyListeners();
@@ -1190,11 +1271,48 @@ class AppController extends ChangeNotifier {
   }
 
   void manualFlatten() {
-    if (position.isFlat) {
+    if (position.isFlat || position.direction == null || position.qtyBtc <= 0) {
       _log('Manual flatten ignored: no open position.');
       notifyListeners();
       return;
     }
+
+    // Live mode: send a real reduce-only market order to WEEX rather than only
+    // adjusting local state. `_place` submits, reconciles, and logs against the
+    // actual (non-simulation) mode.
+    if (!config.simulationMode) {
+      final mark = config.markPrice;
+      if (mark <= 0) {
+        _log('Manual flatten skipped: waiting for live WEEX BTC price.');
+        notifyListeners();
+        return;
+      }
+      final quantity = _roundDown(position.qtyBtc, 0.0001);
+      if (quantity <= 0) {
+        _log('Manual flatten ignored: position smaller than one lot.');
+        notifyListeners();
+        return;
+      }
+      final order = PlannedOrder(
+        id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
+        kind: TradeKind.close,
+        direction: position.direction!,
+        sourceAmount: quantity,
+        sourceUnit: SizeUnit.btc,
+        scaledBtc: quantity,
+        scaledNotionalUsd: quantity * mark,
+        markPrice: mark,
+        createdAt: DateTime.now(),
+        status: TradeStatus.pendingApproval,
+        source: 'Manual flatten, close position',
+      );
+      _log('Manual flatten: submitting reduce-only close ${_describe(order)}.');
+      unawaited(_place(order));
+      notifyListeners();
+      return;
+    }
+
+    // Simulation mode: settle the position locally and realize its PnL.
     final realizedPnl = position.unrealizedPnlUsd;
     _localRealizedPnlUsd += realizedPnl;
     config = config.copyWith(myBalanceUsd: config.myBalanceUsd + realizedPnl);
@@ -1995,18 +2113,20 @@ class AppController extends ChangeNotifier {
   /// return null so a parsed CLOSE never flows through the generic
   /// auto-approve path (the "close" verb is a common English word that appears
   /// in commentary). CLOSE is instead handled by [_handleParsedTelegramClose],
-  /// which ignores it under auto-approve and otherwise queues a full flatten
-  /// for manual approval. Kept static and [visibleForTesting] so this guarantee
-  /// — CLOSE is never auto-executed — is locked by a unit test.
-  /// Decides how a CLOSE signal is handled. Auto-approve always wins first, so
-  /// a CLOSE can never auto-execute even against an open position. Pure and
-  /// [visibleForTesting] so the "no auto-close" guarantee is locked by a test.
+  /// which always queues a full flatten for the user to confirm. Kept static and
+  /// [visibleForTesting] so this guarantee — CLOSE is never auto-executed — is
+  /// locked by a unit test.
+  /// Decides how a CLOSE signal is handled. A CLOSE never auto-executes: with a
+  /// live position it always queues for the user to confirm, regardless of the
+  /// auto-approve setting, so a stray "close" in commentary can never silently
+  /// flatten the book. Pure and [visibleForTesting] so the "no auto-close"
+  /// guarantee is locked by a test. [autoApprove] is accepted (and ignored) so
+  /// the call sites read symmetrically with the other Telegram handlers.
   @visibleForTesting
   static TelegramCloseDisposition closeDisposition({
     required bool autoApprove,
     required PositionView position,
   }) {
-    if (autoApprove) return TelegramCloseDisposition.ignoredAutoApprove;
     if (position.isFlat ||
         position.qtyBtc <= 0 ||
         position.direction == null) {

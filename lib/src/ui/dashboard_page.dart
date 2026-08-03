@@ -165,7 +165,14 @@ class _DashboardPageState extends State<DashboardPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: ManualTradePanel(controller: widget.controller),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ManualTradePanel(controller: widget.controller),
+                            const SizedBox(height: 16),
+                            ManualReducePanel(controller: widget.controller),
+                          ],
+                        ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -177,6 +184,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   Column(
                     children: [
                       ManualTradePanel(controller: widget.controller),
+                      const SizedBox(height: 16),
+                      ManualReducePanel(controller: widget.controller),
                       const SizedBox(height: 16),
                       _PositionPanel(controller: widget.controller),
                     ],
@@ -553,6 +562,220 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
       unit: _unit,
       direction: direction,
     );
+  }
+}
+
+/// Reduce mode for [ManualReducePanel]. `percent` reduces a share of the open
+/// position; `usdt`/`btc` reduce a fixed amount of our own book.
+enum _ReduceMode { percent, usdt, btc }
+
+class ManualReducePanel extends StatefulWidget {
+  const ManualReducePanel({super.key, required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<ManualReducePanel> createState() => _ManualReducePanelState();
+}
+
+class _ManualReducePanelState extends State<ManualReducePanel> {
+  final _amount = TextEditingController(text: '50');
+  _ReduceMode _mode = _ReduceMode.percent;
+
+  @override
+  void dispose() {
+    _amount.dispose();
+    super.dispose();
+  }
+
+  SizeUnit get _unit =>
+      _mode == _ReduceMode.btc ? SizeUnit.btc : SizeUnit.usdt;
+  bool get _isPercent => _mode == _ReduceMode.percent;
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final position = controller.position;
+    final flat = position.isFlat || position.qtyBtc <= 0;
+    final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
+    final reduceBtc = controller.previewManualReduceBtc(
+      amount: amount,
+      unit: _unit,
+      isPercent: _isPercent,
+    );
+    final reduceUsd = reduceBtc * controller.config.markPrice;
+    final remaining = (position.qtyBtc - reduceBtc).clamp(0.0, double.infinity);
+    final pctOfPosition = position.qtyBtc > 0
+        ? (reduceBtc / position.qtyBtc) * 100
+        : 0.0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.remove_circle_outline, color: Brand.danger),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Manual Reduce / Exit',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              flat
+                  ? 'No open position to reduce.'
+                  : 'Open ${position.direction!.name.toUpperCase()} ${position.qtyBtc.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
+              style: const TextStyle(color: Brand.muted, fontSize: 12),
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<_ReduceMode>(
+                segments: const [
+                  ButtonSegment(value: _ReduceMode.percent, label: Text('%')),
+                  ButtonSegment(value: _ReduceMode.usdt, label: Text('USDT')),
+                  ButtonSegment(value: _ReduceMode.btc, label: Text('BTC')),
+                ],
+                selected: {_mode},
+                onSelectionChanged: flat
+                    ? null
+                    : (value) => setState(() => _mode = value.first),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _amount,
+              enabled: !flat,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: switch (_mode) {
+                  _ReduceMode.percent => 'Percent of position',
+                  _ReduceMode.usdt => 'Reduce USDT',
+                  _ReduceMode.btc => 'Reduce BTC',
+                },
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            if (_isPercent) ...[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final pct in const [25, 50, 75, 100])
+                    ActionChip(
+                      label: Text('$pct%'),
+                      onPressed: flat
+                          ? null
+                          : () => setState(() => _amount.text = '$pct'),
+                    ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Brand.surface2,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Brand.border),
+              ),
+              child: Wrap(
+                spacing: 20,
+                runSpacing: 8,
+                children: [
+                  _Metric('Reduce BTC', reduceBtc.toStringAsFixed(4)),
+                  _Metric('Reduce USDT', reduceUsd.toStringAsFixed(2)),
+                  _Metric('% of position', '${pctOfPosition.toStringAsFixed(0)}%'),
+                  _Metric('Remaining BTC', remaining.toStringAsFixed(4)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final narrow = constraints.maxWidth < 280;
+                final reduceBtn = FilledButton.icon(
+                  style: FilledButton.styleFrom(backgroundColor: Brand.danger),
+                  onPressed: (flat || reduceBtc <= 0) ? null : _reduce,
+                  icon: const Icon(Icons.remove),
+                  label: const Text('Reduce', softWrap: false),
+                );
+                final exitBtn = OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Brand.danger,
+                    side: const BorderSide(color: Brand.danger),
+                  ),
+                  onPressed: flat ? null : _confirmExit,
+                  icon: const Icon(Icons.close),
+                  label: const Text('Close Position', softWrap: false),
+                );
+
+                if (narrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [reduceBtn, const SizedBox(height: 8), exitBtn],
+                  );
+                }
+                return Row(
+                  children: [
+                    Expanded(child: reduceBtn),
+                    const SizedBox(width: 12),
+                    Expanded(child: exitBtn),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _reduce() {
+    final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
+    unawaited(
+      widget.controller.manualReduce(
+        amount: amount,
+        unit: _unit,
+        isPercent: _isPercent,
+      ),
+    );
+  }
+
+  Future<void> _confirmExit() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Close Position'),
+        content: const Text(
+          'Close the entire open position immediately at market price?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Brand.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Close Position'),
+          ),
+        ],
+      ),
+    );
+    if (result == true) {
+      widget.controller.manualFlatten();
+    }
   }
 }
 

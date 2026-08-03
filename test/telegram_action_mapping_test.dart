@@ -47,13 +47,15 @@ void main() {
       unrealizedPnlUsd: 0,
     );
 
-    test('auto-approve ON never auto-closes, even with an open position', () {
+    test('auto-approve ON with an open position queues for approval', () {
+      // A CLOSE never auto-executes: even under auto-approve it must surface
+      // the confirmation dialog rather than being silently ignored.
       expect(
         AppController.closeDisposition(
           autoApprove: true,
           position: openPosition,
         ),
-        TelegramCloseDisposition.ignoredAutoApprove,
+        TelegramCloseDisposition.queueForApproval,
       );
     });
 
@@ -67,7 +69,14 @@ void main() {
       );
     });
 
-    test('auto-approve OFF with no position does nothing', () {
+    test('no open position does nothing, regardless of auto-approve', () {
+      expect(
+        AppController.closeDisposition(
+          autoApprove: true,
+          position: flatPosition,
+        ),
+        TelegramCloseDisposition.ignoredNoPosition,
+      );
       expect(
         AppController.closeDisposition(
           autoApprove: false,
