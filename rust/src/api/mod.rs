@@ -2,9 +2,11 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, OnceLock};
 
 use crate::{
-    interpreter::{interpret, Action, InterpreterState},
+    interpreter::{interpret, Action, Direction, InterpreterState},
     patterns::{
-        default_rules, match_actions, match_first, merge_pattern_documents, parse_pattern_document,
+        close_target_should_fire as patterns_close_target_should_fire, default_rules,
+        extract_close_target_range, match_actions, match_first, merge_pattern_documents,
+        parse_pattern_document,
     },
     scaling::{scale_order, ScaleInput, ScaledOrder},
     telegram, weex, Size,
@@ -94,6 +96,12 @@ pub struct ManualScaleRequest {
 pub enum ManualSizeUnit {
     Btc,
     Usdt,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct CloseTarget {
+    pub low: f64,
+    pub high: f64,
 }
 
 const CHART_HISTORY_LIMIT: usize = 1_440;
@@ -336,6 +344,14 @@ pub fn get_equity_history() -> Vec<SeriesPoint> {
 
 pub fn get_pnl_history() -> Vec<SeriesPoint> {
     get_chart_data().pnl
+}
+
+pub fn extract_close_target(text: String) -> Option<CloseTarget> {
+    extract_close_target_range(&text).map(|(low, high)| CloseTarget { low, high })
+}
+
+pub fn close_target_should_fire(direction: Direction, price: f64, low: f64, high: f64) -> bool {
+    patterns_close_target_should_fire(direction, price, low, high)
 }
 
 pub fn classify_message(text: String) -> ApiResultAction {

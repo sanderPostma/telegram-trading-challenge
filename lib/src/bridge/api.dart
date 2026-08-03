@@ -12,7 +12,7 @@ import 'weex.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chart_history`, `classify_message_actions_with_rules`, `push_point`, `weex_rejection_message`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `StateView`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Stream<PriceTick> weexPublicPriceStream() => RustLib.instance.api.crateApiWeexPublicPriceStream();
 
@@ -71,6 +71,21 @@ Future<List<SeriesPoint>> getBalanceHistory() => RustLib.instance.api.crateApiGe
 Future<List<SeriesPoint>> getEquityHistory() => RustLib.instance.api.crateApiGetEquityHistory();
 
 Future<List<SeriesPoint>> getPnlHistory() => RustLib.instance.api.crateApiGetPnlHistory();
+
+Future<CloseTarget?> extractCloseTarget({required String text}) =>
+    RustLib.instance.api.crateApiExtractCloseTarget(text: text);
+
+Future<bool> closeTargetShouldFire({
+  required Direction direction,
+  required double price,
+  required double low,
+  required double high,
+}) => RustLib.instance.api.crateApiCloseTargetShouldFire(
+  direction: direction,
+  price: price,
+  low: low,
+  high: high,
+);
 
 Future<ApiResultAction> classifyMessage({required String text}) =>
     RustLib.instance.api.crateApiClassifyMessage(text: text);
@@ -275,6 +290,24 @@ class ChartData {
           balance == other.balance &&
           equity == other.equity &&
           pnl == other.pnl;
+}
+
+class CloseTarget {
+  final double low;
+  final double high;
+
+  const CloseTarget({required this.low, required this.high});
+
+  @override
+  int get hashCode => low.hashCode ^ high.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CloseTarget &&
+          runtimeType == other.runtimeType &&
+          low == other.low &&
+          high == other.high;
 }
 
 class ManualScaleRequest {

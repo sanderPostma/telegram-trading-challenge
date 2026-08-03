@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1653100857;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1445657086;
 
 // Section: executor
 
@@ -183,6 +183,47 @@ fn wire__crate__api__classify_message_actions_with_patterns_impl(
         },
     )
 }
+fn wire__crate__api__close_target_should_fire_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "close_target_should_fire",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_direction = <crate::interpreter::Direction>::sse_decode(&mut deserializer);
+            let api_price = <f64>::sse_decode(&mut deserializer);
+            let api_low = <f64>::sse_decode(&mut deserializer);
+            let api_high = <f64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::close_target_should_fire(
+                        api_direction,
+                        api_price,
+                        api_low,
+                        api_high,
+                    ))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__default_patterns_yaml_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -209,6 +250,40 @@ fn wire__crate__api__default_patterns_yaml_impl(
             move |context| {
                 transform_result_sse::<_, ()>((move || {
                     let output_ok = Result::<_, ()>::Ok(crate::api::default_patterns_yaml())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__extract_close_target_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "extract_close_target",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Result::<_, ()>::Ok(crate::api::extract_close_target(api_text))?;
                     Ok(output_ok)
                 })())
             }
@@ -1121,6 +1196,18 @@ impl SseDecode for crate::api::ChartData {
     }
 }
 
+impl SseDecode for crate::api::CloseTarget {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_low = <f64>::sse_decode(deserializer);
+        let mut var_high = <f64>::sse_decode(deserializer);
+        return crate::api::CloseTarget {
+            low: var_low,
+            high: var_high,
+        };
+    }
+}
+
 impl SseDecode for crate::interpreter::Direction {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1264,6 +1351,17 @@ impl SseDecode for Option<crate::interpreter::Action> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::interpreter::Action>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::api::CloseTarget> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::api::CloseTarget>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -1756,26 +1854,28 @@ fn pde_ffi_dispatcher_primary_impl(
             rust_vec_len,
             data_len,
         ),
-        5 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__close_target_should_fire_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -1998,6 +2098,22 @@ impl flutter_rust_bridge::IntoDart for crate::api::ChartData {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::ChartData {}
 impl flutter_rust_bridge::IntoIntoDart<crate::api::ChartData> for crate::api::ChartData {
     fn into_into_dart(self) -> crate::api::ChartData {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::CloseTarget {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.low.into_into_dart().into_dart(),
+            self.high.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::CloseTarget {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::CloseTarget> for crate::api::CloseTarget {
+    fn into_into_dart(self) -> crate::api::CloseTarget {
         self
     }
 }
@@ -2609,6 +2725,14 @@ impl SseEncode for crate::api::ChartData {
     }
 }
 
+impl SseEncode for crate::api::CloseTarget {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <f64>::sse_encode(self.low, serializer);
+        <f64>::sse_encode(self.high, serializer);
+    }
+}
+
 impl SseEncode for crate::interpreter::Direction {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2740,6 +2864,16 @@ impl SseEncode for Option<crate::interpreter::Action> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::interpreter::Action>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::api::CloseTarget> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::api::CloseTarget>::sse_encode(value, serializer);
         }
     }
 }

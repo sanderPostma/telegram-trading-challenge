@@ -70,6 +70,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Action dco_decode_box_autoadd_action(dynamic raw);
 
   @protected
+  CloseTarget dco_decode_box_autoadd_close_target(dynamic raw);
+
+  @protected
   Direction dco_decode_box_autoadd_direction(dynamic raw);
 
   @protected
@@ -112,6 +115,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChartData dco_decode_chart_data(dynamic raw);
 
   @protected
+  CloseTarget dco_decode_close_target(dynamic raw);
+
+  @protected
   Direction dco_decode_direction(dynamic raw);
 
   @protected
@@ -149,6 +155,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Action? dco_decode_opt_box_autoadd_action(dynamic raw);
+
+  @protected
+  CloseTarget? dco_decode_opt_box_autoadd_close_target(dynamic raw);
 
   @protected
   Direction? dco_decode_opt_box_autoadd_direction(dynamic raw);
@@ -285,6 +294,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Action sse_decode_box_autoadd_action(SseDeserializer deserializer);
 
   @protected
+  CloseTarget sse_decode_box_autoadd_close_target(SseDeserializer deserializer);
+
+  @protected
   Direction sse_decode_box_autoadd_direction(SseDeserializer deserializer);
 
   @protected
@@ -333,6 +345,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ChartData sse_decode_chart_data(SseDeserializer deserializer);
 
   @protected
+  CloseTarget sse_decode_close_target(SseDeserializer deserializer);
+
+  @protected
   Direction sse_decode_direction(SseDeserializer deserializer);
 
   @protected
@@ -370,6 +385,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Action? sse_decode_opt_box_autoadd_action(SseDeserializer deserializer);
+
+  @protected
+  CloseTarget? sse_decode_opt_box_autoadd_close_target(SseDeserializer deserializer);
 
   @protected
   Direction? sse_decode_opt_box_autoadd_direction(SseDeserializer deserializer);
@@ -519,6 +537,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_box_autoadd_action(Action self, SseSerializer serializer);
 
   @protected
+  void sse_encode_box_autoadd_close_target(CloseTarget self, SseSerializer serializer);
+
+  @protected
   void sse_encode_box_autoadd_direction(Direction self, SseSerializer serializer);
 
   @protected
@@ -585,6 +606,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_chart_data(ChartData self, SseSerializer serializer);
 
   @protected
+  void sse_encode_close_target(CloseTarget self, SseSerializer serializer);
+
+  @protected
   void sse_encode_direction(Direction self, SseSerializer serializer);
 
   @protected
@@ -625,6 +649,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_action(Action? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_close_target(CloseTarget? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_direction(Direction? self, SseSerializer serializer);
