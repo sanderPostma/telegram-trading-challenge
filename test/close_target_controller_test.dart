@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:trading_challenge/src/bridge/weex.dart' as rust_weex;
-import 'package:trading_challenge/src/models/trading.dart';
 import 'package:trading_challenge/src/state/app_controller.dart';
 
 rust_weex.WeexAccountReconciliation _reconciliation({
