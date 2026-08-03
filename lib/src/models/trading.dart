@@ -20,6 +20,44 @@ class PriceCandle {
   final double close;
 }
 
+/// An armed advisory full-close price watch parsed from the signal channel.
+/// [low]/[high] bound the target zone (low <= high). Held on the controller and
+/// persisted so it survives an app restart.
+class CloseTargetWatch {
+  const CloseTargetWatch({
+    required this.low,
+    required this.high,
+    required this.source,
+    required this.armedAt,
+  });
+
+  final double low;
+  final double high;
+  final String source;
+  final DateTime armedAt;
+
+  Map<String, Object> toJson() => {
+    'low': low,
+    'high': high,
+    'source': source,
+    'armedAt': armedAt.toIso8601String(),
+  };
+
+  static CloseTargetWatch? fromJson(Map<String, Object?> json) {
+    final low = json['low'];
+    final high = json['high'];
+    if (low is! num || high is! num) return null;
+    final armedRaw = json['armedAt'];
+    return CloseTargetWatch(
+      low: low.toDouble(),
+      high: high.toDouble(),
+      source: json['source'] is String ? json['source'] as String : '',
+      armedAt: (armedRaw is String ? DateTime.tryParse(armedRaw) : null) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
 class AppConfig {
   const AppConfig({
     this.weexApiKey = '',
