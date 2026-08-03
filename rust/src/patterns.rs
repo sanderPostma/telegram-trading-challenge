@@ -199,6 +199,17 @@ pub fn extract_close_target_range(text: &str) -> Option<(f64, f64)> {
     Some((low.min(high), low.max(high)))
 }
 
+/// Whether live `price` has reached the advisory close zone for the current
+/// position side. Near-edge by direction: a LONG (price rising into the zone)
+/// fires at the low edge; a SHORT (price falling into the zone) fires at the
+/// high edge. Callers guarantee an open position and `price > 0`.
+pub fn close_target_should_fire(direction: Direction, price: f64, low: f64, high: f64) -> bool {
+    match direction {
+        Direction::Long => price >= low,
+        Direction::Short => price <= high,
+    }
+}
+
 fn parse_direction(value: &str) -> Option<Direction> {
     match value.to_ascii_lowercase().as_str() {
         "long" => Some(Direction::Long),
@@ -480,6 +491,19 @@ mod tests {
         );
         // Unrelated prose does not match.
         assert_eq!(extract_close_target_range("closed half, banked $300"), None);
+    }
+
+    #[test]
+    fn close_target_fires_on_near_edge_by_direction() {
+        // LONG enters the zone from below → fires at/above the low edge.
+        assert!(close_target_should_fire(Direction::Long, 63_600.0, 63_600.0, 63_700.0));
+        assert!(close_target_should_fire(Direction::Long, 63_650.0, 63_600.0, 63_700.0));
+        assert!(!close_target_should_fire(Direction::Long, 63_599.0, 63_600.0, 63_700.0));
+
+        // SHORT enters the zone from above → fires at/below the high edge.
+        assert!(close_target_should_fire(Direction::Short, 63_700.0, 63_600.0, 63_700.0));
+        assert!(close_target_should_fire(Direction::Short, 63_650.0, 63_600.0, 63_700.0));
+        assert!(!close_target_should_fire(Direction::Short, 63_701.0, 63_600.0, 63_700.0));
     }
 
     #[test]
