@@ -194,7 +194,10 @@ class _AppShellState extends State<AppShell> {
   }
 
   Future<void> _showCloseTargetDialog() async {
-    if (!mounted) return;
+    if (!mounted) {
+      _closeTargetDialogOpen = false;
+      return;
+    }
     final controller = widget.controller;
     final result = await showDialog<bool>(
       context: context,

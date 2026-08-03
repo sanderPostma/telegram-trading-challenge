@@ -1073,7 +1073,7 @@ class AppController extends ChangeNotifier {
         );
       }
       final candles = await _getHistoricalCandles();
-      _applyWeexReconciliation(result.value!, candles: candles);
+      applyWeexReconciliation(result.value!, candles: candles);
     } catch (error, stackTrace) {
       weexAccountConnected = false;
       weexReconciliationError = error.toString();
@@ -1215,7 +1215,13 @@ class AppController extends ChangeNotifier {
       config.weexSecret.trim().isNotEmpty &&
       config.weexPassphrase.trim().isNotEmpty;
 
-  void _applyWeexReconciliation(
+  /// Applies an exchange reconciliation snapshot. Renamed off `_` and marked
+  /// [visibleForTesting] so the close-target edge-trigger disarm (only on an
+  /// open->flat transition observed *by this reconcile*, never on an
+  /// already-flat watch) can be locked by a unit test without touching the
+  /// Rust bridge or the network.
+  @visibleForTesting
+  void applyWeexReconciliation(
     rust_weex.WeexAccountReconciliation update, {
     List<PriceCandle> candles = const [],
   }) {
@@ -1242,6 +1248,7 @@ class AppController extends ChangeNotifier {
     if (markPrice > 0) {
       config = config.copyWith(markPrice: markPrice);
     }
+    final closeWatchWasOpen = !position.isFlat;
     position = PositionView(
       direction: direction,
       qtyBtc: direction == null ? 0 : reconciledPosition.qtyBtc,
@@ -1257,7 +1264,12 @@ class AppController extends ChangeNotifier {
           ? 0
           : reconciledPosition.leverage,
     );
-    _disarmCloseTargetIfFlat();
+    // Edge-trigger: only disarm on an open->flat transition observed by this
+    // reconcile. A watch armed while flat (or restored from persistence on
+    // restart while flat) must persist until a position exists to flatten.
+    if (closeWatchWasOpen && position.isFlat) {
+      _disarmCloseTarget();
+    }
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
     _lastWeexReconciledAt = DateTime.now();
     weexAccountConnected = true;
@@ -1400,7 +1412,9 @@ class AppController extends ChangeNotifier {
             high: watch.high,
           )
           .then((fire) {
-            if (fire && closeTargetWatch != null && !closeTargetTriggered) {
+            if (fire &&
+                identical(closeTargetWatch, watch) &&
+                !closeTargetTriggered) {
               closeTargetTriggered = true;
               _log(
                 'Close-target reached ${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)} at ${price.toStringAsFixed(2)} USDT.',
