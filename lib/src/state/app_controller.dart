@@ -122,6 +122,7 @@ class AppController extends ChangeNotifier {
   );
   CloseTargetWatch? closeTargetWatch;
   bool closeTargetTriggered = false;
+  bool _evaluatingCloseTarget = false;
 
   Future<void> loadConfig() async {
     try {
@@ -564,6 +565,18 @@ class AppController extends ChangeNotifier {
         rust_telegram.TelegramActionStatus.rejected,
       ]);
       return;
+    }
+
+    if (useRustBridge) {
+      try {
+        final target = await rust.extractCloseTarget(text: rawText);
+        if (target != null) {
+          armCloseTarget(low: target.low, high: target.high, source: channel);
+        }
+      } catch (error, stackTrace) {
+        await AppLog.write('Close-target extraction failed: $error',
+            error: error, stackTrace: stackTrace);
+      }
     }
 
     await AppLog.write(
@@ -1152,6 +1165,7 @@ class AppController extends ChangeNotifier {
     _lastWeexPriceAt = DateTime.now();
     config = config.copyWith(markPrice: price);
     _markPositionToMarket(price);
+    _maybeTriggerCloseTarget(price);
     weexPriceConnected = true;
     weexPriceStatus = WeexPriceStatus.live;
     weexPriceError = null;
@@ -1243,6 +1257,7 @@ class AppController extends ChangeNotifier {
           ? 0
           : reconciledPosition.leverage,
     );
+    _disarmCloseTargetIfFlat();
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
     _lastWeexReconciledAt = DateTime.now();
     weexAccountConnected = true;
@@ -1327,6 +1342,7 @@ class AppController extends ChangeNotifier {
       notionalUsd: 0,
       unrealizedPnlUsd: 0,
     );
+    _disarmCloseTargetIfFlat();
     _log(
       'Position flattened in simulation state. Realized ${realizedPnl.toStringAsFixed(2)} USDT.',
     );
@@ -1366,6 +1382,36 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _maybeTriggerCloseTarget(double price) {
+    if (!useRustBridge) return;
+    final watch = closeTargetWatch;
+    if (watch == null || closeTargetTriggered || _evaluatingCloseTarget) return;
+    if (price <= 0 || position.isFlat || position.direction == null) return;
+    final direction = position.direction == TradeDirection.long
+        ? rust_interpreter.Direction.long
+        : rust_interpreter.Direction.short;
+    _evaluatingCloseTarget = true;
+    unawaited(
+      rust
+          .closeTargetShouldFire(
+            direction: direction,
+            price: price,
+            low: watch.low,
+            high: watch.high,
+          )
+          .then((fire) {
+            if (fire && closeTargetWatch != null && !closeTargetTriggered) {
+              closeTargetTriggered = true;
+              _log(
+                'Close-target reached ${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)} at ${price.toStringAsFixed(2)} USDT.',
+              );
+              notifyListeners();
+            }
+          })
+          .whenComplete(() => _evaluatingCloseTarget = false),
+    );
+  }
+
   void armCloseTarget({
     required double low,
     required double high,
@@ -1398,6 +1444,12 @@ class AppController extends ChangeNotifier {
     closeTargetTriggered = false;
     unawaited(_persistCloseTarget());
     notifyListeners();
+  }
+
+  void _disarmCloseTargetIfFlat() {
+    if (closeTargetWatch != null && position.isFlat) {
+      _disarmCloseTarget();
+    }
   }
 
   Future<void> _persistCloseTarget() async {
@@ -1825,6 +1877,7 @@ class AppController extends ChangeNotifier {
         unrealizedPnlUsd: 0,
         crossCombinedLeverage: position.crossCombinedLeverage,
       );
+      _disarmCloseTargetIfFlat();
       return;
     }
     final sameDirection =
