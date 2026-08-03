@@ -21,6 +21,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
   String? _shownApprovalId;
+  bool _closeTargetDialogOpen = false;
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +33,13 @@ class _AppShellState extends State<AppShell> {
           _shownApprovalId = pending.id;
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _showApproval(pending),
+          );
+        }
+
+        if (widget.controller.closeTargetTriggered && !_closeTargetDialogOpen) {
+          _closeTargetDialogOpen = true;
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _showCloseTargetDialog(),
           );
         }
 
@@ -183,6 +191,72 @@ class _AppShellState extends State<AppShell> {
     } else {
       widget.controller.rejectPending();
     }
+  }
+
+  Future<void> _showCloseTargetDialog() async {
+    if (!mounted) return;
+    final controller = widget.controller;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Close-target reached'),
+        content: AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) {
+            final watch = controller.closeTargetWatch;
+            final position = controller.position;
+            final live = controller.config.markPrice;
+            return SizedBox(
+              width: 420,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _kv(
+                    'Target',
+                    watch == null
+                        ? '--'
+                        : '${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)} USDT',
+                  ),
+                  _kv('Live price', '${live.toStringAsFixed(2)} USDT'),
+                  _kv('Side', position.direction?.name.toUpperCase() ?? 'FLAT'),
+                  _kv('Size', '${position.qtyBtc.toStringAsFixed(4)} BTC'),
+                  _kv(
+                    'Unrealized P&L',
+                    '${position.unrealizedPnlUsd.toStringAsFixed(2)} USDT',
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Price reached the advisory close zone. This does not close '
+                    'automatically — confirm to flatten, or dismiss to keep the '
+                    'position open.',
+                    style: TextStyle(color: Brand.muted),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Dismiss'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(backgroundColor: Brand.danger),
+            onPressed: () => Navigator.of(context).pop(true),
+            icon: const Icon(Icons.close),
+            label: const Text('Close now'),
+          ),
+        ],
+      ),
+    );
+    _closeTargetDialogOpen = false;
+    if (result == true) {
+      widget.controller.manualFlatten();
+    }
+    widget.controller.cancelCloseTarget();
   }
 
   Widget _kv(String label, String value) {
