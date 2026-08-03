@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1445657086;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 905367623;
 
 // Section: executor
 
@@ -284,6 +284,40 @@ fn wire__crate__api__extract_close_target_impl(
                 transform_result_sse::<_, ()>((move || {
                     let output_ok =
                         Result::<_, ()>::Ok(crate::api::extract_close_target(api_text))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__extract_master_balance_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "extract_master_balance",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_text = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Result::<_, ()>::Ok(crate::api::extract_master_balance(api_text))?;
                     Ok(output_ok)
                 })())
             }
@@ -1857,25 +1891,26 @@ fn pde_ffi_dispatcher_primary_impl(
         5 => wire__crate__api__close_target_should_fire_impl(port, ptr, rust_vec_len, data_len),
         6 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
         7 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__extract_master_balance_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }

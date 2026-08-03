@@ -5,8 +5,8 @@ use crate::{
     interpreter::{interpret, Action, Direction, InterpreterState},
     patterns::{
         close_target_should_fire as patterns_close_target_should_fire, default_rules,
-        extract_close_target_range, match_actions, match_first, merge_pattern_documents,
-        parse_pattern_document,
+        extract_close_target_range, extract_master_balance as patterns_extract_master_balance,
+        match_actions, match_first, merge_pattern_documents, parse_pattern_document,
     },
     scaling::{scale_order, ScaleInput, ScaledOrder},
     telegram, weex, Size,
@@ -348,6 +348,10 @@ pub fn get_pnl_history() -> Vec<SeriesPoint> {
 
 pub fn extract_close_target(text: String) -> Option<CloseTarget> {
     extract_close_target_range(&text).map(|(low, high)| CloseTarget { low, high })
+}
+
+pub fn extract_master_balance(text: String) -> Option<f64> {
+    patterns_extract_master_balance(&text)
 }
 
 pub fn close_target_should_fire(direction: Direction, price: f64, low: f64, high: f64) -> bool {

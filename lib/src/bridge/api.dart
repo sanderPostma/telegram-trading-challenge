@@ -75,6 +75,9 @@ Future<List<SeriesPoint>> getPnlHistory() => RustLib.instance.api.crateApiGetPnl
 Future<CloseTarget?> extractCloseTarget({required String text}) =>
     RustLib.instance.api.crateApiExtractCloseTarget(text: text);
 
+Future<double?> extractMasterBalance({required String text}) =>
+    RustLib.instance.api.crateApiExtractMasterBalance(text: text);
+
 Future<bool> closeTargetShouldFire({
   required Direction direction,
   required double price,

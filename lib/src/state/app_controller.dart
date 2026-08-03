@@ -577,6 +577,25 @@ class AppController extends ChangeNotifier {
         await AppLog.write('Close-target extraction failed: $error',
             error: error, stackTrace: stackTrace);
       }
+
+      // A "NEW BALANCE $7,800" (or "Account balance $X") announcement updates
+      // the challenge (master) account balance, which drives the scale ratio.
+      try {
+        final balance = await rust.extractMasterBalance(text: rawText);
+        if (balance != null &&
+            balance > 0 &&
+            balance != config.masterBalanceUsd) {
+          config = config.copyWith(masterBalanceUsd: balance);
+          _log(
+            'Challenge balance updated from $channel: ${balance.toStringAsFixed(2)} USDT.',
+          );
+          unawaited(_persistConfig());
+          notifyListeners();
+        }
+      } catch (error, stackTrace) {
+        await AppLog.write('Challenge balance extraction failed: $error',
+            error: error, stackTrace: stackTrace);
+      }
     }
 
     await AppLog.write(

@@ -156,12 +156,17 @@ pub fn match_actions(text: &str, rules: &[PatternRule]) -> anyhow::Result<Vec<Ru
     Ok(hits)
 }
 
+/// Extracts the challenge (master) account balance announced in a channel
+/// message. Recognizes both the "Account balance $10,000" status line and the
+/// terse "NEW BALANCE $7,800" announcement, with an optional `:`/`=` separator.
 pub fn extract_master_balance(text: &str) -> Option<f64> {
-    Regex::new(r"(?i)Account balance\s*\$?(?P<v>[\d,]+(?:\.\d+)?)")
-        .ok()?
-        .captures(text)?
-        .name("v")
-        .and_then(|m| parse_number(m.as_str()))
+    Regex::new(
+        r"(?i)(?:NEW\s+BALANCE|ACCOUNT\s+BALANCE)\s*[:=]?\s*\$?(?P<v>[\d,]+(?:\.\d+)?)",
+    )
+    .ok()?
+    .captures(text)?
+    .name("v")
+    .and_then(|m| parse_number(m.as_str()))
 }
 
 pub fn extract_trade_size(text: &str) -> Option<f64> {
@@ -453,6 +458,15 @@ mod tests {
         assert_eq!(
             extract_master_balance("Account balance $10,000"),
             Some(10_000.0)
+        );
+        // The channel also announces the challenge balance as "NEW BALANCE".
+        assert_eq!(
+            extract_master_balance("NEW BALANCE $7,800"),
+            Some(7_800.0)
+        );
+        assert_eq!(
+            extract_master_balance("New balance: 12,500.50"),
+            Some(12_500.50)
         );
         assert_eq!(extract_trade_size("Trade Size $31,000"), Some(31_000.0));
     }
