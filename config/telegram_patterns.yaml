@@ -49,38 +49,61 @@ patterns:
     priority: 1
     enabled: true
   # --- Trade signals (verb anchored to line start). -------------------------
+  # Entry verbs cover both the terse past-tense channel style ("STARTED 0.5BTC
+  # SHORT") and the newer scalp style ("OPENING $50000 SCALP BITCOIN LONG").
+  # entry captures a BTC quantity; entry_usd captures a USD notional. The "SCALP
+  # BITCOIN" filler between the amount and direction is skipped by `.*?`.
   - name: entry
-    regex: '(?im)^\s*STARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?:STARTED|OPENING|OPENED)\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 10
     enabled: true
+  - name: entry_usd
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?).*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 11
+    enabled: true
+  # The "$" is optional so a bare notional ("ADDED 10000") is still a USD add.
+  # add_btc has the lower priority number so a bare BTC quantity ("ADDED 0.5
+  # BTC") wins the tie against add_usd, which would otherwise read the digits as
+  # dollars.
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
-    priority: 20
+    priority: 21
     enabled: true
   - name: add_btc
     regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
-    priority: 21
+    priority: 20
     enabled: true
+  # Reduce verbs accept the past tense ("REDUCED"), the bare imperative
+  # ("REDUCE") and the scalp gerund ("REDUCING $25000 SCALP BITCOIN LONG").
   - name: reduce_usd
-    regex: '(?im)^\s*REDUCE[D]?\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
     action: reduce
     priority: 30
     enabled: true
   - name: reduce_btc
-    regex: '(?im)^\s*REDUCE[D]?\b\s*(?P<btc>[\d.]+)\s*BTC'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC'
     action: reduce
     priority: 31
     enabled: true
   - name: reduce_pct
-    regex: '(?im)^\s*REDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b.*?(?P<pct>\d+)\s*%'
     action: reduce
     priority: 32
     enabled: true
+  # "Taking 50% out of the trade" is a partial reduction. Any trailing dollar
+  # figure ("$300 banked") is realized-PnL commentary, not a size.
+  - name: reduce_taking_pct
+    regex: '(?im)^\s*TAKING\s+(?P<pct>\d+)\s*%\s+OUT\b'
+    action: reduce
+    priority: 33
+    enabled: true
+  # Close verbs include the scalp gerund "CLOSING" and "CLOSED ALL TRADES".
   - name: close
-    regex: '(?im)^\s*(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
+    regex: '(?im)^\s*(CLOSED|CLOSING|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
     action: close
     priority: 40
     enabled: true

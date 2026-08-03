@@ -24,37 +24,47 @@ patterns:
     priority: 1
     enabled: true
   - name: entry
-    regex: '(?im)^\s*STARTED\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?:STARTED|OPENING|OPENED)\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 10
     enabled: true
+  - name: entry_usd
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?).*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 11
+    enabled: true
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
-    priority: 20
+    priority: 21
     enabled: true
   - name: add_btc
     regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
-    priority: 21
+    priority: 20
     enabled: true
   - name: reduce_usd
-    regex: '(?im)^\s*REDUCE[D]?\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
     action: reduce
     priority: 30
     enabled: true
   - name: reduce_btc
-    regex: '(?im)^\s*REDUCE[D]?\b\s*(?P<btc>[\d.]+)\s*BTC'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC'
     action: reduce
     priority: 31
     enabled: true
   - name: reduce_pct
-    regex: '(?im)^\s*REDUCE[D]?\b.*?(?P<pct>\d+)\s*%'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b.*?(?P<pct>\d+)\s*%'
     action: reduce
     priority: 32
     enabled: true
+  - name: reduce_taking_pct
+    regex: '(?im)^\s*TAKING\s+(?P<pct>\d+)\s*%\s+OUT\b'
+    action: reduce
+    priority: 33
+    enabled: true
   - name: close
-    regex: '(?im)^\s*(CLOSED|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
+    regex: '(?im)^\s*(CLOSED|CLOSING|CLOSE|EXIT|EXITED|FLAT|STOPPED OUT|TP HIT|TOOK PROFIT)\b'
     action: close
     priority: 40
     enabled: true

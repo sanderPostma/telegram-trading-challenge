@@ -224,6 +224,19 @@ mod tests {
         assert_eq!(add_without_to.direction, Some(Direction::Short));
         assert_eq!(add_without_to.size, Some(Size::Usd(5000.0)));
 
+        // A bare number with no "$" is still a USD add (real message "ADDED
+        // 10000"). It must not be dropped for lacking the dollar sign.
+        let add_bare = match_first("ADDED 10000", &rules).unwrap().unwrap();
+        assert_eq!(add_bare.action, RuleAction::Add);
+        assert_eq!(add_bare.size, Some(Size::Usd(10_000.0)));
+
+        // A bare BTC quantity must still parse as BTC, not USD, even though the
+        // now-optional "$" lets the USD rule also match the digits.
+        let add_bare_btc = match_first("ADDED 0.5 BTC SHORT", &rules).unwrap().unwrap();
+        assert_eq!(add_bare_btc.action, RuleAction::Add);
+        assert_eq!(add_bare_btc.direction, Some(Direction::Short));
+        assert_eq!(add_bare_btc.size, Some(Size::Btc(0.5)));
+
         let compound = match_actions(
             "ADDED $5000 AND ADDING $5000 TO LIMIT TRIGGER AT 64,300",
             &rules,
@@ -237,6 +250,46 @@ mod tests {
 
         let noise = match_first("CHAT TEST", &rules).unwrap().unwrap();
         assert_eq!(noise.action, RuleAction::Ignore);
+    }
+
+    #[test]
+    fn scalp_style_signals_classify() {
+        let rules = default_rules();
+
+        // The newer channel format: a USD-notional entry with "SCALP BITCOIN"
+        // filler between the size and the direction.
+        let long = match_first("OPENING $50000 SCALP BITCOIN LONG", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(long.action, RuleAction::Enter);
+        assert_eq!(long.direction, Some(Direction::Long));
+        assert_eq!(long.size, Some(Size::Usd(50_000.0)));
+
+        // The SHORT variant.
+        let short = match_first("OPENING $50000 SCALP BITCOIN SHORT", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(short.action, RuleAction::Enter);
+        assert_eq!(short.direction, Some(Direction::Short));
+        assert_eq!(short.size, Some(Size::Usd(50_000.0)));
+
+        // The REDUCE variant (scalp gerund + USD amount).
+        let reduce = match_first("REDUCING $25000 SCALP BITCOIN LONG", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(reduce.action, RuleAction::Reduce);
+        assert_eq!(reduce.size, Some(Size::Usd(25_000.0)));
+
+        // The CLOSE variant.
+        let close = match_first("CLOSING SCALP BITCOIN LONG", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(close.action, RuleAction::Close);
+
+        // "CLOSED ALL TRADES" is a real close (the exact message from the bug
+        // report) and must not be swallowed as noise.
+        let close_all = match_first("CLOSED ALL TRADES", &rules).unwrap().unwrap();
+        assert_eq!(close_all.action, RuleAction::Close);
     }
 
     #[test]
@@ -324,6 +377,14 @@ mod tests {
         assert!(match_first("we are down about 3% on the day", &rules)
             .unwrap()
             .is_none());
+
+        // "Taking X% out ..." is a reduction; the trailing "$300 banked" is
+        // realized-PnL commentary, not a size, and must be ignored.
+        let taking = match_first("Taking 50% out of the trade $300 banked", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(taking.action, RuleAction::Reduce);
+        assert_eq!(taking.size, Some(Size::Pct(0.5)));
     }
 
     #[test]
@@ -376,9 +437,10 @@ patterns:
 "#;
         let merged = merge_pattern_documents(default_rules_yaml(), local).unwrap();
         let rules = parse_pattern_document(&merged).unwrap();
-        // 9 default patterns (guard, entry, add_usd, add_btc, reduce_usd,
-        // reduce_btc, reduce_pct, close, noop) + the new custom_add override.
-        assert_eq!(rules.len(), 10);
+        // 11 default patterns (guard, entry, entry_usd, add_usd, add_btc,
+        // reduce_usd, reduce_btc, reduce_pct, reduce_taking_pct, close, noop) +
+        // the new custom_add override.
+        assert_eq!(rules.len(), 12);
         assert_eq!(
             rules
                 .iter()
