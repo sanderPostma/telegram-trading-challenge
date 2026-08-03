@@ -31,6 +31,8 @@ class AppController extends ChangeNotifier {
   AppController({this.useRustBridge = false});
 
   static const _configPrefsKey = 'trading_challenge.app_config.v1';
+  static const _closeTargetPrefsKey =
+      'trading_challenge.close_target_watch.v1';
   static const _klineCachePrefsKey = 'trading_challenge.weex_kline_cache.v1';
   static const _chartSnapshotInterval = Duration(minutes: 1);
   static const _exchangeReconcileInterval = Duration(seconds: 5);
@@ -118,6 +120,8 @@ class AppController extends ChangeNotifier {
     notionalUsd: 0,
     unrealizedPnlUsd: 0,
   );
+  CloseTargetWatch? closeTargetWatch;
+  bool closeTargetTriggered = false;
 
   Future<void> loadConfig() async {
     try {
@@ -140,6 +144,7 @@ class AppController extends ChangeNotifier {
         stackTrace: stackTrace,
       );
     }
+    await _loadCloseTarget();
     await _initializePatterns();
     _resetLocalChartHistory();
   }
@@ -1359,6 +1364,69 @@ class AppController extends ChangeNotifier {
     _log('Simulation mode ${value ? 'enabled' : 'disabled'}.');
     unawaited(_persistConfig());
     notifyListeners();
+  }
+
+  void armCloseTarget({
+    required double low,
+    required double high,
+    required String source,
+  }) {
+    final lo = low <= high ? low : high;
+    final hi = low <= high ? high : low;
+    closeTargetWatch = CloseTargetWatch(
+      low: lo,
+      high: hi,
+      source: source,
+      armedAt: DateTime.now(),
+    );
+    closeTargetTriggered = false;
+    _log(
+      'Close-watch armed ${lo.toStringAsFixed(0)}–${hi.toStringAsFixed(0)} (from $source).',
+    );
+    unawaited(_persistCloseTarget());
+    notifyListeners();
+  }
+
+  void cancelCloseTarget() {
+    if (closeTargetWatch == null && !closeTargetTriggered) return;
+    _disarmCloseTarget();
+    _log('Close-watch cancelled.');
+  }
+
+  void _disarmCloseTarget() {
+    closeTargetWatch = null;
+    closeTargetTriggered = false;
+    unawaited(_persistCloseTarget());
+    notifyListeners();
+  }
+
+  Future<void> _persistCloseTarget() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final watch = closeTargetWatch;
+      if (watch == null) {
+        await prefs.remove(_closeTargetPrefsKey);
+      } else {
+        await prefs.setString(_closeTargetPrefsKey, jsonEncode(watch.toJson()));
+      }
+    } catch (error, stackTrace) {
+      _log('Close-watch could not be saved: $error',
+          error: error, stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _loadCloseTarget() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_closeTargetPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, Object?>) {
+        closeTargetWatch = CloseTargetWatch.fromJson(decoded);
+      }
+    } catch (_) {
+      // A corrupt cache is non-fatal; start disarmed.
+    }
   }
 
   Future<void> _persistConfig() async {
