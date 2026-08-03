@@ -596,6 +596,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
   Widget build(BuildContext context) {
     final controller = widget.controller;
     final position = controller.position;
+    final watch = controller.closeTargetWatch;
     final flat = position.isFlat || position.qtyBtc <= 0;
     final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
     final reduceBtc = controller.previewManualReduceBtc(
@@ -634,6 +635,35 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
                   : 'Open ${position.direction!.name.toUpperCase()} ${position.qtyBtc.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
               style: const TextStyle(color: Brand.muted, fontSize: 12),
             ),
+            if (watch != null) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Brand.surface2,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Brand.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.notifications_active_outlined,
+                        color: Brand.gold, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Close-watch armed ${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)}',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: controller.cancelCloseTarget,
+                      child: const Text('Cancel'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
