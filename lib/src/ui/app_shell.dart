@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/trading.dart';
@@ -257,7 +259,7 @@ class _AppShellState extends State<AppShell> {
     );
     _closeTargetDialogOpen = false;
     if (result == true) {
-      widget.controller.manualFlatten();
+      unawaited(widget.controller.manualFlatten());
     }
     widget.controller.cancelCloseTarget();
   }

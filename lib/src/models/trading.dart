@@ -58,6 +58,66 @@ class CloseTargetWatch {
   }
 }
 
+/// A take-profit plan resting on the exchange against the open position.
+///
+/// Unlike [CloseTargetWatch] — an app-side alert that asks before closing —
+/// this lives on WEEX: it fires and closes the position even if the app is
+/// offline. [orderId] is the exchange id needed to cancel or replace it.
+class ExchangeTakeProfit {
+  const ExchangeTakeProfit({
+    required this.orderId,
+    required this.triggerPrice,
+    required this.direction,
+    required this.planType,
+    required this.source,
+    required this.placedAt,
+  });
+
+  final String orderId;
+  final double triggerPrice;
+  final TradeDirection direction;
+
+  /// `TAKE_PROFIT` or `STOP_LOSS` — a target below a long (or above a short)
+  /// is a stop, and WEEX rejects it as a take-profit.
+  final String planType;
+  final String source;
+  final DateTime placedAt;
+
+  bool get isStop => planType == 'STOP_LOSS';
+
+  Map<String, Object> toJson() => {
+    'orderId': orderId,
+    'triggerPrice': triggerPrice,
+    'direction': direction.name,
+    'planType': planType,
+    'source': source,
+    'placedAt': placedAt.toIso8601String(),
+  };
+
+  static ExchangeTakeProfit? fromJson(Map<String, Object?> json) {
+    final orderId = json['orderId'];
+    final triggerPrice = json['triggerPrice'];
+    if (orderId is! String || orderId.isEmpty || triggerPrice is! num) {
+      return null;
+    }
+    final direction = json['direction'] == 'short'
+        ? TradeDirection.short
+        : TradeDirection.long;
+    final placedRaw = json['placedAt'];
+    return ExchangeTakeProfit(
+      orderId: orderId,
+      triggerPrice: triggerPrice.toDouble(),
+      direction: direction,
+      planType: json['planType'] is String
+          ? json['planType'] as String
+          : 'TAKE_PROFIT',
+      source: json['source'] is String ? json['source'] as String : '',
+      placedAt: (placedRaw is String ? DateTime.tryParse(placedRaw) : null) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
 class AppConfig {
   const AppConfig({
     this.weexApiKey = '',

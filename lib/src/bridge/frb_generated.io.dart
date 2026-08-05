@@ -106,10 +106,16 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAlgoOrderRequest dco_decode_box_autoadd_weex_algo_order_request(dynamic raw);
 
   @protected
+  WeexCancelAlgoRequest dco_decode_box_autoadd_weex_cancel_algo_request(dynamic raw);
+
+  @protected
   WeexMarketOrderAck dco_decode_box_autoadd_weex_market_order_ack(dynamic raw);
 
   @protected
   WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(dynamic raw);
+
+  @protected
+  WeexTpSlOrderRequest dco_decode_box_autoadd_weex_tp_sl_order_request(dynamic raw);
 
   @protected
   ChartData dco_decode_chart_data(dynamic raw);
@@ -229,6 +235,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAlgoOrderRequest dco_decode_weex_algo_order_request(dynamic raw);
 
   @protected
+  WeexCancelAlgoRequest dco_decode_weex_cancel_algo_request(dynamic raw);
+
+  @protected
   WeexExecutionSnapshot dco_decode_weex_execution_snapshot(dynamic raw);
 
   @protected
@@ -239,6 +248,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WeexPositionSnapshot dco_decode_weex_position_snapshot(dynamic raw);
+
+  @protected
+  WeexTpSlOrderRequest dco_decode_weex_tp_sl_order_request(dynamic raw);
 
   @protected
   AnyhowException sse_decode_AnyhowException(SseDeserializer deserializer);
@@ -334,10 +346,20 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAlgoOrderRequest sse_decode_box_autoadd_weex_algo_order_request(SseDeserializer deserializer);
 
   @protected
+  WeexCancelAlgoRequest sse_decode_box_autoadd_weex_cancel_algo_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(SseDeserializer deserializer);
 
   @protected
   WeexMarketOrderRequest sse_decode_box_autoadd_weex_market_order_request(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WeexTpSlOrderRequest sse_decode_box_autoadd_weex_tp_sl_order_request(
     SseDeserializer deserializer,
   );
 
@@ -465,6 +487,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   WeexAlgoOrderRequest sse_decode_weex_algo_order_request(SseDeserializer deserializer);
 
   @protected
+  WeexCancelAlgoRequest sse_decode_weex_cancel_algo_request(SseDeserializer deserializer);
+
+  @protected
   WeexExecutionSnapshot sse_decode_weex_execution_snapshot(SseDeserializer deserializer);
 
   @protected
@@ -475,6 +500,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WeexPositionSnapshot sse_decode_weex_position_snapshot(SseDeserializer deserializer);
+
+  @protected
+  WeexTpSlOrderRequest sse_decode_weex_tp_sl_order_request(SseDeserializer deserializer);
 
   @protected
   void sse_encode_AnyhowException(AnyhowException self, SseSerializer serializer);
@@ -591,6 +619,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_box_autoadd_weex_cancel_algo_request(
+    WeexCancelAlgoRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_box_autoadd_weex_market_order_ack(
     WeexMarketOrderAck self,
     SseSerializer serializer,
@@ -599,6 +633,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_weex_market_order_request(
     WeexMarketOrderRequest self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_weex_tp_sl_order_request(
+    WeexTpSlOrderRequest self,
     SseSerializer serializer,
   );
 
@@ -735,6 +775,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_weex_algo_order_request(WeexAlgoOrderRequest self, SseSerializer serializer);
 
   @protected
+  void sse_encode_weex_cancel_algo_request(WeexCancelAlgoRequest self, SseSerializer serializer);
+
+  @protected
   void sse_encode_weex_execution_snapshot(WeexExecutionSnapshot self, SseSerializer serializer);
 
   @protected
@@ -745,6 +788,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_weex_position_snapshot(WeexPositionSnapshot self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_weex_tp_sl_order_request(WeexTpSlOrderRequest self, SseSerializer serializer);
 }
 
 // Section: wire_class

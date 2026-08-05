@@ -29,12 +29,27 @@ patterns:
     priority: 10
     enabled: true
   - name: entry_usd
-    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?).*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 11
     enabled: true
+  - name: entry_usd_short
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\b(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\b.*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 12
+    enabled: true
+  - name: entry_verbless
+    regex: '(?im)^\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM]))?\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 13
+    enabled: true
+  - name: entry_verbless_short
+    regex: '(?im)^\s*(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 14
+    enabled: true
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
@@ -44,7 +59,7 @@ patterns:
     priority: 20
     enabled: true
   - name: reduce_usd
-    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?'
     action: reduce
     priority: 30
     enabled: true

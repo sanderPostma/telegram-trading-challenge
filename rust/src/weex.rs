@@ -18,6 +18,7 @@ use tokio_tungstenite::{
 };
 
 use crate::execution::{position_side, OrderRequest, OrderSide};
+use crate::interpreter::Direction;
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -87,6 +88,39 @@ pub struct WeexAlgoOrderRequest {
     pub client_algo_id: String,
     pub qty_step: f64,
     pub price_step: f64,
+}
+
+/// A take-profit (or stop-loss) attached to an open position. Unlike an algo
+/// order it carries no side of its own: the exchange closes whatever is open on
+/// `position_side` when `trigger_price` is reached, so it stays correct as the
+/// position is added to or partially reduced.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeexTpSlOrderRequest {
+    pub api_key: String,
+    pub api_secret: String,
+    pub passphrase: String,
+    pub symbol: String,
+    pub base_url: String,
+    /// LONG or SHORT: the position this plan protects.
+    pub position_side: String,
+    /// TAKE_PROFIT or STOP_LOSS.
+    pub plan_type: String,
+    pub trigger_price: f64,
+    /// 0 closes the entire position — the scalping default.
+    pub qty_btc: f64,
+    pub client_algo_id: String,
+    pub qty_step: f64,
+    pub price_step: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeexCancelAlgoRequest {
+    pub api_key: String,
+    pub api_secret: String,
+    pub passphrase: String,
+    pub symbol: String,
+    pub base_url: String,
+    pub order_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -376,6 +410,119 @@ pub async fn submit_algo_order(
     })
 }
 
+/// Places a take-profit/stop-loss plan against an open position.
+/// `POST /capi/v3/placeTpSlOrder`. Quantity 0 (the default) closes the whole
+/// position at market when the trigger is reached.
+pub async fn submit_tp_sl_order(
+    request: WeexTpSlOrderRequest,
+) -> anyhow::Result<WeexMarketOrderAck> {
+    let client = SignedRestClient::new(WeexAccountRequest {
+        api_key: request.api_key,
+        api_secret: request.api_secret,
+        passphrase: request.passphrase,
+        symbol: request.symbol,
+        base_url: request.base_url,
+        recent_lookback_ms: 7 * 24 * 60 * 60 * 1000,
+    })?;
+    let position_side = normalize_position_side(&request.position_side)?;
+    let plan_type = request.plan_type.trim().to_ascii_uppercase();
+    if !matches!(plan_type.as_str(), "TAKE_PROFIT" | "STOP_LOSS") {
+        anyhow::bail!("WEEX TP/SL plan type must be TAKE_PROFIT or STOP_LOSS");
+    }
+    if request.trigger_price <= 0.0 || !request.trigger_price.is_finite() {
+        anyhow::bail!("WEEX TP/SL trigger price must be positive");
+    }
+    if request.qty_btc < 0.0 || !request.qty_btc.is_finite() {
+        anyhow::bail!("WEEX TP/SL quantity must be zero (whole position) or positive");
+    }
+
+    let body = tp_sl_order_body(
+        &client.request.symbol,
+        position_side,
+        &plan_type,
+        request.trigger_price,
+        request.qty_btc,
+        &request.client_algo_id,
+        request.qty_step,
+        request.price_step,
+    );
+    let payload: Value = client.post("/capi/v3/placeTpSlOrder", body).await?;
+    Ok(ack_from_payload(payload)?)
+}
+
+/// Cancels a conditional (trigger / TP / SL) order by exchange order id.
+/// `DELETE /capi/v3/algoOrder`.
+pub async fn cancel_algo_order(
+    request: WeexCancelAlgoRequest,
+) -> anyhow::Result<WeexMarketOrderAck> {
+    let order_id = request.order_id.trim().to_string();
+    if order_id.is_empty() {
+        anyhow::bail!("WEEX cancel requires a conditional order id");
+    }
+    let client = SignedRestClient::new(WeexAccountRequest {
+        api_key: request.api_key,
+        api_secret: request.api_secret,
+        passphrase: request.passphrase,
+        symbol: request.symbol,
+        base_url: request.base_url,
+        recent_lookback_ms: 7 * 24 * 60 * 60 * 1000,
+    })?;
+    let body = json!({
+        "symbol": client.request.symbol,
+        "orderId": order_id,
+    });
+    let payload: Value = client.delete("/capi/v3/algoOrder", body).await?;
+    Ok(ack_from_payload(payload)?)
+}
+
+/// Whether a target price is a take-profit or a stop-loss for an open position.
+/// WEEX rejects a TAKE_PROFIT whose trigger sits on the wrong side of the
+/// market, and a channel target can land either side: "TP SET 64450" is a
+/// take-profit for a LONG below it, but a stop for a LONG already above it.
+pub fn tp_sl_plan_type(direction: Direction, trigger_price: f64, mark_price: f64) -> &'static str {
+    let in_profit = match direction {
+        Direction::Long => trigger_price > mark_price,
+        Direction::Short => trigger_price < mark_price,
+    };
+    if in_profit {
+        "TAKE_PROFIT"
+    } else {
+        "STOP_LOSS"
+    }
+}
+
+fn normalize_position_side(value: &str) -> anyhow::Result<&'static str> {
+    match value.trim().to_ascii_uppercase().as_str() {
+        "LONG" => Ok("LONG"),
+        "SHORT" => Ok("SHORT"),
+        other => anyhow::bail!("WEEX position side must be LONG or SHORT, got {other:?}"),
+    }
+}
+
+/// Reads an order acknowledgement from a response that may be a bare object or
+/// a single-element array (`placeTpSlOrder` answers with an array).
+fn ack_from_payload(payload: Value) -> anyhow::Result<WeexMarketOrderAck> {
+    let value = payload
+        .as_array()
+        .and_then(|items| items.first().cloned())
+        .unwrap_or(payload);
+    let ack: ContractOrderAck = serde_json::from_value(value)?;
+    let order_id = json_id_to_string(&ack.order_id);
+    let error_code = json_scalar_to_string(&ack.error_code);
+    let error_message = json_scalar_to_string(&ack.error_message);
+    let success = ack.success.unwrap_or_else(|| {
+        !order_id.is_empty() && (error_code.is_empty() || error_code == "0" || error_code == "200")
+    });
+    Ok(WeexMarketOrderAck {
+        order_id,
+        client_order_id: json_optional_id_to_string(&ack.client_order_id)
+            .or_else(|| json_optional_id_to_string(&ack.client_algo_id)),
+        success,
+        error_code,
+        error_message,
+    })
+}
+
 fn parse_order_side(side: &str) -> anyhow::Result<OrderSide> {
     if side.eq_ignore_ascii_case("buy") {
         Ok(OrderSide::Buy)
@@ -583,6 +730,10 @@ impl SignedRestClient {
 
     async fn post<T: DeserializeOwned>(&self, path: &str, body: Value) -> anyhow::Result<T> {
         self.request(Method::POST, path, &[], Some(body)).await
+    }
+
+    async fn delete<T: DeserializeOwned>(&self, path: &str, body: Value) -> anyhow::Result<T> {
+        self.request(Method::DELETE, path, &[], Some(body)).await
     }
 
     async fn request<T: DeserializeOwned>(
@@ -845,6 +996,32 @@ pub fn algo_order_body(
         "triggerPrice": format_step(trigger_price, price_step),
         "clientAlgoId": sanitize_client_order_id(client_algo_id),
     })
+}
+
+/// Builds the `placeTpSlOrder` body. `quantity` is omitted when zero, which is
+/// how the exchange is told to close the entire position — the plan then stays
+/// correct even if the position is added to before the trigger fires.
+pub fn tp_sl_order_body(
+    symbol: &str,
+    position_side: &str,
+    plan_type: &str,
+    trigger_price: f64,
+    quantity: f64,
+    client_algo_id: &str,
+    qty_step: f64,
+    price_step: f64,
+) -> serde_json::Value {
+    let mut body = json!({
+        "symbol": symbol,
+        "clientAlgoId": sanitize_client_order_id(client_algo_id),
+        "planType": plan_type,
+        "triggerPrice": format_step(trigger_price, price_step),
+        "positionSide": position_side,
+    });
+    if quantity > 0.0 {
+        body["quantity"] = json!(format_step(quantity, qty_step));
+    }
+    body
 }
 
 pub async fn stream_public_price(
@@ -1126,6 +1303,86 @@ mod tests {
     fn reduce_only_flips_position_side() {
         let request = OrderRequest::market("BTCUSDT", OrderSide::Buy, 0.1).reduce_only();
         assert_eq!(market_order_body(&request, 0.001)["positionSide"], "SHORT");
+    }
+
+    #[test]
+    fn builds_position_attached_tp_body() {
+        // No quantity: the exchange closes the whole position at the trigger,
+        // so the plan survives later adds and partial reduces.
+        let body = tp_sl_order_body(
+            "BTCUSDT",
+            "LONG",
+            "TAKE_PROFIT",
+            64_450.0,
+            0.0,
+            "tmg-tp-1",
+            0.0001,
+            0.1,
+        );
+        assert_eq!(body["symbol"], "BTCUSDT");
+        assert_eq!(body["positionSide"], "LONG");
+        assert_eq!(body["planType"], "TAKE_PROFIT");
+        assert_eq!(body["triggerPrice"], "64450.0");
+        assert!(body.get("quantity").is_none());
+
+        // A partial TP carries its size, rounded to the lot step.
+        let partial = tp_sl_order_body(
+            "BTCUSDT",
+            "SHORT",
+            "STOP_LOSS",
+            64_450.0,
+            0.00219,
+            "tmg-tp-2",
+            0.0001,
+            0.1,
+        );
+        assert_eq!(partial["positionSide"], "SHORT");
+        assert_eq!(partial["quantity"], "0.0021");
+    }
+
+    #[test]
+    fn classifies_target_as_take_profit_or_stop_by_direction() {
+        // A LONG takes profit above the market and stops below it.
+        assert_eq!(
+            tp_sl_plan_type(Direction::Long, 64_450.0, 64_000.0),
+            "TAKE_PROFIT"
+        );
+        assert_eq!(
+            tp_sl_plan_type(Direction::Long, 63_500.0, 64_000.0),
+            "STOP_LOSS"
+        );
+        // A SHORT is the mirror image.
+        assert_eq!(
+            tp_sl_plan_type(Direction::Short, 63_500.0, 64_000.0),
+            "TAKE_PROFIT"
+        );
+        assert_eq!(
+            tp_sl_plan_type(Direction::Short, 64_450.0, 64_000.0),
+            "STOP_LOSS"
+        );
+    }
+
+    #[test]
+    fn reads_ack_from_array_and_object_payloads() {
+        // placeTpSlOrder answers with a single-element array.
+        let array = ack_from_payload(serde_json::json!([{
+            "orderId": 812345678901234900u64,
+            "success": true,
+            "errorCode": "",
+            "errorMessage": ""
+        }]))
+        .unwrap();
+        assert_eq!(array.order_id, "812345678901234900");
+        assert!(array.success);
+
+        // Cancel answers with a bare object.
+        let object = ack_from_payload(serde_json::json!({
+            "orderId": "712345678901234567",
+            "success": true
+        }))
+        .unwrap();
+        assert_eq!(object.order_id, "712345678901234567");
+        assert!(object.success);
     }
 
     #[test]

@@ -52,6 +52,23 @@ Future<ApiResultWeexMarketOrderAck> weexSubmitMarketOrder({
 Future<ApiResultWeexMarketOrderAck> weexSubmitAlgoOrder({required WeexAlgoOrderRequest request}) =>
     RustLib.instance.api.crateApiWeexSubmitAlgoOrder(request: request);
 
+Future<ApiResultWeexMarketOrderAck> weexSubmitTpSlOrder({required WeexTpSlOrderRequest request}) =>
+    RustLib.instance.api.crateApiWeexSubmitTpSlOrder(request: request);
+
+Future<ApiResultWeexMarketOrderAck> weexCancelAlgoOrder({required WeexCancelAlgoRequest request}) =>
+    RustLib.instance.api.crateApiWeexCancelAlgoOrder(request: request);
+
+/// TAKE_PROFIT or STOP_LOSS for a target price against an open position.
+Future<String> weexTpSlPlanType({
+  required Direction direction,
+  required double triggerPrice,
+  required double markPrice,
+}) => RustLib.instance.api.crateApiWeexTpSlPlanType(
+  direction: direction,
+  triggerPrice: triggerPrice,
+  markPrice: markPrice,
+);
+
 Future<void> recordChartSnapshot({
   required PlatformInt64 timestampMs,
   required double balance,

@@ -34,6 +34,17 @@
 # Because Rust regex has no lookbehind, guards work at the message level, not
 # inline. No genuine signal in the reference channel contains a guard word.
 #
+# NOT EVERYTHING IS A PATTERN. Take-profit targets are extracted in code
+# (`extract_close_target_range`), not from this file: "TP SET 64450",
+# "TP: 64450", "TAKE PROFIT SET AT 64450", and "target for full close is
+# 63600-63700" place a real TP on WEEX against the open position, whichever
+# direction it runs. It carries no size, so the exchange closes the whole
+# position at the trigger — including anything added afterwards — with no
+# confirmation from the app. A range uses the edge the price reaches first (the
+# low for a LONG, the high for a SHORT). With no position, in simulation mode,
+# or when WEEX rejects the plan, the target falls back to an app-side watch that
+# asks before closing. "TP HIT" is a fill report and is matched by `close`.
+#
 # When a new Telegram message does not match, give the complete message and
 # this file to a browser-based AI assistant such as ChatGPT, Claude, or Gemini.
 # Ask it to explain the mismatch and propose a minimal Rust-regex pattern that
@@ -59,16 +70,39 @@ patterns:
     priority: 10
     enabled: true
   - name: entry_usd
-    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?).*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 11
+    enabled: true
+  # Shorthand notional without a "$": the k/m suffix is what marks the number as
+  # dollars ("opened 20k btc long" = $20,000 of BTC). A bare quantity keeps its
+  # BTC reading through the `entry` rule, which wins the tie on priority.
+  - name: entry_usd_short
+    regex: '(?im)^\s*(?:OPENING|OPENED|STARTED)\b.*?\b(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\b.*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 12
+    enabled: true
+  # Verbless headline entry: "$20,000 BTC LONG FOR CHALLENGE". The amount must
+  # open the line and be followed by the asset and a direction, so PnL prose
+  # ("$20,000 profit ...") does not open a position. Only an explicit "$" or a
+  # k/m suffix marks the number as a notional; a bare "0.5 BTC LONG" headline
+  # stays unmatched rather than being read as $0.50.
+  - name: entry_verbless
+    regex: '(?im)^\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM]))?\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 13
+    enabled: true
+  - name: entry_verbless_short
+    regex: '(?im)^\s*(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    action: enter
+    priority: 14
     enabled: true
   # The "$" is optional so a bare notional ("ADDED 10000") is still a USD add.
   # add_btc has the lower priority number so a bare BTC quantity ("ADDED 0.5
   # BTC") wins the tie against add_usd, which would otherwise read the digits as
   # dollars.
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
@@ -80,7 +114,7 @@ patterns:
   # Reduce verbs accept the past tense ("REDUCED"), the bare imperative
   # ("REDUCE") and the scalp gerund ("REDUCING $25000 SCALP BITCOIN LONG").
   - name: reduce_usd
-    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)'
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?'
     action: reduce
     priority: 30
     enabled: true

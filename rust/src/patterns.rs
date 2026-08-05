@@ -191,8 +191,11 @@ pub fn extract_close_target_range(text: &str) -> Option<(f64, f64)> {
         return None;
     }
 
+    // "TP SET 64450" is the terse channel shorthand for the same advisory
+    // level. Only the SET/TARGET (or punctuated "TP:") forms arm a watch —
+    // "TP HIT" reports a fill and is handled by the `close` pattern rule.
     let re = Regex::new(
-        r"(?i)(?:full\s+close\s+target|target\s+(?:for|to)\s+(?:a\s+)?full\s+close(?:\s+is)?)\s*:?\s*\$?(?P<low>[\d,]+(?:\.\d+)?)(?:\s*(?:-|–|—|to)\s*\$?(?P<high>[\d,]+(?:\.\d+)?))?",
+        r"(?i)(?:full\s+close\s+target|target\s+(?:for|to)\s+(?:a\s+)?full\s+close(?:\s+is)?|(?:TP|TAKE\s+PROFIT)\s+(?:SET|TARGET)(?:\s+(?:AT|IS|TO))?|(?:TP|TAKE\s+PROFIT)\s*[:=])\s*:?\s*\$?(?P<low>[\d,]+(?:\.\d+)?)(?:\s*(?:-|–|—|to)\s*\$?(?P<high>[\d,]+(?:\.\d+)?))?",
     )
     .ok()?;
     let caps = re.captures(text)?;
@@ -225,7 +228,13 @@ fn parse_direction(value: &str) -> Option<Direction> {
 
 fn parse_size(caps: &regex::Captures<'_>) -> Option<Size> {
     if let Some(v) = caps.name("usd").and_then(|m| parse_number(m.as_str())) {
-        return Some(Size::Usd(v));
+        // A "k"/"m" suffix scales the notional ("20k btc long" is $20,000).
+        let scale = match caps.name("mult").map(|m| m.as_str().to_ascii_lowercase()) {
+            Some(suffix) if suffix == "k" => 1_000.0,
+            Some(suffix) if suffix == "m" => 1_000_000.0,
+            _ => 1.0,
+        };
+        return Some(Size::Usd(v * scale));
     }
     if let Some(v) = caps.name("btc").and_then(|m| parse_number(m.as_str())) {
         return Some(Size::Btc(v));
@@ -333,6 +342,49 @@ mod tests {
         // report) and must not be swallowed as noise.
         let close_all = match_first("CLOSED ALL TRADES", &rules).unwrap().unwrap();
         assert_eq!(close_all.action, RuleAction::Close);
+    }
+
+    #[test]
+    fn shorthand_and_verbless_entries_classify() {
+        let rules = default_rules();
+
+        // "20k" is a USD notional shorthand; "btc" here names the asset, not a
+        // quantity, so this is $20,000 of BTC and not 20 BTC.
+        let shorthand = match_first("opened 20k btc long", &rules).unwrap().unwrap();
+        assert_eq!(shorthand.action, RuleAction::Enter);
+        assert_eq!(shorthand.direction, Some(Direction::Long));
+        assert_eq!(shorthand.size, Some(Size::Usd(20_000.0)));
+
+        // A verbless headline entry: amount, asset, direction, all on one line.
+        let verbless = match_first("$20,000 BTC LONG FOR CHALLENGE", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(verbless.action, RuleAction::Enter);
+        assert_eq!(verbless.direction, Some(Direction::Long));
+        assert_eq!(verbless.size, Some(Size::Usd(20_000.0)));
+
+        // The shorthand must not hijack a real BTC quantity entry.
+        let btc_qty = match_first("OPENED 0.5 BTC LONG", &rules).unwrap().unwrap();
+        assert_eq!(btc_qty.size, Some(Size::Btc(0.5)));
+
+        // The k/m shorthand also applies to adds and reduces.
+        let add = match_first("ADDED 10k", &rules).unwrap().unwrap();
+        assert_eq!(add.action, RuleAction::Add);
+        assert_eq!(add.size, Some(Size::Usd(10_000.0)));
+
+        // PnL/prose lines with a dollar figure are not verbless entries: they
+        // lack the asset+direction shape the rule requires.
+        for text in [
+            "$20,000 profit on the challenge so far",
+            "BTC LONG is looking good here",
+        ] {
+            let hit = match_first(text, &rules).unwrap();
+            assert_ne!(
+                hit.map(|h| h.action),
+                Some(RuleAction::Enter),
+                "must not be an entry: {text:?}"
+            );
+        }
     }
 
     #[test]
@@ -508,6 +560,50 @@ mod tests {
     }
 
     #[test]
+    fn extracts_take_profit_target() {
+        // The terse channel shorthand for the same advisory close level.
+        assert_eq!(
+            extract_close_target_range("TP SET 64450"),
+            Some((64_450.0, 64_450.0))
+        );
+        assert_eq!(
+            extract_close_target_range("tp set $64,450"),
+            Some((64_450.0, 64_450.0))
+        );
+        // A range and the spelled-out / punctuated variants.
+        assert_eq!(
+            extract_close_target_range("TP SET 64450-64500"),
+            Some((64_450.0, 64_500.0))
+        );
+        assert_eq!(
+            extract_close_target_range("TP: 64450"),
+            Some((64_450.0, 64_450.0))
+        );
+        assert_eq!(
+            extract_close_target_range("TAKE PROFIT SET AT 64450"),
+            Some((64_450.0, 64_450.0))
+        );
+        // Hypothetical wording still vetoes arming.
+        assert_eq!(extract_close_target_range("what if TP SET 64450"), None);
+    }
+
+    #[test]
+    fn take_profit_set_is_not_a_close_signal() {
+        let rules = default_rules();
+
+        // "TP SET" announces a target; only "TP HIT" is a close. Arming must not
+        // flatten the book.
+        let hits = match_actions("TP SET 64450", &rules).unwrap();
+        assert!(
+            hits.iter().all(|hit| hit.action != RuleAction::Close),
+            "TP SET must not classify as a close, got {hits:?}"
+        );
+
+        let hit = match_first("TP HIT", &rules).unwrap().unwrap();
+        assert_eq!(hit.action, RuleAction::Close);
+    }
+
+    #[test]
     fn close_target_fires_on_near_edge_by_direction() {
         // LONG enters the zone from below → fires at/above the low edge.
         assert!(close_target_should_fire(Direction::Long, 63_600.0, 63_600.0, 63_700.0));
@@ -538,10 +634,11 @@ patterns:
 "#;
         let merged = merge_pattern_documents(default_rules_yaml(), local).unwrap();
         let rules = parse_pattern_document(&merged).unwrap();
-        // 11 default patterns (guard, entry, entry_usd, add_usd, add_btc,
-        // reduce_usd, reduce_btc, reduce_pct, reduce_taking_pct, close, noop) +
-        // the new custom_add override.
-        assert_eq!(rules.len(), 12);
+        // 14 default patterns (guard, entry, entry_usd, entry_usd_short,
+        // entry_verbless, entry_verbless_short, add_usd, add_btc, reduce_usd,
+        // reduce_btc, reduce_pct, reduce_taking_pct, close, noop) + the new
+        // custom_add override.
+        assert_eq!(rules.len(), 15);
         assert_eq!(
             rules
                 .iter()

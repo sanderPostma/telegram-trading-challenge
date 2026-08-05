@@ -65,7 +65,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => 905367623;
+  int get rustContentHash => -631656769;
 
   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
     stem: 'trading_challenge_core',
@@ -145,6 +145,10 @@ abstract class RustLibApi extends BaseApi {
 
   Future<ApiResultString> crateApiValidatePatternsYaml({required String patternsYaml});
 
+  Future<ApiResultWeexMarketOrderAck> crateApiWeexCancelAlgoOrder({
+    required WeexCancelAlgoRequest request,
+  });
+
   Stream<PriceTick> crateApiWeexPublicPriceStream();
 
   Future<ApiResultWeexAccountReconciliation> crateApiWeexReconcileAccount({
@@ -166,6 +170,16 @@ abstract class RustLibApi extends BaseApi {
 
   Future<ApiResultWeexMarketOrderAck> crateApiWeexSubmitMarketOrder({
     required WeexMarketOrderRequest request,
+  });
+
+  Future<ApiResultWeexMarketOrderAck> crateApiWeexSubmitTpSlOrder({
+    required WeexTpSlOrderRequest request,
+  });
+
+  Future<String> crateApiWeexTpSlPlanType({
+    required Direction direction,
+    required double triggerPrice,
+    required double markPrice,
   });
 }
 
@@ -675,6 +689,31 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "validate_patterns_yaml", argNames: ["patternsYaml"]);
 
   @override
+  Future<ApiResultWeexMarketOrderAck> crateApiWeexCancelAlgoOrder({
+    required WeexCancelAlgoRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_weex_cancel_algo_request(request, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWeexCancelAlgoOrderConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeexCancelAlgoOrderConstMeta =>
+      const TaskConstMeta(debugName: "weex_cancel_algo_order", argNames: ["request"]);
+
+  @override
   Stream<PriceTick> crateApiWeexPublicPriceStream() {
     final sink = RustStreamSink<PriceTick>();
     unawaited(
@@ -683,7 +722,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           callFfi: (port_) {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_StreamSink_price_tick_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24, port: port_);
           },
           codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
           constMeta: kCrateApiWeexPublicPriceStreamConstMeta,
@@ -707,7 +746,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_account_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_account_reconciliation,
@@ -742,7 +781,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(path, serializer);
           sse_encode_String(query, serializer);
           sse_encode_String(body, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiWeexSignPreviewConstMeta,
@@ -766,7 +805,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_algo_order_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -791,7 +830,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_market_order_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -806,6 +845,59 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiWeexSubmitMarketOrderConstMeta =>
       const TaskConstMeta(debugName: "weex_submit_market_order", argNames: ["request"]);
+
+  @override
+  Future<ApiResultWeexMarketOrderAck> crateApiWeexSubmitTpSlOrder({
+    required WeexTpSlOrderRequest request,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_weex_tp_sl_order_request(request, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWeexSubmitTpSlOrderConstMeta,
+        argValues: [request],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeexSubmitTpSlOrderConstMeta =>
+      const TaskConstMeta(debugName: "weex_submit_tp_sl_order", argNames: ["request"]);
+
+  @override
+  Future<String> crateApiWeexTpSlPlanType({
+    required Direction direction,
+    required double triggerPrice,
+    required double markPrice,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_direction(direction, serializer);
+          sse_encode_f_64(triggerPrice, serializer);
+          sse_encode_f_64(markPrice, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_String, decodeErrorData: null),
+        constMeta: kCrateApiWeexTpSlPlanTypeConstMeta,
+        argValues: [direction, triggerPrice, markPrice],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeexTpSlPlanTypeConstMeta => const TaskConstMeta(
+    debugName: "weex_tp_sl_plan_type",
+    argNames: ["direction", "triggerPrice", "markPrice"],
+  );
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -1026,6 +1118,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexCancelAlgoRequest dco_decode_box_autoadd_weex_cancel_algo_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weex_cancel_algo_request(raw);
+  }
+
+  @protected
   WeexMarketOrderAck dco_decode_box_autoadd_weex_market_order_ack(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_weex_market_order_ack(raw);
@@ -1035,6 +1133,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexMarketOrderRequest dco_decode_box_autoadd_weex_market_order_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_weex_market_order_request(raw);
+  }
+
+  @protected
+  WeexTpSlOrderRequest dco_decode_box_autoadd_weex_tp_sl_order_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weex_tp_sl_order_request(raw);
   }
 
   @protected
@@ -1389,6 +1493,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexCancelAlgoRequest dco_decode_weex_cancel_algo_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return WeexCancelAlgoRequest(
+      apiKey: dco_decode_String(arr[0]),
+      apiSecret: dco_decode_String(arr[1]),
+      passphrase: dco_decode_String(arr[2]),
+      symbol: dco_decode_String(arr[3]),
+      baseUrl: dco_decode_String(arr[4]),
+      orderId: dco_decode_String(arr[5]),
+    );
+  }
+
+  @protected
   WeexExecutionSnapshot dco_decode_weex_execution_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1458,6 +1577,27 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       leverage: dco_decode_f_64(arr[7]),
       liquidationPrice: dco_decode_opt_box_autoadd_f_64(arr[8]),
       updatedAtMs: dco_decode_i_64(arr[9]),
+    );
+  }
+
+  @protected
+  WeexTpSlOrderRequest dco_decode_weex_tp_sl_order_request(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 12) throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    return WeexTpSlOrderRequest(
+      apiKey: dco_decode_String(arr[0]),
+      apiSecret: dco_decode_String(arr[1]),
+      passphrase: dco_decode_String(arr[2]),
+      symbol: dco_decode_String(arr[3]),
+      baseUrl: dco_decode_String(arr[4]),
+      positionSide: dco_decode_String(arr[5]),
+      planType: dco_decode_String(arr[6]),
+      triggerPrice: dco_decode_f_64(arr[7]),
+      qtyBtc: dco_decode_f_64(arr[8]),
+      clientAlgoId: dco_decode_String(arr[9]),
+      qtyStep: dco_decode_f_64(arr[10]),
+      priceStep: dco_decode_f_64(arr[11]),
     );
   }
 
@@ -1677,6 +1817,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexCancelAlgoRequest sse_decode_box_autoadd_weex_cancel_algo_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weex_cancel_algo_request(deserializer));
+  }
+
+  @protected
   WeexMarketOrderAck sse_decode_box_autoadd_weex_market_order_ack(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_weex_market_order_ack(deserializer));
@@ -1688,6 +1836,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_weex_market_order_request(deserializer));
+  }
+
+  @protected
+  WeexTpSlOrderRequest sse_decode_box_autoadd_weex_tp_sl_order_request(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weex_tp_sl_order_request(deserializer));
   }
 
   @protected
@@ -2181,6 +2337,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexCancelAlgoRequest sse_decode_weex_cancel_algo_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_apiKey = sse_decode_String(deserializer);
+    var var_apiSecret = sse_decode_String(deserializer);
+    var var_passphrase = sse_decode_String(deserializer);
+    var var_symbol = sse_decode_String(deserializer);
+    var var_baseUrl = sse_decode_String(deserializer);
+    var var_orderId = sse_decode_String(deserializer);
+    return WeexCancelAlgoRequest(
+      apiKey: var_apiKey,
+      apiSecret: var_apiSecret,
+      passphrase: var_passphrase,
+      symbol: var_symbol,
+      baseUrl: var_baseUrl,
+      orderId: var_orderId,
+    );
+  }
+
+  @protected
   WeexExecutionSnapshot sse_decode_weex_execution_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_execId = sse_decode_String(deserializer);
@@ -2279,6 +2454,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       leverage: var_leverage,
       liquidationPrice: var_liquidationPrice,
       updatedAtMs: var_updatedAtMs,
+    );
+  }
+
+  @protected
+  WeexTpSlOrderRequest sse_decode_weex_tp_sl_order_request(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_apiKey = sse_decode_String(deserializer);
+    var var_apiSecret = sse_decode_String(deserializer);
+    var var_passphrase = sse_decode_String(deserializer);
+    var var_symbol = sse_decode_String(deserializer);
+    var var_baseUrl = sse_decode_String(deserializer);
+    var var_positionSide = sse_decode_String(deserializer);
+    var var_planType = sse_decode_String(deserializer);
+    var var_triggerPrice = sse_decode_f_64(deserializer);
+    var var_qtyBtc = sse_decode_f_64(deserializer);
+    var var_clientAlgoId = sse_decode_String(deserializer);
+    var var_qtyStep = sse_decode_f_64(deserializer);
+    var var_priceStep = sse_decode_f_64(deserializer);
+    return WeexTpSlOrderRequest(
+      apiKey: var_apiKey,
+      apiSecret: var_apiSecret,
+      passphrase: var_passphrase,
+      symbol: var_symbol,
+      baseUrl: var_baseUrl,
+      positionSide: var_positionSide,
+      planType: var_planType,
+      triggerPrice: var_triggerPrice,
+      qtyBtc: var_qtyBtc,
+      clientAlgoId: var_clientAlgoId,
+      qtyStep: var_qtyStep,
+      priceStep: var_priceStep,
     );
   }
 
@@ -2514,6 +2720,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_weex_cancel_algo_request(
+    WeexCancelAlgoRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weex_cancel_algo_request(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_weex_market_order_ack(
     WeexMarketOrderAck self,
     SseSerializer serializer,
@@ -2529,6 +2744,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_weex_market_order_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_weex_tp_sl_order_request(
+    WeexTpSlOrderRequest self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weex_tp_sl_order_request(self, serializer);
   }
 
   @protected
@@ -2913,6 +3137,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_weex_cancel_algo_request(WeexCancelAlgoRequest self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.apiKey, serializer);
+    sse_encode_String(self.apiSecret, serializer);
+    sse_encode_String(self.passphrase, serializer);
+    sse_encode_String(self.symbol, serializer);
+    sse_encode_String(self.baseUrl, serializer);
+    sse_encode_String(self.orderId, serializer);
+  }
+
+  @protected
   void sse_encode_weex_execution_snapshot(WeexExecutionSnapshot self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.execId, serializer);
@@ -2967,5 +3202,22 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_f_64(self.leverage, serializer);
     sse_encode_opt_box_autoadd_f_64(self.liquidationPrice, serializer);
     sse_encode_i_64(self.updatedAtMs, serializer);
+  }
+
+  @protected
+  void sse_encode_weex_tp_sl_order_request(WeexTpSlOrderRequest self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.apiKey, serializer);
+    sse_encode_String(self.apiSecret, serializer);
+    sse_encode_String(self.passphrase, serializer);
+    sse_encode_String(self.symbol, serializer);
+    sse_encode_String(self.baseUrl, serializer);
+    sse_encode_String(self.positionSide, serializer);
+    sse_encode_String(self.planType, serializer);
+    sse_encode_f_64(self.triggerPrice, serializer);
+    sse_encode_f_64(self.qtyBtc, serializer);
+    sse_encode_String(self.clientAlgoId, serializer);
+    sse_encode_f_64(self.qtyStep, serializer);
+    sse_encode_f_64(self.priceStep, serializer);
   }
 }

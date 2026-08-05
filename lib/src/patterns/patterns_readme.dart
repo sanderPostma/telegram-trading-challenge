@@ -54,6 +54,19 @@ instructions joined by AND are evaluated as separate actions. For example,
 add and one conditional limit add. A LIMIT TRIGGER AT price clause creates a
 limit order; without it the order is sent at market.
 
+Not everything is driven by these patterns. Take-profit targets are matched in
+code, not in this YAML: "TP SET 64450" (also "TP: 64450", "TAKE PROFIT SET AT
+64450", "target for full close is 63600-63700", and ranges) places a real TP on
+WEEX for the open position, in whichever direction it runs. The plan carries no
+size, so the exchange closes the entire position when the trigger is reached —
+including anything added afterwards — without asking. It keeps working while
+the app is closed. Replacing a target cancels the previous one first.
+
+If there is no open position, or the app is in simulation mode, or WEEX rejects
+the plan, the target falls back to an app-side close-watch that asks you to
+confirm when the price gets there. "TP HIT" reports a fill and is a close
+signal, handled by the close pattern below.
+
 Named capture groups are interpreted by the app:
 
 - btc: BTC quantity

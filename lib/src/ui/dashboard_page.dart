@@ -569,6 +569,48 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
 /// position; `usdt`/`btc` reduce a fixed amount of our own book.
 enum _ReduceMode { percent, usdt, btc }
 
+/// One-line status strip with a cancel action, used for the resting exchange
+/// take-profit and the app-side close-watch.
+class _StatusStrip extends StatelessWidget {
+  const _StatusStrip({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onCancel,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: Brand.surface2,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Brand.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(label, style: const TextStyle(fontSize: 12)),
+            ),
+            TextButton(onPressed: onCancel, child: const Text('Cancel')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ManualReducePanel extends StatefulWidget {
   const ManualReducePanel({super.key, required this.controller});
 
@@ -597,6 +639,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
     final controller = widget.controller;
     final position = controller.position;
     final watch = controller.closeTargetWatch;
+    final takeProfit = controller.exchangeTakeProfit;
     final flat = position.isFlat || position.qtyBtc <= 0;
     final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
     final reduceBtc = controller.previewManualReduceBtc(
@@ -635,35 +678,27 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
                   : 'Open ${position.direction!.name.toUpperCase()} ${position.qtyBtc.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
               style: const TextStyle(color: Brand.muted, fontSize: 12),
             ),
-            if (watch != null) ...[
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: Brand.surface2,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Brand.border),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.notifications_active_outlined,
-                        color: Brand.gold, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Close-watch armed ${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: controller.cancelCloseTarget,
-                      child: const Text('Cancel'),
-                    ),
-                  ],
-                ),
+            // A resting exchange plan closes on its own; the app-side watch
+            // only asks. They are never both live for the same target.
+            if (takeProfit != null)
+              _StatusStrip(
+                icon: Icons.flag_outlined,
+                iconColor: Brand.gold,
+                label:
+                    '${takeProfit.isStop ? 'Stop' : 'Take-profit'} on WEEX at '
+                    '${takeProfit.triggerPrice.toStringAsFixed(0)} — closes the '
+                    '${takeProfit.direction.name.toUpperCase()} automatically',
+                onCancel: () =>
+                    unawaited(controller.cancelExchangeTakeProfit()),
+              )
+            else if (watch != null)
+              _StatusStrip(
+                icon: Icons.notifications_active_outlined,
+                iconColor: Brand.gold,
+                label:
+                    'Close-watch armed ${watch.low.toStringAsFixed(0)}–${watch.high.toStringAsFixed(0)} (asks before closing)',
+                onCancel: controller.cancelCloseTarget,
               ),
-            ],
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
@@ -837,7 +872,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
       ),
     );
     if (result == true) {
-      widget.controller.manualFlatten();
+      unawaited(widget.controller.manualFlatten());
     }
   }
 }

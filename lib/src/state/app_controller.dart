@@ -33,6 +33,8 @@ class AppController extends ChangeNotifier {
   static const _configPrefsKey = 'trading_challenge.app_config.v1';
   static const _closeTargetPrefsKey =
       'trading_challenge.close_target_watch.v1';
+  static const _exchangeTakeProfitPrefsKey =
+      'trading_challenge.exchange_take_profit.v1';
   static const _klineCachePrefsKey = 'trading_challenge.weex_kline_cache.v1';
   static const _chartSnapshotInterval = Duration(minutes: 1);
   static const _exchangeReconcileInterval = Duration(seconds: 5);
@@ -43,6 +45,11 @@ class AppController extends ChangeNotifier {
       'https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml';
   static const _telegramPatternsRequestTimeout = Duration(seconds: 8);
   static const _telegramChannelId = -1003766320116;
+  /// A live close is verified against the exchange and any residual re-submitted
+  /// this many times before the controller reports it as still open.
+  static const _flattenMaxAttempts = 3;
+  static const _flattenSettleDelay = Duration(milliseconds: 750);
+  static const _lotStep = 0.0001;
 
   final bool useRustBridge;
   StreamSubscription? _weexPriceSubscription;
@@ -51,7 +58,7 @@ class AppController extends ChangeNotifier {
   Timer? _weexReconcileTimer;
   Timer? _chartSnapshotTimer;
   bool _weexRestPollInFlight = false;
-  bool _weexReconcileInFlight = false;
+  Future<void>? _weexReconcile;
   bool _hasExchangePnlBaseline = false;
   String? _lastWeexPriceSource;
   DateTime? _lastWeexPriceAt;
@@ -122,6 +129,9 @@ class AppController extends ChangeNotifier {
   );
   CloseTargetWatch? closeTargetWatch;
   bool closeTargetTriggered = false;
+
+  /// The take-profit currently resting on WEEX for the open position, if any.
+  ExchangeTakeProfit? exchangeTakeProfit;
   bool _evaluatingCloseTarget = false;
 
   Future<void> loadConfig() async {
@@ -146,6 +156,7 @@ class AppController extends ChangeNotifier {
       );
     }
     await _loadCloseTarget();
+    await _loadExchangeTakeProfit();
     await _initializePatterns();
     _resetLocalChartHistory();
   }
@@ -517,7 +528,7 @@ class AppController extends ChangeNotifier {
     // A reduction that reaches the whole position is a flatten; reuse the exit
     // path so it submits live and realizes PnL in simulation.
     if (quantity >= _roundDown(position.qtyBtc, 0.0001)) {
-      manualFlatten();
+      await manualFlatten();
       return;
     }
 
@@ -571,7 +582,14 @@ class AppController extends ChangeNotifier {
       try {
         final target = await rust.extractCloseTarget(text: rawText);
         if (target != null) {
-          armCloseTarget(low: target.low, high: target.high, source: channel);
+          // A target is a real TP on the exchange: it closes the position on
+          // its own, with no app-side confirmation. Only when it cannot be
+          // placed does the app fall back to the advisory close-watch.
+          await setExchangeTakeProfit(
+            low: target.low,
+            high: target.high,
+            source: channel,
+          );
         }
       } catch (error, stackTrace) {
         await AppLog.write('Close-target extraction failed: $error',
@@ -1070,11 +1088,26 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  Future<void> reconcileFromExchange() async {
-    if (!useRustBridge || _weexReconcileInFlight || !_hasWeexCredentials) {
-      return;
-    }
-    _weexReconcileInFlight = true;
+  /// Reconciles against WEEX, joining the in-flight pass when one is already
+  /// running rather than dropping the request. Callers that need a snapshot
+  /// taken *after* their own order use [_reconcileFreshFromExchange].
+  Future<void> reconcileFromExchange() {
+    if (!useRustBridge || !_hasWeexCredentials) return Future<void>.value();
+    return _weexReconcile ??= _reconcileFromExchangeOnce().whenComplete(
+      () => _weexReconcile = null,
+    );
+  }
+
+  /// Reconciles with a snapshot guaranteed to be newer than any pass already
+  /// running: an in-flight read may have been issued before our fill landed, so
+  /// it is awaited and then a fresh pass is taken.
+  Future<void> _reconcileFreshFromExchange() async {
+    final inFlight = _weexReconcile;
+    if (inFlight != null) await inFlight;
+    await reconcileFromExchange();
+  }
+
+  Future<void> _reconcileFromExchangeOnce() async {
     try {
       final result = await rust.weexReconcileAccount(
         request: rust_weex.WeexAccountRequest(
@@ -1102,8 +1135,6 @@ class AppController extends ChangeNotifier {
         stackTrace: stackTrace,
       );
       notifyListeners();
-    } finally {
-      _weexReconcileInFlight = false;
     }
   }
 
@@ -1288,6 +1319,9 @@ class AppController extends ChangeNotifier {
     // restart while flat) must persist until a position exists to flatten.
     if (closeWatchWasOpen && position.isFlat) {
       _disarmCloseTarget();
+      // The position that carried the exchange TP is gone, so WEEX has already
+      // released the plan; drop the local record with it.
+      _forgetExchangeTakeProfitIfFlat();
     }
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
     _lastWeexReconciledAt = DateTime.now();
@@ -1321,7 +1355,7 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void manualFlatten() {
+  Future<void> manualFlatten() async {
     if (position.isFlat || position.direction == null || position.qtyBtc <= 0) {
       _log('Manual flatten ignored: no open position.');
       notifyListeners();
@@ -1332,34 +1366,7 @@ class AppController extends ChangeNotifier {
     // adjusting local state. `_place` submits, reconciles, and logs against the
     // actual (non-simulation) mode.
     if (!config.simulationMode) {
-      final mark = config.markPrice;
-      if (mark <= 0) {
-        _log('Manual flatten skipped: waiting for live WEEX BTC price.');
-        notifyListeners();
-        return;
-      }
-      final quantity = _roundDown(position.qtyBtc, 0.0001);
-      if (quantity <= 0) {
-        _log('Manual flatten ignored: position smaller than one lot.');
-        notifyListeners();
-        return;
-      }
-      final order = PlannedOrder(
-        id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
-        kind: TradeKind.close,
-        direction: position.direction!,
-        sourceAmount: quantity,
-        sourceUnit: SizeUnit.btc,
-        scaledBtc: quantity,
-        scaledNotionalUsd: quantity * mark,
-        markPrice: mark,
-        createdAt: DateTime.now(),
-        status: TradeStatus.pendingApproval,
-        source: 'Manual flatten, close position',
-      );
-      _log('Manual flatten: submitting reduce-only close ${_describe(order)}.');
-      unawaited(_place(order));
-      notifyListeners();
+      await _flattenLive();
       return;
     }
 
@@ -1374,12 +1381,106 @@ class AppController extends ChangeNotifier {
       unrealizedPnlUsd: 0,
     );
     _disarmCloseTargetIfFlat();
+    _forgetExchangeTakeProfitIfFlat();
     _log(
       'Position flattened in simulation state. Realized ${realizedPnl.toStringAsFixed(2)} USDT.',
     );
     unawaited(_persistConfig());
     unawaited(_snapshotChartState(force: true));
     notifyListeners();
+  }
+
+  /// Submits reduce-only close orders until WEEX confirms the book is flat.
+  /// A single submit is not enough on its own: the order can partially fill, or
+  /// the position can move between the local snapshot and the submit, and the
+  /// residual then shows up as a *partial reduce* fill rather than a close. So
+  /// after each submit the position is re-read from the exchange and whatever
+  /// is left is submitted again, up to [_flattenMaxAttempts]. A remainder below
+  /// one lot cannot be closed at all and is reported instead of retried.
+  Future<void> _flattenLive() async {
+    final canVerify = useRustBridge && _hasWeexCredentials;
+    for (var attempt = 1; ; attempt++) {
+      final remaining = position.isFlat || position.direction == null
+          ? 0.0
+          : position.qtyBtc;
+      final step = flattenStep(
+        remainingBtc: remaining,
+        lotStep: _lotStep,
+        attempt: attempt,
+        maxAttempts: _flattenMaxAttempts,
+      );
+      if (step != FlattenStep.submit) {
+        switch (step) {
+          case FlattenStep.done:
+            if (attempt > 1) _log('Manual flatten confirmed flat by WEEX.');
+          case FlattenStep.dust:
+            _log(
+              attempt == 1
+                  ? 'Manual flatten ignored: position smaller than one lot.'
+                  : 'Manual flatten left ${remaining.toStringAsFixed(6)} BTC below one lot; it cannot be closed.',
+            );
+          case FlattenStep.giveUp:
+            _log(
+              'Manual flatten gave up after $_flattenMaxAttempts attempts; '
+              '${remaining.toStringAsFixed(4)} BTC is still open.',
+            );
+          case FlattenStep.submit:
+            break;
+        }
+        notifyListeners();
+        return;
+      }
+
+      final mark = config.markPrice;
+      if (mark <= 0) {
+        _log('Manual flatten skipped: waiting for live WEEX BTC price.');
+        notifyListeners();
+        return;
+      }
+      final quantity = _roundDown(remaining, _lotStep);
+
+      final order = PlannedOrder(
+        id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
+        kind: TradeKind.close,
+        direction: position.direction!,
+        sourceAmount: quantity,
+        sourceUnit: SizeUnit.btc,
+        scaledBtc: quantity,
+        scaledNotionalUsd: quantity * mark,
+        markPrice: mark,
+        createdAt: DateTime.now(),
+        status: TradeStatus.pendingApproval,
+        source: attempt == 1
+            ? 'Manual flatten, close position'
+            : 'Manual flatten residual $attempt, close position',
+      );
+      _log(
+        'Manual flatten: submitting reduce-only close ${_describe(order)}'
+        '${attempt == 1 ? '' : ' (residual attempt $attempt)'}.',
+      );
+      final status = await _place(order);
+      if (status == TradeStatus.failed || status == TradeStatus.rejected) {
+        _log('Manual flatten stopped: close order ${status.name}.');
+        notifyListeners();
+        return;
+      }
+      if (!canVerify) {
+        notifyListeners();
+        return;
+      }
+
+      await Future<void>.delayed(_flattenSettleDelay);
+      await _reconcileFreshFromExchange();
+      if (position.isFlat || position.qtyBtc <= 0) {
+        _log('Manual flatten confirmed flat by WEEX.');
+        notifyListeners();
+        return;
+      }
+      _log(
+        'Manual flatten incomplete: WEEX still reports '
+        '${position.qtyBtc.toStringAsFixed(4)} BTC open.',
+      );
+    }
   }
 
   Future<void> saveConfig(AppConfig next, {bool log = true}) async {
@@ -1443,6 +1544,201 @@ class AppController extends ChangeNotifier {
           })
           .whenComplete(() => _evaluatingCloseTarget = false),
     );
+  }
+
+  /// Places (or replaces) a take-profit on the exchange for the open position,
+  /// in whichever direction it currently runs. The plan carries no quantity, so
+  /// WEEX closes the whole position at the trigger — including anything added
+  /// afterwards — without the app being involved.
+  ///
+  /// A range target has one trigger, taken at the edge the price reaches first:
+  /// the low for a LONG rising into the zone, the high for a SHORT falling into
+  /// it. This mirrors `close_target_should_fire`.
+  ///
+  /// Falls back to the advisory [armCloseTarget] watch when the exchange cannot
+  /// hold the plan — simulation mode, no credentials, or a rejected submit — so
+  /// a target is never silently dropped.
+  Future<void> setExchangeTakeProfit({
+    required double low,
+    required double high,
+    required String source,
+  }) async {
+    final lo = low <= high ? low : high;
+    final hi = low <= high ? high : low;
+
+    if (position.isFlat || position.direction == null || position.qtyBtc <= 0) {
+      _log(
+        'Take-profit ${lo.toStringAsFixed(0)} ignored: no open position to attach it to.',
+      );
+      notifyListeners();
+      return;
+    }
+    if (config.simulationMode || !useRustBridge || !_hasWeexCredentials) {
+      _log(
+        'Take-profit ${lo.toStringAsFixed(0)} kept as an app-side watch '
+        '(${config.simulationMode ? 'simulation mode' : 'no live WEEX access'}).',
+      );
+      armCloseTarget(low: lo, high: hi, source: source);
+      return;
+    }
+
+    final direction = position.direction!;
+    final trigger = direction == TradeDirection.long ? lo : hi;
+    if (trigger <= 0) {
+      _log('Take-profit ignored: trigger price must be positive.');
+      notifyListeners();
+      return;
+    }
+
+    // Replace rather than stack: two live plans on one position would close it
+    // twice, and the second would be rejected as reduce-only with nothing left.
+    await cancelExchangeTakeProfit(log: false);
+
+    try {
+      final planType = await rust.weexTpSlPlanType(
+        direction: direction == TradeDirection.long
+            ? rust_interpreter.Direction.long
+            : rust_interpreter.Direction.short,
+        triggerPrice: trigger,
+        markPrice: config.markPrice,
+      );
+      final result = await rust.weexSubmitTpSlOrder(
+        request: rust_weex.WeexTpSlOrderRequest(
+          apiKey: config.weexApiKey,
+          apiSecret: config.weexSecret,
+          passphrase: config.weexPassphrase,
+          symbol: 'BTCUSDT',
+          baseUrl: 'https://api-contract.weex.com',
+          positionSide: direction == TradeDirection.long ? 'LONG' : 'SHORT',
+          planType: planType,
+          triggerPrice: trigger,
+          // Zero closes the entire position at the trigger.
+          qtyBtc: 0,
+          clientAlgoId:
+              'tmg-tp-${DateTime.now().microsecondsSinceEpoch}',
+          qtyStep: _lotStep,
+          priceStep: 0.1,
+        ),
+      );
+      final ack = result.value;
+      if (!result.ok || ack == null || ack.orderId.isEmpty) {
+        _log(
+          'Take-profit ${trigger.toStringAsFixed(0)} rejected by WEEX: '
+          '${result.error ?? 'unknown error'}. Falling back to an app-side watch.',
+        );
+        armCloseTarget(low: lo, high: hi, source: source);
+        return;
+      }
+      exchangeTakeProfit = ExchangeTakeProfit(
+        orderId: ack.orderId,
+        triggerPrice: trigger,
+        direction: direction,
+        planType: planType,
+        source: source,
+        placedAt: DateTime.now(),
+      );
+      // The exchange now owns the close; an app-side watch would only ask a
+      // second time for the same level.
+      _disarmCloseTarget();
+      _log(
+        '${planType == 'STOP_LOSS' ? 'Stop' : 'Take-profit'} set on WEEX at '
+        '${trigger.toStringAsFixed(0)} USDT for the open '
+        '${direction.name.toUpperCase()} (order ${ack.orderId}, from $source).',
+      );
+      unawaited(_persistExchangeTakeProfit());
+      notifyListeners();
+    } catch (error, stackTrace) {
+      _log(
+        'Take-profit submit failed: $error. Falling back to an app-side watch.',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      armCloseTarget(low: lo, high: hi, source: source);
+    }
+  }
+
+  /// Cancels the resting take-profit on the exchange, if any.
+  Future<void> cancelExchangeTakeProfit({bool log = true}) async {
+    final existing = exchangeTakeProfit;
+    if (existing == null) return;
+    exchangeTakeProfit = null;
+    unawaited(_persistExchangeTakeProfit());
+    notifyListeners();
+    if (!useRustBridge || !_hasWeexCredentials) return;
+    try {
+      final result = await rust.weexCancelAlgoOrder(
+        request: rust_weex.WeexCancelAlgoRequest(
+          apiKey: config.weexApiKey,
+          apiSecret: config.weexSecret,
+          passphrase: config.weexPassphrase,
+          symbol: 'BTCUSDT',
+          baseUrl: 'https://api-contract.weex.com',
+          orderId: existing.orderId,
+        ),
+      );
+      if (log || !result.ok) {
+        _log(
+          result.ok
+              ? 'Take-profit ${existing.triggerPrice.toStringAsFixed(0)} cancelled on WEEX.'
+              : 'Take-profit ${existing.triggerPrice.toStringAsFixed(0)} could not be cancelled: '
+                    '${result.error ?? 'unknown error'} (order ${existing.orderId}).',
+        );
+      }
+    } catch (error, stackTrace) {
+      _log(
+        'Take-profit cancel failed for order ${existing.orderId}: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  Future<void> _persistExchangeTakeProfit() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final tp = exchangeTakeProfit;
+      if (tp == null) {
+        await prefs.remove(_exchangeTakeProfitPrefsKey);
+      } else {
+        await prefs.setString(
+          _exchangeTakeProfitPrefsKey,
+          jsonEncode(tp.toJson()),
+        );
+      }
+    } catch (error, stackTrace) {
+      _log('Take-profit could not be saved: $error',
+          error: error, stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _loadExchangeTakeProfit() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_exchangeTakeProfitPrefsKey);
+      if (raw == null || raw.isEmpty) return;
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, Object?>) {
+        exchangeTakeProfit = ExchangeTakeProfit.fromJson(decoded);
+        notifyListeners();
+      }
+    } catch (error, stackTrace) {
+      _log('Take-profit could not be restored: $error',
+          error: error, stackTrace: stackTrace);
+    }
+  }
+
+  /// Forgets the local record once the position is gone: WEEX cancels a
+  /// position-attached plan when that position closes.
+  void _forgetExchangeTakeProfitIfFlat() {
+    if (exchangeTakeProfit != null && position.isFlat) {
+      final tp = exchangeTakeProfit!;
+      exchangeTakeProfit = null;
+      unawaited(_persistExchangeTakeProfit());
+      _log(
+        'Take-profit ${tp.triggerPrice.toStringAsFixed(0)} released with the closed position.',
+      );
+      notifyListeners();
+    }
   }
 
   void armCloseTarget({
@@ -1759,10 +2055,7 @@ class AppController extends ChangeNotifier {
     );
   }
 
-  double _roundDown(double value, double step) {
-    if (step <= 0) return value;
-    return (value / step).floorToDouble() * step;
-  }
+  double _roundDown(double value, double step) => roundDownToLot(value, step);
 
   Future<TradeStatus> _place(PlannedOrder order) async {
     if (!config.simulationMode) {
@@ -1911,6 +2204,7 @@ class AppController extends ChangeNotifier {
         crossCombinedLeverage: position.crossCombinedLeverage,
       );
       _disarmCloseTargetIfFlat();
+      _forgetExchangeTakeProfitIfFlat();
       return;
     }
     final sameDirection =
@@ -2513,6 +2807,51 @@ Future<String> _getJson(HttpClient client, Uri uri) async {
     throw HttpException('HTTP ${response.statusCode}: $body', uri: uri);
   }
   return body;
+}
+
+/// One iteration of the verified flatten loop: what to do with the position the
+/// exchange still reports after the previous close attempt.
+enum FlattenStep {
+  /// Lots remain and attempts are left — submit a reduce-only close for them.
+  submit,
+
+  /// The book is flat; the close is complete.
+  done,
+
+  /// A remainder smaller than one lot. It cannot be submitted, so retrying
+  /// would loop forever — report it instead.
+  dust,
+
+  /// Still open after the last allowed attempt.
+  giveUp,
+}
+
+/// Decides the next step of a verified flatten. Pure and [visibleForTesting] so
+/// the termination guarantees — never loop on sub-lot dust, never exceed
+/// [maxAttempts] — are locked by unit tests rather than by a live exchange.
+@visibleForTesting
+FlattenStep flattenStep({
+  required double remainingBtc,
+  required double lotStep,
+  required int attempt,
+  required int maxAttempts,
+}) {
+  if (remainingBtc <= 0) return FlattenStep.done;
+  if (roundDownToLot(remainingBtc, lotStep) <= 0) return FlattenStep.dust;
+  if (attempt > maxAttempts) return FlattenStep.giveUp;
+  return FlattenStep.submit;
+}
+
+/// Floors `value` to a whole multiple of `step`.
+///
+/// The epsilon mirrors the Rust lot formatter (`weex.rs` `format_qty`). Binary
+/// floating point makes 0.0055 / 0.0001 come out as 54.99999999999999, so a
+/// bare floor drops a whole lot: a "full" close would submit 0.0054 BTC and
+/// leave 0.0001 behind, which the exchange then reports as a partial reduce.
+@visibleForTesting
+double roundDownToLot(double value, double step) {
+  if (step <= 0) return value;
+  return ((value / step) + 1e-9).floorToDouble() * step;
 }
 
 @visibleForTesting

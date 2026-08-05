@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 905367623;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -631656769;
 
 // Section: executor
 
@@ -830,6 +830,44 @@ fn wire__crate__api__validate_patterns_yaml_impl(
         },
     )
 }
+fn wire__crate__api__weex_cancel_algo_order_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weex_cancel_algo_order",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::weex::WeexCancelAlgoRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::weex_cancel_algo_order(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
 fn wire__crate__api__weex_public_price_stream_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1026,6 +1064,83 @@ fn wire__crate__api__weex_submit_market_order_impl(
                     })()
                     .await,
                 )
+            }
+        },
+    )
+}
+fn wire__crate__api__weex_submit_tp_sl_order_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weex_submit_tp_sl_order",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::weex::WeexTpSlOrderRequest>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::weex_submit_tp_sl_order(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__weex_tp_sl_plan_type_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weex_tp_sl_plan_type",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_direction = <crate::interpreter::Direction>::sse_decode(&mut deserializer);
+            let api_trigger_price = <f64>::sse_decode(&mut deserializer);
+            let api_mark_price = <f64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::weex_tp_sl_plan_type(
+                        api_direction,
+                        api_trigger_price,
+                        api_mark_price,
+                    ))?;
+                    Ok(output_ok)
+                })())
             }
         },
     )
@@ -1764,6 +1879,26 @@ impl SseDecode for crate::weex::WeexAlgoOrderRequest {
     }
 }
 
+impl SseDecode for crate::weex::WeexCancelAlgoRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_apiKey = <String>::sse_decode(deserializer);
+        let mut var_apiSecret = <String>::sse_decode(deserializer);
+        let mut var_passphrase = <String>::sse_decode(deserializer);
+        let mut var_symbol = <String>::sse_decode(deserializer);
+        let mut var_baseUrl = <String>::sse_decode(deserializer);
+        let mut var_orderId = <String>::sse_decode(deserializer);
+        return crate::weex::WeexCancelAlgoRequest {
+            api_key: var_apiKey,
+            api_secret: var_apiSecret,
+            passphrase: var_passphrase,
+            symbol: var_symbol,
+            base_url: var_baseUrl,
+            order_id: var_orderId,
+        };
+    }
+}
+
 impl SseDecode for crate::weex::WeexExecutionSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1870,6 +2005,38 @@ impl SseDecode for crate::weex::WeexPositionSnapshot {
     }
 }
 
+impl SseDecode for crate::weex::WeexTpSlOrderRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_apiKey = <String>::sse_decode(deserializer);
+        let mut var_apiSecret = <String>::sse_decode(deserializer);
+        let mut var_passphrase = <String>::sse_decode(deserializer);
+        let mut var_symbol = <String>::sse_decode(deserializer);
+        let mut var_baseUrl = <String>::sse_decode(deserializer);
+        let mut var_positionSide = <String>::sse_decode(deserializer);
+        let mut var_planType = <String>::sse_decode(deserializer);
+        let mut var_triggerPrice = <f64>::sse_decode(deserializer);
+        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_clientAlgoId = <String>::sse_decode(deserializer);
+        let mut var_qtyStep = <f64>::sse_decode(deserializer);
+        let mut var_priceStep = <f64>::sse_decode(deserializer);
+        return crate::weex::WeexTpSlOrderRequest {
+            api_key: var_apiKey,
+            api_secret: var_apiSecret,
+            passphrase: var_passphrase,
+            symbol: var_symbol,
+            base_url: var_baseUrl,
+            position_side: var_positionSide,
+            plan_type: var_planType,
+            trigger_price: var_triggerPrice,
+            qty_btc: var_qtyBtc,
+            client_algo_id: var_clientAlgoId,
+            qty_step: var_qtyStep,
+            price_step: var_priceStep,
+        };
+    }
+}
+
 fn pde_ffi_dispatcher_primary_impl(
     func_id: i32,
     port: flutter_rust_bridge::for_generated::MessagePort,
@@ -1906,11 +2073,14 @@ fn pde_ffi_dispatcher_primary_impl(
         20 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
         21 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
         22 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__weex_cancel_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__weex_submit_tp_sl_order_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__weex_tp_sl_plan_type_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2501,6 +2671,31 @@ impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexAlgoOrderRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::weex::WeexCancelAlgoRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.api_key.into_into_dart().into_dart(),
+            self.api_secret.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
+            self.symbol.into_into_dart().into_dart(),
+            self.base_url.into_into_dart().into_dart(),
+            self.order_id.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::weex::WeexCancelAlgoRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexCancelAlgoRequest>
+    for crate::weex::WeexCancelAlgoRequest
+{
+    fn into_into_dart(self) -> crate::weex::WeexCancelAlgoRequest {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::weex::WeexExecutionSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2610,6 +2805,37 @@ impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexPositionSnapshot>
     for crate::weex::WeexPositionSnapshot
 {
     fn into_into_dart(self) -> crate::weex::WeexPositionSnapshot {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::weex::WeexTpSlOrderRequest {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.api_key.into_into_dart().into_dart(),
+            self.api_secret.into_into_dart().into_dart(),
+            self.passphrase.into_into_dart().into_dart(),
+            self.symbol.into_into_dart().into_dart(),
+            self.base_url.into_into_dart().into_dart(),
+            self.position_side.into_into_dart().into_dart(),
+            self.plan_type.into_into_dart().into_dart(),
+            self.trigger_price.into_into_dart().into_dart(),
+            self.qty_btc.into_into_dart().into_dart(),
+            self.client_algo_id.into_into_dart().into_dart(),
+            self.qty_step.into_into_dart().into_dart(),
+            self.price_step.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::weex::WeexTpSlOrderRequest
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexTpSlOrderRequest>
+    for crate::weex::WeexTpSlOrderRequest
+{
+    fn into_into_dart(self) -> crate::weex::WeexTpSlOrderRequest {
         self
     }
 }
@@ -3182,6 +3408,18 @@ impl SseEncode for crate::weex::WeexAlgoOrderRequest {
     }
 }
 
+impl SseEncode for crate::weex::WeexCancelAlgoRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.api_key, serializer);
+        <String>::sse_encode(self.api_secret, serializer);
+        <String>::sse_encode(self.passphrase, serializer);
+        <String>::sse_encode(self.symbol, serializer);
+        <String>::sse_encode(self.base_url, serializer);
+        <String>::sse_encode(self.order_id, serializer);
+    }
+}
+
 impl SseEncode for crate::weex::WeexExecutionSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3240,6 +3478,24 @@ impl SseEncode for crate::weex::WeexPositionSnapshot {
         <f64>::sse_encode(self.leverage, serializer);
         <Option<f64>>::sse_encode(self.liquidation_price, serializer);
         <i64>::sse_encode(self.updated_at_ms, serializer);
+    }
+}
+
+impl SseEncode for crate::weex::WeexTpSlOrderRequest {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.api_key, serializer);
+        <String>::sse_encode(self.api_secret, serializer);
+        <String>::sse_encode(self.passphrase, serializer);
+        <String>::sse_encode(self.symbol, serializer);
+        <String>::sse_encode(self.base_url, serializer);
+        <String>::sse_encode(self.position_side, serializer);
+        <String>::sse_encode(self.plan_type, serializer);
+        <f64>::sse_encode(self.trigger_price, serializer);
+        <f64>::sse_encode(self.qty_btc, serializer);
+        <String>::sse_encode(self.client_algo_id, serializer);
+        <f64>::sse_encode(self.qty_step, serializer);
+        <f64>::sse_encode(self.price_step, serializer);
     }
 }
 

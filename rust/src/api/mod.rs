@@ -292,6 +292,59 @@ pub async fn weex_submit_algo_order(
     }
 }
 
+pub async fn weex_submit_tp_sl_order(
+    request: weex::WeexTpSlOrderRequest,
+) -> ApiResultWeexMarketOrderAck {
+    match weex::submit_tp_sl_order(request).await {
+        Ok(value) if value.success => ApiResultWeexMarketOrderAck {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Ok(value) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            error: Some(weex_rejection_message(&value)),
+            value: Some(value),
+        },
+        Err(error) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub async fn weex_cancel_algo_order(
+    request: weex::WeexCancelAlgoRequest,
+) -> ApiResultWeexMarketOrderAck {
+    match weex::cancel_algo_order(request).await {
+        Ok(value) if value.success => ApiResultWeexMarketOrderAck {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Ok(value) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            error: Some(weex_rejection_message(&value)),
+            value: Some(value),
+        },
+        Err(error) => ApiResultWeexMarketOrderAck {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// TAKE_PROFIT or STOP_LOSS for a target price against an open position.
+pub fn weex_tp_sl_plan_type(
+    direction: crate::interpreter::Direction,
+    trigger_price: f64,
+    mark_price: f64,
+) -> String {
+    weex::tp_sl_plan_type(direction, trigger_price, mark_price).to_string()
+}
+
 pub fn record_chart_snapshot(timestamp_ms: i64, balance: f64, equity: f64, cumulative_pnl: f64) {
     if timestamp_ms <= 0
         || !balance.is_finite()

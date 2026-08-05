@@ -230,6 +230,45 @@ class WeexAlgoOrderRequest {
           priceStep == other.priceStep;
 }
 
+class WeexCancelAlgoRequest {
+  final String apiKey;
+  final String apiSecret;
+  final String passphrase;
+  final String symbol;
+  final String baseUrl;
+  final String orderId;
+
+  const WeexCancelAlgoRequest({
+    required this.apiKey,
+    required this.apiSecret,
+    required this.passphrase,
+    required this.symbol,
+    required this.baseUrl,
+    required this.orderId,
+  });
+
+  @override
+  int get hashCode =>
+      apiKey.hashCode ^
+      apiSecret.hashCode ^
+      passphrase.hashCode ^
+      symbol.hashCode ^
+      baseUrl.hashCode ^
+      orderId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeexCancelAlgoRequest &&
+          runtimeType == other.runtimeType &&
+          apiKey == other.apiKey &&
+          apiSecret == other.apiSecret &&
+          passphrase == other.passphrase &&
+          symbol == other.symbol &&
+          baseUrl == other.baseUrl &&
+          orderId == other.orderId;
+}
+
 class WeexExecutionSnapshot {
   final String execId;
   final String orderId;
@@ -436,4 +475,77 @@ class WeexPositionSnapshot {
           leverage == other.leverage &&
           liquidationPrice == other.liquidationPrice &&
           updatedAtMs == other.updatedAtMs;
+}
+
+/// A take-profit (or stop-loss) attached to an open position. Unlike an algo
+/// order it carries no side of its own: the exchange closes whatever is open on
+/// `position_side` when `trigger_price` is reached, so it stays correct as the
+/// position is added to or partially reduced.
+class WeexTpSlOrderRequest {
+  final String apiKey;
+  final String apiSecret;
+  final String passphrase;
+  final String symbol;
+  final String baseUrl;
+
+  /// LONG or SHORT: the position this plan protects.
+  final String positionSide;
+
+  /// TAKE_PROFIT or STOP_LOSS.
+  final String planType;
+  final double triggerPrice;
+
+  /// 0 closes the entire position — the scalping default.
+  final double qtyBtc;
+  final String clientAlgoId;
+  final double qtyStep;
+  final double priceStep;
+
+  const WeexTpSlOrderRequest({
+    required this.apiKey,
+    required this.apiSecret,
+    required this.passphrase,
+    required this.symbol,
+    required this.baseUrl,
+    required this.positionSide,
+    required this.planType,
+    required this.triggerPrice,
+    required this.qtyBtc,
+    required this.clientAlgoId,
+    required this.qtyStep,
+    required this.priceStep,
+  });
+
+  @override
+  int get hashCode =>
+      apiKey.hashCode ^
+      apiSecret.hashCode ^
+      passphrase.hashCode ^
+      symbol.hashCode ^
+      baseUrl.hashCode ^
+      positionSide.hashCode ^
+      planType.hashCode ^
+      triggerPrice.hashCode ^
+      qtyBtc.hashCode ^
+      clientAlgoId.hashCode ^
+      qtyStep.hashCode ^
+      priceStep.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeexTpSlOrderRequest &&
+          runtimeType == other.runtimeType &&
+          apiKey == other.apiKey &&
+          apiSecret == other.apiSecret &&
+          passphrase == other.passphrase &&
+          symbol == other.symbol &&
+          baseUrl == other.baseUrl &&
+          positionSide == other.positionSide &&
+          planType == other.planType &&
+          triggerPrice == other.triggerPrice &&
+          qtyBtc == other.qtyBtc &&
+          clientAlgoId == other.clientAlgoId &&
+          qtyStep == other.qtyStep &&
+          priceStep == other.priceStep;
 }
