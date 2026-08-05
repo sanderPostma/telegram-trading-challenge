@@ -334,6 +334,13 @@ pub async fn submit_market_order(
     if request.qty_btc <= 0.0 || !request.qty_btc.is_finite() {
         anyhow::bail!("WEEX market order quantity must be positive");
     }
+    // The last gate before the exchange. Everything upstream — Telegram
+    // parsing, scaling, manual entry — funnels through here.
+    if let Err(reason) =
+        crate::risk::check_order(&client.request.symbol, request.qty_btc, request.reduce_only)
+    {
+        anyhow::bail!(reason);
+    }
     let mut order = OrderRequest::market(&client.request.symbol, side, request.qty_btc);
     order.client_order_id = Some(sanitize_client_order_id(&request.client_order_id));
     if request.reduce_only {
@@ -380,6 +387,9 @@ pub async fn submit_algo_order(
     let order_type = request.order_type.trim().to_ascii_uppercase();
     if !matches!(order_type.as_str(), "STOP" | "TAKE_PROFIT") {
         anyhow::bail!("WEEX conditional limit order type must be STOP or TAKE_PROFIT");
+    }
+    if let Err(reason) = crate::risk::check_symbol(&client.request.symbol) {
+        anyhow::bail!(reason);
     }
 
     let body = algo_order_body(
@@ -435,6 +445,9 @@ pub async fn submit_tp_sl_order(
     if request.qty_btc < 0.0 || !request.qty_btc.is_finite() {
         anyhow::bail!("WEEX TP/SL quantity must be zero (whole position) or positive");
     }
+    if let Err(reason) = crate::risk::check_symbol(&client.request.symbol) {
+        anyhow::bail!(reason);
+    }
 
     let body = tp_sl_order_body(
         &client.request.symbol,
@@ -448,6 +461,83 @@ pub async fn submit_tp_sl_order(
     );
     let payload: Value = client.post("/capi/v3/placeTpSlOrder", body).await?;
     Ok(ack_from_payload(payload)?)
+}
+
+/// What the exchange knows about one `client_order_id`.
+///
+/// `found: false` is a positive statement — the exchange answered and has no
+/// such order, so it never landed. An `Err` from [`lookup_order_by_client_id`]
+/// means the opposite: we could not find out, and nothing should be retried on
+/// the strength of it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WeexOrderStatus {
+    pub found: bool,
+    pub order_id: String,
+    pub client_order_id: Option<String>,
+    /// Exchange status verbatim (NEW, PARTIALLY_FILLED, FILLED, CANCELED,
+    /// REJECTED), uppercased. Empty when the order is absent.
+    pub status: String,
+    pub filled_qty_btc: f64,
+    pub avg_price: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ContractOrderDetail {
+    #[serde(default)]
+    order_id: Value,
+    #[serde(default)]
+    client_order_id: Value,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    executed_qty: String,
+    #[serde(default)]
+    avg_price: String,
+}
+
+/// Asks WEEX what happened to an order we submitted but never got an answer
+/// for — the crash-during-submit case. `GET /capi/v3/order`.
+pub async fn lookup_order_by_client_id(
+    request: WeexAccountRequest,
+    client_order_id: String,
+) -> anyhow::Result<WeexOrderStatus> {
+    let client_order_id = sanitize_client_order_id(&client_order_id);
+    if client_order_id.is_empty() {
+        anyhow::bail!("WEEX order lookup requires a client order id");
+    }
+    let client = SignedRestClient::new(request)?;
+    let detail: ContractOrderDetail = client
+        .get(
+            "/capi/v3/order",
+            &[
+                ("symbol", client.request.symbol.clone()),
+                ("origClientOrderId", client_order_id.clone()),
+            ],
+        )
+        .await?;
+
+    let order_id = json_id_to_string(&detail.order_id);
+    if order_id.is_empty() && detail.status.trim().is_empty() {
+        return Ok(WeexOrderStatus {
+            found: false,
+            order_id: String::new(),
+            client_order_id: Some(client_order_id),
+            status: String::new(),
+            filled_qty_btc: 0.0,
+            avg_price: 0.0,
+        });
+    }
+
+    Ok(WeexOrderStatus {
+        found: true,
+        order_id,
+        client_order_id: json_optional_id_to_string(&detail.client_order_id)
+            .or(Some(client_order_id)),
+        status: detail.status.trim().to_ascii_uppercase(),
+        filled_qty_btc: parse_f64_lossy(&detail.executed_qty).abs(),
+        avg_price: parse_f64_lossy(&detail.avg_price),
+    })
 }
 
 /// Cancels a conditional (trigger / TP / SL) order by exchange order id.
@@ -949,7 +1039,7 @@ fn sanitize_client_order_id(value: &str) -> String {
         .take(36)
         .collect::<String>();
     if cleaned.is_empty() {
-        format!("tmg-{}", Utc::now().timestamp_millis())
+        format!("tc-{}", Utc::now().timestamp_millis())
     } else {
         cleaned
     }
@@ -966,7 +1056,7 @@ pub fn market_order_body(request: &OrderRequest, qty_step: f64) -> serde_json::V
         "positionSide": position_side(request),
         "type": "MARKET",
         "quantity": format_step(request.quantity, qty_step),
-        "newClientOrderId": request.client_order_id.clone().unwrap_or_else(|| "tmg-manual".to_string()),
+        "newClientOrderId": request.client_order_id.clone().unwrap_or_else(|| "tc-manual".to_string()),
     })
 }
 
@@ -1315,7 +1405,7 @@ mod tests {
             "TAKE_PROFIT",
             64_450.0,
             0.0,
-            "tmg-tp-1",
+            "tc-tp-1",
             0.0001,
             0.1,
         );
@@ -1332,7 +1422,7 @@ mod tests {
             "STOP_LOSS",
             64_450.0,
             0.00219,
-            "tmg-tp-2",
+            "tc-tp-2",
             0.0001,
             0.1,
         );
@@ -1394,7 +1484,7 @@ mod tests {
             64_300.0,
             64_300.0,
             "STOP",
-            "tmg-123-limit",
+            "tc-123-limit",
             0.0001,
             0.1,
         );

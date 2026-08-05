@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -631656769;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1291247560;
 
 // Section: executor
 
@@ -218,6 +218,40 @@ fn wire__crate__api__close_target_should_fire_impl(
                         api_low,
                         api_high,
                     ))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__dedup_pending_actions_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "dedup_pending_actions",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_state_path = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok =
+                        Result::<_, ()>::Ok(crate::api::dedup_pending_actions(api_state_path))?;
                     Ok(output_ok)
                 })())
             }
@@ -564,6 +598,216 @@ fn wire__crate__api__record_chart_snapshot_impl(
         },
     )
 }
+fn wire__crate__api__risk_check_signal_age_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_check_signal_age",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_message_timestamp_ms = <i64>::sse_decode(&mut deserializer);
+            let api_now_ms = <i64>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::risk_check_signal_age(
+                        api_message_timestamp_ms,
+                        api_now_ms,
+                    ))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__risk_context_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_context",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::risk_context())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__risk_limits_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_limits",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::risk_limits())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__risk_preview_order_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_preview_order",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_symbol = <String>::sse_decode(&mut deserializer);
+            let api_qty_btc = <f64>::sse_decode(&mut deserializer);
+            let api_reduce_only = <bool>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::risk_preview_order(
+                        api_symbol,
+                        api_qty_btc,
+                        api_reduce_only,
+                    ))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__risk_set_limits_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_set_limits",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_limits = <crate::risk::RiskLimits>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok({
+                        crate::api::risk_set_limits(api_limits);
+                    })?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__risk_update_context_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "risk_update_context",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_context = <crate::risk::RiskContext>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok({
+                        crate::api::risk_update_context(api_context);
+                    })?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__scale_manual_order_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -592,6 +836,142 @@ fn wire__crate__api__scale_manual_order_impl(
                 transform_result_sse::<_, ()>((move || {
                     let output_ok =
                         Result::<_, ()>::Ok(crate::api::scale_manual_order(api_request))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__secrets_harden_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "secrets_harden",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::secrets_harden(api_dir))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__secrets_load_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "secrets_load",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::secrets_load(api_dir))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__secrets_purge_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "secrets_purge",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dir = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::secrets_purge(api_dir))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__secrets_save_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "secrets_save",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_dir = <String>::sse_decode(&mut deserializer);
+            let api_credentials_json = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::secrets_save(
+                        api_dir,
+                        api_credentials_json,
+                    ))?;
                     Ok(output_ok)
                 })())
             }
@@ -859,6 +1239,45 @@ fn wire__crate__api__weex_cancel_algo_order_impl(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
                             crate::api::weex_cancel_algo_order(api_request).await,
+                        )?;
+                        Ok(output_ok)
+                    })()
+                    .await,
+                )
+            }
+        },
+    )
+}
+fn wire__crate__api__weex_lookup_order_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_async::<flutter_rust_bridge::for_generated::SseCodec, _, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "weex_lookup_order",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_request = <crate::weex::WeexAccountRequest>::sse_decode(&mut deserializer);
+            let api_client_order_id = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| async move {
+                transform_result_sse::<_, ()>(
+                    (move || async move {
+                        let output_ok = Result::<_, ()>::Ok(
+                            crate::api::weex_lookup_order(api_request, api_client_order_id).await,
                         )?;
                         Ok(output_ok)
                     })()
@@ -1252,6 +1671,20 @@ impl SseDecode for crate::api::ApiResultActions {
     }
 }
 
+impl SseDecode for crate::api::ApiResultPendingActions {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ok = <bool>::sse_decode(deserializer);
+        let mut var_value = <Option<Vec<crate::api::PendingAction>>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::ApiResultPendingActions {
+            ok: var_ok,
+            value: var_value,
+            error: var_error,
+        };
+    }
+}
+
 impl SseDecode for crate::api::ApiResultScaledOrder {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1317,6 +1750,20 @@ impl SseDecode for crate::api::ApiResultWeexMarketOrderAck {
         let mut var_value = <Option<crate::weex::WeexMarketOrderAck>>::sse_decode(deserializer);
         let mut var_error = <Option<String>>::sse_decode(deserializer);
         return crate::api::ApiResultWeexMarketOrderAck {
+            ok: var_ok,
+            value: var_value,
+            error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::api::ApiResultWeexOrderStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_ok = <bool>::sse_decode(deserializer);
+        let mut var_value = <Option<crate::weex::WeexOrderStatus>>::sse_decode(deserializer);
+        let mut var_error = <Option<String>>::sse_decode(deserializer);
+        return crate::api::ApiResultWeexOrderStatus {
             ok: var_ok,
             value: var_value,
             error: var_error,
@@ -1390,6 +1837,18 @@ impl SseDecode for i64 {
     }
 }
 
+impl SseDecode for crate::risk::Limit {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_value = <f64>::sse_decode(deserializer);
+        let mut var_percent = <bool>::sse_decode(deserializer);
+        return crate::risk::Limit {
+            value: var_value,
+            percent: var_percent,
+        };
+    }
+}
+
 impl SseDecode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1409,6 +1868,18 @@ impl SseDecode for Vec<crate::interpreter::Action> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::interpreter::Action>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::PendingAction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::PendingAction>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -1609,6 +2080,17 @@ impl SseDecode for Option<crate::weex::WeexMarketOrderAck> {
     }
 }
 
+impl SseDecode for Option<crate::weex::WeexOrderStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::weex::WeexOrderStatus>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
 impl SseDecode for Option<Vec<crate::interpreter::Action>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1617,6 +2099,35 @@ impl SseDecode for Option<Vec<crate::interpreter::Action>> {
         } else {
             return None;
         }
+    }
+}
+
+impl SseDecode for Option<Vec<crate::api::PendingAction>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<Vec<crate::api::PendingAction>>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for crate::api::PendingAction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_dedupKey = <String>::sse_decode(deserializer);
+        let mut var_channelId = <i64>::sse_decode(deserializer);
+        let mut var_messageId = <i64>::sse_decode(deserializer);
+        let mut var_actionOrdinal = <u32>::sse_decode(deserializer);
+        let mut var_updatedAtMs = <i64>::sse_decode(deserializer);
+        return crate::api::PendingAction {
+            dedup_key: var_dedupKey,
+            channel_id: var_channelId,
+            message_id: var_messageId,
+            action_ordinal: var_actionOrdinal,
+            updated_at_ms: var_updatedAtMs,
+        };
     }
 }
 
@@ -1642,6 +2153,48 @@ impl SseDecode for crate::weex::PriceTick {
             received_at_ms: var_receivedAtMs,
             ok: var_ok,
             error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::risk::RiskContext {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_referencePrice = <f64>::sse_decode(deserializer);
+        let mut var_openPositionNotionalUsd = <f64>::sse_decode(deserializer);
+        let mut var_leverage = <f64>::sse_decode(deserializer);
+        let mut var_realizedPnlTodayUsd = <f64>::sse_decode(deserializer);
+        let mut var_accountBalanceUsd = <f64>::sse_decode(deserializer);
+        return crate::risk::RiskContext {
+            reference_price: var_referencePrice,
+            open_position_notional_usd: var_openPositionNotionalUsd,
+            leverage: var_leverage,
+            realized_pnl_today_usd: var_realizedPnlTodayUsd,
+            account_balance_usd: var_accountBalanceUsd,
+        };
+    }
+}
+
+impl SseDecode for crate::risk::RiskLimits {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_killSwitch = <bool>::sse_decode(deserializer);
+        let mut var_maxOrderNotional = <crate::risk::Limit>::sse_decode(deserializer);
+        let mut var_maxOrderQtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_maxPositionNotional = <crate::risk::Limit>::sse_decode(deserializer);
+        let mut var_symbolAllowlist = <Vec<String>>::sse_decode(deserializer);
+        let mut var_maxLeverage = <f64>::sse_decode(deserializer);
+        let mut var_dailyLoss = <crate::risk::Limit>::sse_decode(deserializer);
+        let mut var_maxSignalAgeSecs = <i64>::sse_decode(deserializer);
+        return crate::risk::RiskLimits {
+            kill_switch: var_killSwitch,
+            max_order_notional: var_maxOrderNotional,
+            max_order_qty_btc: var_maxOrderQtyBtc,
+            max_position_notional: var_maxPositionNotional,
+            symbol_allowlist: var_symbolAllowlist,
+            max_leverage: var_maxLeverage,
+            daily_loss: var_dailyLoss,
+            max_signal_age_secs: var_maxSignalAgeSecs,
         };
     }
 }
@@ -1773,6 +2326,13 @@ impl SseDecode for crate::telegram::TelegramMessageEvent {
             received_at_ms: var_receivedAtMs,
             error: var_error,
         };
+    }
+}
+
+impl SseDecode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        deserializer.cursor.read_u32::<NativeEndian>().unwrap()
     }
 }
 
@@ -1977,6 +2537,26 @@ impl SseDecode for crate::weex::WeexMarketOrderRequest {
     }
 }
 
+impl SseDecode for crate::weex::WeexOrderStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_found = <bool>::sse_decode(deserializer);
+        let mut var_orderId = <String>::sse_decode(deserializer);
+        let mut var_clientOrderId = <Option<String>>::sse_decode(deserializer);
+        let mut var_status = <String>::sse_decode(deserializer);
+        let mut var_filledQtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_avgPrice = <f64>::sse_decode(deserializer);
+        return crate::weex::WeexOrderStatus {
+            found: var_found,
+            order_id: var_orderId,
+            client_order_id: var_clientOrderId,
+            status: var_status,
+            filled_qty_btc: var_filledQtyBtc,
+            avg_price: var_avgPrice,
+        };
+    }
+}
+
 impl SseDecode for crate::weex::WeexPositionSnapshot {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2056,31 +2636,43 @@ fn pde_ffi_dispatcher_primary_impl(
             data_len,
         ),
         5 => wire__crate__api__close_target_should_fire_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__extract_master_balance_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__weex_cancel_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__weex_submit_tp_sl_order_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__weex_tp_sl_plan_type_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__dedup_pending_actions_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__extract_master_balance_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__risk_check_signal_age_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__risk_context_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__risk_limits_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__risk_preview_order_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__risk_set_limits_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__risk_update_context_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__secrets_harden_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__secrets_load_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__secrets_purge_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__secrets_save_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__weex_cancel_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__weex_lookup_order_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__weex_submit_tp_sl_order_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__weex_tp_sl_plan_type_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2179,6 +2771,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultActions>
     for crate::api::ApiResultActions
 {
     fn into_into_dart(self) -> crate::api::ApiResultActions {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ApiResultPendingActions {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ok.into_into_dart().into_dart(),
+            self.value.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ApiResultPendingActions
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultPendingActions>
+    for crate::api::ApiResultPendingActions
+{
+    fn into_into_dart(self) -> crate::api::ApiResultPendingActions {
         self
     }
 }
@@ -2290,6 +2904,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultWeexMarketOrderAck>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::ApiResultWeexOrderStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.ok.into_into_dart().into_dart(),
+            self.value.into_into_dart().into_dart(),
+            self.error.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive
+    for crate::api::ApiResultWeexOrderStatus
+{
+}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultWeexOrderStatus>
+    for crate::api::ApiResultWeexOrderStatus
+{
+    fn into_into_dart(self) -> crate::api::ApiResultWeexOrderStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ChartData {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2341,6 +2977,22 @@ impl flutter_rust_bridge::IntoIntoDart<crate::interpreter::Direction>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::risk::Limit {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.value.into_into_dart().into_dart(),
+            self.percent.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::risk::Limit {}
+impl flutter_rust_bridge::IntoIntoDart<crate::risk::Limit> for crate::risk::Limit {
+    fn into_into_dart(self) -> crate::risk::Limit {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ManualScaleRequest {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2382,6 +3034,25 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ManualSizeUnit> for crate::ap
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::PendingAction {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.dedup_key.into_into_dart().into_dart(),
+            self.channel_id.into_into_dart().into_dart(),
+            self.message_id.into_into_dart().into_dart(),
+            self.action_ordinal.into_into_dart().into_dart(),
+            self.updated_at_ms.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::PendingAction {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::PendingAction> for crate::api::PendingAction {
+    fn into_into_dart(self) -> crate::api::PendingAction {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::weex::PriceTick {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2401,6 +3072,47 @@ impl flutter_rust_bridge::IntoDart for crate::weex::PriceTick {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::weex::PriceTick {}
 impl flutter_rust_bridge::IntoIntoDart<crate::weex::PriceTick> for crate::weex::PriceTick {
     fn into_into_dart(self) -> crate::weex::PriceTick {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::risk::RiskContext {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.reference_price.into_into_dart().into_dart(),
+            self.open_position_notional_usd.into_into_dart().into_dart(),
+            self.leverage.into_into_dart().into_dart(),
+            self.realized_pnl_today_usd.into_into_dart().into_dart(),
+            self.account_balance_usd.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::risk::RiskContext {}
+impl flutter_rust_bridge::IntoIntoDart<crate::risk::RiskContext> for crate::risk::RiskContext {
+    fn into_into_dart(self) -> crate::risk::RiskContext {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::risk::RiskLimits {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.kill_switch.into_into_dart().into_dart(),
+            self.max_order_notional.into_into_dart().into_dart(),
+            self.max_order_qty_btc.into_into_dart().into_dart(),
+            self.max_position_notional.into_into_dart().into_dart(),
+            self.symbol_allowlist.into_into_dart().into_dart(),
+            self.max_leverage.into_into_dart().into_dart(),
+            self.daily_loss.into_into_dart().into_dart(),
+            self.max_signal_age_secs.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::risk::RiskLimits {}
+impl flutter_rust_bridge::IntoIntoDart<crate::risk::RiskLimits> for crate::risk::RiskLimits {
+    fn into_into_dart(self) -> crate::risk::RiskLimits {
         self
     }
 }
@@ -2780,6 +3492,28 @@ impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexMarketOrderRequest>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::weex::WeexOrderStatus {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.found.into_into_dart().into_dart(),
+            self.order_id.into_into_dart().into_dart(),
+            self.client_order_id.into_into_dart().into_dart(),
+            self.status.into_into_dart().into_dart(),
+            self.filled_qty_btc.into_into_dart().into_dart(),
+            self.avg_price.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::weex::WeexOrderStatus {}
+impl flutter_rust_bridge::IntoIntoDart<crate::weex::WeexOrderStatus>
+    for crate::weex::WeexOrderStatus
+{
+    fn into_into_dart(self) -> crate::weex::WeexOrderStatus {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::weex::WeexPositionSnapshot {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -2925,6 +3659,15 @@ impl SseEncode for crate::api::ApiResultActions {
     }
 }
 
+impl SseEncode for crate::api::ApiResultPendingActions {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.ok, serializer);
+        <Option<Vec<crate::api::PendingAction>>>::sse_encode(self.value, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
 impl SseEncode for crate::api::ApiResultScaledOrder {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -2966,6 +3709,15 @@ impl SseEncode for crate::api::ApiResultWeexMarketOrderAck {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.ok, serializer);
         <Option<crate::weex::WeexMarketOrderAck>>::sse_encode(self.value, serializer);
+        <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::api::ApiResultWeexOrderStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.ok, serializer);
+        <Option<crate::weex::WeexOrderStatus>>::sse_encode(self.value, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
     }
 }
@@ -3031,6 +3783,14 @@ impl SseEncode for i64 {
     }
 }
 
+impl SseEncode for crate::risk::Limit {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <f64>::sse_encode(self.value, serializer);
+        <bool>::sse_encode(self.percent, serializer);
+    }
+}
+
 impl SseEncode for Vec<String> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3047,6 +3807,16 @@ impl SseEncode for Vec<crate::interpreter::Action> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::interpreter::Action>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::PendingAction> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::PendingAction>::sse_encode(item, serializer);
         }
     }
 }
@@ -3219,6 +3989,16 @@ impl SseEncode for Option<crate::weex::WeexMarketOrderAck> {
     }
 }
 
+impl SseEncode for Option<crate::weex::WeexOrderStatus> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::weex::WeexOrderStatus>::sse_encode(value, serializer);
+        }
+    }
+}
+
 impl SseEncode for Option<Vec<crate::interpreter::Action>> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3226,6 +4006,27 @@ impl SseEncode for Option<Vec<crate::interpreter::Action>> {
         if let Some(value) = self {
             <Vec<crate::interpreter::Action>>::sse_encode(value, serializer);
         }
+    }
+}
+
+impl SseEncode for Option<Vec<crate::api::PendingAction>> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <Vec<crate::api::PendingAction>>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for crate::api::PendingAction {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.dedup_key, serializer);
+        <i64>::sse_encode(self.channel_id, serializer);
+        <i64>::sse_encode(self.message_id, serializer);
+        <u32>::sse_encode(self.action_ordinal, serializer);
+        <i64>::sse_encode(self.updated_at_ms, serializer);
     }
 }
 
@@ -3241,6 +4042,31 @@ impl SseEncode for crate::weex::PriceTick {
         <i64>::sse_encode(self.received_at_ms, serializer);
         <bool>::sse_encode(self.ok, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::risk::RiskContext {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <f64>::sse_encode(self.reference_price, serializer);
+        <f64>::sse_encode(self.open_position_notional_usd, serializer);
+        <f64>::sse_encode(self.leverage, serializer);
+        <f64>::sse_encode(self.realized_pnl_today_usd, serializer);
+        <f64>::sse_encode(self.account_balance_usd, serializer);
+    }
+}
+
+impl SseEncode for crate::risk::RiskLimits {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.kill_switch, serializer);
+        <crate::risk::Limit>::sse_encode(self.max_order_notional, serializer);
+        <f64>::sse_encode(self.max_order_qty_btc, serializer);
+        <crate::risk::Limit>::sse_encode(self.max_position_notional, serializer);
+        <Vec<String>>::sse_encode(self.symbol_allowlist, serializer);
+        <f64>::sse_encode(self.max_leverage, serializer);
+        <crate::risk::Limit>::sse_encode(self.daily_loss, serializer);
+        <i64>::sse_encode(self.max_signal_age_secs, serializer);
     }
 }
 
@@ -3340,6 +4166,13 @@ impl SseEncode for crate::telegram::TelegramMessageEvent {
         <String>::sse_encode(self.text, serializer);
         <i64>::sse_encode(self.received_at_ms, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for u32 {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        serializer.cursor.write_u32::<NativeEndian>(self).unwrap();
     }
 }
 
@@ -3462,6 +4295,18 @@ impl SseEncode for crate::weex::WeexMarketOrderRequest {
         <bool>::sse_encode(self.reduce_only, serializer);
         <String>::sse_encode(self.client_order_id, serializer);
         <f64>::sse_encode(self.qty_step, serializer);
+    }
+}
+
+impl SseEncode for crate::weex::WeexOrderStatus {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.found, serializer);
+        <String>::sse_encode(self.order_id, serializer);
+        <Option<String>>::sse_encode(self.client_order_id, serializer);
+        <String>::sse_encode(self.status, serializer);
+        <f64>::sse_encode(self.filled_qty_btc, serializer);
+        <f64>::sse_encode(self.avg_price, serializer);
     }
 }
 

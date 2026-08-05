@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../bridge/api.dart' as rust;
 import '../bridge/interpreter.dart' as rust_interpreter;
+import '../bridge/risk.dart' as rust_risk;
 import '../bridge/scaling.dart' as rust_scaling;
 import '../bridge/telegram.dart' as rust_telegram;
 import '../bridge/weex.dart' as rust_weex;
@@ -15,6 +16,7 @@ import '../logging/app_log.dart';
 import '../models/trading.dart';
 import '../patterns/default_patterns.dart';
 import '../patterns/patterns_readme.dart';
+import '../security/credential_store.dart';
 
 enum WeexPriceStatus { idle, connecting, live, unavailable }
 
@@ -28,9 +30,23 @@ enum TelegramCloseDisposition {
 }
 
 class AppController extends ChangeNotifier {
-  AppController({this.useRustBridge = false});
+  AppController({this.useRustBridge = false, CredentialStore? credentialStore})
+      : _credentialStore = credentialStore ??
+            (useRustBridge
+                ? EncryptedCredentialStore(AppLog.configDirectory)
+                : InMemoryCredentialStore());
+
+  /// Credentials are sealed on disk rather than sitting in the preferences
+  /// file. See `lib/src/security/credential_store.dart`.
+  final CredentialStore _credentialStore;
 
   static const _configPrefsKey = 'trading_challenge.app_config.v1';
+
+  /// Suffix identifying a config blob written under an older preference
+  /// prefix. Any such key may still hold plaintext credentials, so it is
+  /// migrated and then deleted. Matching on the suffix rather than a list of
+  /// names catches every prefix this app has ever shipped under.
+  static const _configPrefsKeySuffix = '.app_config.v1';
   static const _closeTargetPrefsKey =
       'trading_challenge.close_target_watch.v1';
   static const _exchangeTakeProfitPrefsKey =
@@ -135,6 +151,7 @@ class AppController extends ChangeNotifier {
   bool _evaluatingCloseTarget = false;
 
   Future<void> loadConfig() async {
+    var migratedPlaintext = false;
     try {
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(_configPrefsKey);
@@ -143,11 +160,15 @@ class AppController extends ChangeNotifier {
         if (decoded is! Map) {
           _log('Saved settings ignored: unexpected format.');
         } else {
-          config = AppConfig.fromPersistentJson(
-            Map<String, Object?>.from(decoded),
-          ).copyWith(autoUpdateMaster: true);
+          final json = Map<String, Object?>.from(decoded);
+          config = AppConfig.fromPersistentJson(json)
+              .copyWith(autoUpdateMaster: true);
+          // Builds before credentials were encrypted stored them here in the
+          // clear. Take them, seal them, and scrub the preferences file.
+          migratedPlaintext = AppConfig.containsPlaintextSecrets(json);
         }
       }
+      migratedPlaintext |= await _migrateLegacyConfigKeys(prefs);
     } catch (error, stackTrace) {
       _log(
         'Saved settings could not be loaded: $error',
@@ -155,10 +176,15 @@ class AppController extends ChangeNotifier {
         stackTrace: stackTrace,
       );
     }
+    await _loadSecrets(migratedPlaintext: migratedPlaintext);
     await _loadCloseTarget();
     await _loadExchangeTakeProfit();
     await _initializePatterns();
     _resetLocalChartHistory();
+    // Arm the gate before anything can place an order.
+    await _pushRiskLimits();
+    // Then settle whatever a previous run left in the air.
+    unawaited(reconcilePendingActions());
   }
 
   Future<void> _initializePatterns() {
@@ -649,12 +675,19 @@ class AppController extends ChangeNotifier {
       }
 
       final statuses = <rust_telegram.TelegramActionStatus>[];
-      for (final action in actions) {
+      for (var index = 0; index < actions.length; index++) {
+        final action = actions[index];
         await AppLog.write(
           'Telegram parse result: ${_parsedActionDebug(action)}',
         );
         statuses.add(
-          await _handleParsedTelegramAction(action, channel: channel),
+          await _handleParsedTelegramAction(
+            action,
+            channel: channel,
+            // The dedup key seeds the exchange client order id, so a crash
+            // mid-submit can still be traced back to an order on WEEX.
+            dedupKey: index < dedupKeys.length ? dedupKeys[index] : null,
+          ),
         );
       }
       await _finalizeTelegramActions(dedupKeys, statuses);
@@ -673,6 +706,7 @@ class AppController extends ChangeNotifier {
   Future<rust_telegram.TelegramActionStatus> _handleParsedTelegramAction(
     rust_interpreter.Action action, {
     required String channel,
+    String? dedupKey,
   }) async {
     final summary = _parsedActionSummary(action);
     if (action.kind == rust_interpreter.ActionKind.ignore) {
@@ -715,6 +749,7 @@ class AppController extends ChangeNotifier {
         direction: direction,
         size: action.size,
         source: 'Telegram $channel: $summary',
+        dedupKey: dedupKey,
       ),
       _ => _buildParsedEntryOrAddOrder(
         kind: kind,
@@ -722,6 +757,7 @@ class AppController extends ChangeNotifier {
         size: _sizeFromParsed(action.size),
         triggerPrice: action.triggerPrice,
         source: 'Telegram $channel: $summary',
+        dedupKey: dedupKey,
       ),
     };
     if (order == null) {
@@ -1324,6 +1360,13 @@ class AppController extends ChangeNotifier {
       _forgetExchangeTakeProfitIfFlat();
     }
     _mergeReconciledExecutions(update.recentExecutions, candles: candles);
+    // Refresh the facts the risk gate measures limits against, now that
+    // position, mark price, and today's realized PnL are all current.
+    unawaited(
+      _pushRiskContext(
+        realizedPnlTodayUsd: _realizedPnlToday(update.recentExecutions),
+      ),
+    );
     _lastWeexReconciledAt = DateTime.now();
     weexAccountConnected = true;
     weexReconciliationError = null;
@@ -1615,7 +1658,7 @@ class AppController extends ChangeNotifier {
           // Zero closes the entire position at the trigger.
           qtyBtc: 0,
           clientAlgoId:
-              'tmg-tp-${DateTime.now().microsecondsSinceEpoch}',
+              'tc-tp-${DateTime.now().microsecondsSinceEpoch}',
           qtyStep: _lotStep,
           priceStep: 0.1,
         ),
@@ -1810,6 +1853,258 @@ class AppController extends ChangeNotifier {
     }
   }
 
+  /// Reads credentials from the encrypted store, or seals the ones that were
+  /// just recovered from a plaintext preferences blob.
+  Future<void> _loadSecrets({required bool migratedPlaintext}) async {
+    if (migratedPlaintext) {
+      // `config` already carries the plaintext credentials read above. Seal
+      // them, then rewrite preferences without them.
+      await _credentialStore.write(config.toSecretsJson());
+      await _persistConfig();
+      _log('Stored credentials were moved into encrypted storage.');
+      await _hardenDataDirectory();
+      return;
+    }
+    try {
+      final stored = await _credentialStore.read();
+      if (stored != null) {
+        config = config.applySecrets(stored);
+      }
+      final store = _credentialStore;
+      if (store is EncryptedCredentialStore && store.errors.isNotEmpty) {
+        _log('Encrypted credentials could not be read: ${store.errors.first}');
+      }
+    } catch (error, stackTrace) {
+      _log(
+        'Encrypted credentials could not be read: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+    await _hardenDataDirectory();
+  }
+
+  Future<void> _hardenDataDirectory() async {
+    final store = _credentialStore;
+    if (store is EncryptedCredentialStore) {
+      await store.harden();
+    }
+  }
+
+  /// Migrates and removes config blobs written under earlier preference keys.
+  /// Returns true when any of them carried plaintext credentials.
+  Future<bool> _migrateLegacyConfigKeys(SharedPreferences prefs) async {
+    var foundSecrets = false;
+    final legacyKeys = prefs
+        .getKeys()
+        .where((key) => key != _configPrefsKey && key.endsWith(_configPrefsKeySuffix))
+        .toList();
+    for (final key in legacyKeys) {
+      final raw = prefs.getString(key);
+      if (raw == null || raw.isEmpty) continue;
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final json = Map<String, Object?>.from(decoded);
+          if (AppConfig.containsPlaintextSecrets(json)) {
+            // Only adopt them if the current key had none, so a stale blob
+            // cannot overwrite live credentials.
+            if (config.weexApiKey.isEmpty && config.weexSecret.isEmpty) {
+              config = config.applySecrets(json);
+            }
+            foundSecrets = true;
+          }
+        }
+      } catch (_) {
+        // An unparseable legacy blob is still worth deleting.
+      }
+      await prefs.remove(key);
+      _log('Removed obsolete settings key "$key".');
+    }
+    return foundSecrets;
+  }
+
+  // --- risk limits ---------------------------------------------------------
+
+  /// Updates the hard limits and pushes them to the Rust gate.
+  Future<void> setRiskSettings(RiskSettings next) async {
+    config = config.copyWith(risk: next);
+    _log(
+      next.killSwitch
+          ? 'Risk: kill switch ENGAGED — new positions are blocked.'
+          : 'Risk limits updated.',
+    );
+    notifyListeners();
+    await _persistConfig();
+  }
+
+  /// Mirrors the configured limits into Rust, which enforces them on the
+  /// submit path. Dart holds them only for the UI.
+  Future<void> _pushRiskLimits() async {
+    if (!useRustBridge) return;
+    final risk = config.risk;
+    try {
+      await rust.riskSetLimits(
+        limits: rust_risk.RiskLimits(
+          killSwitch: risk.killSwitch,
+          maxOrderNotional: _rustLimit(risk.maxOrderNotional),
+          maxOrderQtyBtc: risk.maxOrderQtyBtc,
+          maxPositionNotional: _rustLimit(risk.maxPositionNotional),
+          symbolAllowlist: risk.symbolAllowlist,
+          maxLeverage: risk.maxLeverage,
+          dailyLoss: _rustLimit(risk.dailyLoss),
+          maxSignalAgeSecs: risk.maxSignalAgeSecs,
+        ),
+      );
+    } catch (error, stackTrace) {
+      _log(
+        'Risk limits could not be applied: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  static rust_risk.Limit _rustLimit(RiskLimitValue limit) =>
+      rust_risk.Limit(value: limit.value, percent: limit.percent);
+
+  /// Feeds the gate the live account facts it measures limits against.
+  Future<void> _pushRiskContext({required double realizedPnlTodayUsd}) async {
+    if (!useRustBridge) return;
+    try {
+      await rust.riskUpdateContext(
+        context: rust_risk.RiskContext(
+          referencePrice: config.markPrice,
+          openPositionNotionalUsd: position.notionalUsd,
+          leverage: position.crossCombinedLeverage,
+          realizedPnlTodayUsd: realizedPnlTodayUsd,
+          // Percentage limits are measured against this.
+          accountBalanceUsd: config.myBalanceUsd,
+        ),
+      );
+    } catch (error) {
+      // The gate keeps its previous context; a stale mark price only makes it
+      // more conservative, never less.
+    }
+  }
+
+  /// Realized PnL booked since midnight UTC, for the daily loss limit.
+  double _realizedPnlToday(List<rust_weex.WeexExecutionSnapshot> executions) {
+    final now = DateTime.now().toUtc();
+    final startOfDay = DateTime.utc(now.year, now.month, now.day)
+        .millisecondsSinceEpoch;
+    return executions
+        .where((execution) => execution.timestampMs >= startOfDay)
+        .fold<double>(
+          0,
+          (total, execution) =>
+              total + execution.realizedPnlUsdt - execution.feeUsdt,
+        );
+  }
+
+  // --- crash recovery ------------------------------------------------------
+
+  /// Resolves actions that were reserved but never finalized — the app died
+  /// between reserving the slot and hearing back from WEEX.
+  ///
+  /// Nothing is ever re-submitted here. An order confirmed on the exchange is
+  /// marked submitted; one the exchange has never heard of is marked failed so
+  /// it stops blocking; anything we could not check is left pending and
+  /// reported, because "don't know" must not become "try again".
+  Future<void> reconcilePendingActions() async {
+    if (!useRustBridge) return;
+    if (config.weexApiKey.isEmpty || config.weexSecret.isEmpty) return;
+    try {
+      final result = await rust.dedupPendingActions(
+        statePath: AppLog.telegramStatePath,
+      );
+      final pending = result.value;
+      if (!result.ok || pending == null || pending.isEmpty) return;
+
+      _log(
+        '${pending.length} unfinished action(s) from a previous run; checking WEEX.',
+      );
+      var unresolved = 0;
+      for (final action in pending) {
+        final clientOrderId = PlannedOrder.clientOrderIdForDedupKey(
+          action.dedupKey,
+        );
+        final status = await _lookupExchangeOrder(clientOrderId);
+        if (status == null) {
+          unresolved++;
+          _log(
+            'Unfinished action $clientOrderId could not be checked against WEEX; '
+            'left pending for manual review.',
+          );
+          continue;
+        }
+        if (status.found) {
+          await _finalizeTelegramDedup(
+            action.dedupKey,
+            rust_telegram.TelegramActionStatus.submitted,
+          );
+          _log(
+            'Unfinished action $clientOrderId did reach WEEX '
+            '(${status.status}, filled ${status.filledQtyBtc.toStringAsFixed(4)} BTC); '
+            'recorded as submitted.',
+          );
+        } else {
+          await _finalizeTelegramDedup(
+            action.dedupKey,
+            rust_telegram.TelegramActionStatus.failed,
+          );
+          _log(
+            'Unfinished action $clientOrderId never reached WEEX; recorded as failed.',
+          );
+        }
+      }
+      if (unresolved > 0) {
+        weexReconciliationError =
+            '$unresolved unfinished order(s) could not be verified against WEEX. '
+            'Check your WEEX order history before trading.';
+        notifyListeners();
+      }
+    } catch (error, stackTrace) {
+      _log(
+        'Pending-action reconciliation failed: $error',
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+  }
+
+  /// Returns null when the exchange could not be asked — distinct from a
+  /// definitive "no such order".
+  Future<rust_weex.WeexOrderStatus?> _lookupExchangeOrder(
+    String clientOrderId,
+  ) async {
+    try {
+      final result = await rust.weexLookupOrder(
+        request: rust_weex.WeexAccountRequest(
+          apiKey: config.weexApiKey,
+          apiSecret: config.weexSecret,
+          passphrase: config.weexPassphrase,
+          symbol: 'BTCUSDT',
+          baseUrl: 'https://api-contract.weex.com',
+          recentLookbackMs: _exchangeHistoryLookback.inMilliseconds,
+        ),
+        clientOrderId: clientOrderId,
+      );
+      return result.ok ? result.value : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Wipes stored credentials — both the sealed blob and its key half.
+  Future<void> forgetStoredCredentials() async {
+    await _credentialStore.purge();
+    config = config.applySecrets(const {});
+    await _persistConfig();
+    _log('Stored credentials were erased.');
+    notifyListeners();
+  }
+
   Future<void> _persistConfig() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1817,6 +2112,8 @@ class AppController extends ChangeNotifier {
         _configPrefsKey,
         jsonEncode(config.toPersistentJson()),
       );
+      await _credentialStore.write(config.toSecretsJson());
+      unawaited(_pushRiskLimits());
     } catch (error, stackTrace) {
       _log(
         'Settings could not be saved: $error',
@@ -1942,6 +2239,7 @@ class AppController extends ChangeNotifier {
     required String source,
     required TradeStatus status,
     double? triggerPrice,
+    String? dedupKey,
   }) {
     final ratio = config.scaleRatio;
     final mark = config.markPrice;
@@ -1968,6 +2266,7 @@ class AppController extends ChangeNotifier {
       status: status,
       source: source,
       triggerPrice: triggerPrice,
+      dedupKey: dedupKey,
     );
   }
 
@@ -1977,6 +2276,7 @@ class AppController extends ChangeNotifier {
     required (double, SizeUnit)? size,
     required double? triggerPrice,
     required String source,
+    String? dedupKey,
   }) {
     if (direction == null || size == null) return null;
     if (triggerPrice != null && (triggerPrice <= 0 || !triggerPrice.isFinite)) {
@@ -1992,6 +2292,7 @@ class AppController extends ChangeNotifier {
           : '$source, limit trigger at ${triggerPrice.toStringAsFixed(2)} USDT',
       status: TradeStatus.pendingApproval,
       triggerPrice: triggerPrice,
+      dedupKey: dedupKey,
     );
   }
 
@@ -1999,6 +2300,7 @@ class AppController extends ChangeNotifier {
     required TradeDirection? direction,
     required rust_interpreter.Size? size,
     required String source,
+    String? dedupKey,
   }) {
     if (direction == null) return null;
     // A reduction only makes sense against a live position on the same side;
@@ -2128,7 +2430,7 @@ class AppController extends ChangeNotifier {
             triggerPrice: triggerPrice,
             limitPrice: triggerPrice,
             orderType: orderType,
-            clientAlgoId: 'tmg-${order.id}-trigger',
+            clientAlgoId: 'tc-${order.id}-trigger',
             qtyStep: 0.0001,
             priceStep: 0.1,
           ),
@@ -2157,7 +2459,7 @@ class AppController extends ChangeNotifier {
           side: side,
           qtyBtc: order.scaledBtc,
           reduceOnly: reduceOnly,
-          clientOrderId: 'tmg-${order.id}',
+          clientOrderId: order.exchangeClientOrderId,
           qtyStep: 0.0001,
         ),
       );

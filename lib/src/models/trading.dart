@@ -118,6 +118,170 @@ class ExchangeTakeProfit {
   }
 }
 
+/// A limit written either as an absolute USD amount or as a percentage of
+/// account balance — `5000` or `15%`.
+///
+/// The percentage form is what makes one setting survive a balance-scaling
+/// challenge: a fixed \$500 per-order cap that suits \$7k strangles the same
+/// strategy at \$500k, silently. Mirrors `Limit` in `rust/src/risk.rs`.
+class RiskLimitValue {
+  const RiskLimitValue(this.value, {this.percent = false});
+
+  const RiskLimitValue.off() : value = 0, percent = false;
+
+  final double value;
+  final bool percent;
+
+  bool get isOff => !value.isFinite || value <= 0;
+
+  /// The limit in USD for [accountBalanceUsd], or null when it is off or a
+  /// percentage with no known balance.
+  double? resolve(double accountBalanceUsd) {
+    if (isOff) return null;
+    if (!percent) return value;
+    if (accountBalanceUsd <= 0 || !accountBalanceUsd.isFinite) return null;
+    return accountBalanceUsd * value / 100;
+  }
+
+  /// Round-trips with [parse]: what the user typed, normalised.
+  String get text {
+    if (isOff) return '';
+    final number = value == value.roundToDouble()
+        ? value.round().toString()
+        : value.toStringAsFixed(2);
+    return percent ? '$number%' : number;
+  }
+
+  /// Reads `5000`, `15%`, `1 500,50`, or blank. Anything unparseable is off.
+  static RiskLimitValue parse(String raw) {
+    var text = raw.trim();
+    if (text.isEmpty) return const RiskLimitValue.off();
+    final percent = text.endsWith('%');
+    if (percent) text = text.substring(0, text.length - 1).trim();
+    text = text
+        .replaceAll(RegExp(r'[\s\u00a0$]'), '')
+        .replaceAll(',', '.');
+    final parsed = double.tryParse(text);
+    if (parsed == null || !parsed.isFinite || parsed <= 0) {
+      return const RiskLimitValue.off();
+    }
+    return RiskLimitValue(parsed, percent: percent);
+  }
+
+  Map<String, Object> toJson() => {'value': value, 'percent': percent};
+
+  /// Accepts the older plain-number form as an absolute USD amount.
+  static RiskLimitValue fromJson(Object? json) {
+    if (json is num) return RiskLimitValue(json.toDouble());
+    if (json is Map) {
+      final map = Map<String, Object?>.from(json);
+      return RiskLimitValue(
+        _doubleValue(map['value'], 0),
+        percent: _boolValue(map['percent'], false),
+      );
+    }
+    return const RiskLimitValue.off();
+  }
+}
+
+/// Hard limits applied to every order, below the signal parser.
+///
+/// A value of 0 means "not configured" and leaves that rail open, so an
+/// upgrade changes nothing until the user sets a number. The exception is
+/// [symbolAllowlist], which is empty for "no allowlist".
+///
+/// The authoritative copy lives in Rust; this mirrors it for the UI and for
+/// persistence. See `rust/src/risk.rs`.
+class RiskSettings {
+  const RiskSettings({
+    this.killSwitch = false,
+    this.maxOrderNotional = const RiskLimitValue.off(),
+    this.maxOrderQtyBtc = 0,
+    this.maxPositionNotional = const RiskLimitValue.off(),
+    this.symbolAllowlist = const ['BTCUSDT'],
+    this.maxLeverage = 0,
+    this.dailyLoss = const RiskLimitValue.off(),
+    this.maxSignalAgeSecs = 0,
+  });
+
+  final bool killSwitch;
+  final RiskLimitValue maxOrderNotional;
+  final double maxOrderQtyBtc;
+  final RiskLimitValue maxPositionNotional;
+  final List<String> symbolAllowlist;
+  final double maxLeverage;
+  final RiskLimitValue dailyLoss;
+  final int maxSignalAgeSecs;
+
+  /// True when at least one numeric rail is armed. The UI nags while false.
+  bool get hasAnyLimit =>
+      !maxOrderNotional.isOff ||
+      maxOrderQtyBtc > 0 ||
+      !maxPositionNotional.isOff ||
+      maxLeverage > 0 ||
+      !dailyLoss.isOff ||
+      maxSignalAgeSecs > 0;
+
+  RiskSettings copyWith({
+    bool? killSwitch,
+    RiskLimitValue? maxOrderNotional,
+    double? maxOrderQtyBtc,
+    RiskLimitValue? maxPositionNotional,
+    List<String>? symbolAllowlist,
+    double? maxLeverage,
+    RiskLimitValue? dailyLoss,
+    int? maxSignalAgeSecs,
+  }) {
+    return RiskSettings(
+      killSwitch: killSwitch ?? this.killSwitch,
+      maxOrderNotional: maxOrderNotional ?? this.maxOrderNotional,
+      maxOrderQtyBtc: maxOrderQtyBtc ?? this.maxOrderQtyBtc,
+      maxPositionNotional: maxPositionNotional ?? this.maxPositionNotional,
+      symbolAllowlist: symbolAllowlist ?? this.symbolAllowlist,
+      maxLeverage: maxLeverage ?? this.maxLeverage,
+      dailyLoss: dailyLoss ?? this.dailyLoss,
+      maxSignalAgeSecs: maxSignalAgeSecs ?? this.maxSignalAgeSecs,
+    );
+  }
+
+  Map<String, Object> toJson() => {
+        'killSwitch': killSwitch,
+        'maxOrderNotional': maxOrderNotional.toJson(),
+        'maxOrderQtyBtc': maxOrderQtyBtc,
+        'maxPositionNotional': maxPositionNotional.toJson(),
+        'symbolAllowlist': symbolAllowlist,
+        'maxLeverage': maxLeverage,
+        'dailyLoss': dailyLoss.toJson(),
+        'maxSignalAgeSecs': maxSignalAgeSecs,
+      };
+
+  factory RiskSettings.fromJson(Map<String, Object?> json) {
+    final allowlistRaw = json['symbolAllowlist'];
+    return RiskSettings(
+      killSwitch: _boolValue(json['killSwitch'], false),
+      // `maxOrderNotionalUsd` etc. are the older plain-number keys.
+      maxOrderNotional: RiskLimitValue.fromJson(
+        json['maxOrderNotional'] ?? json['maxOrderNotionalUsd'],
+      ),
+      maxOrderQtyBtc: _doubleValue(json['maxOrderQtyBtc'], 0),
+      maxPositionNotional: RiskLimitValue.fromJson(
+        json['maxPositionNotional'] ?? json['maxPositionNotionalUsd'],
+      ),
+      symbolAllowlist: allowlistRaw is List
+          ? allowlistRaw
+              .map((entry) => entry.toString().trim().toUpperCase())
+              .where((entry) => entry.isNotEmpty)
+              .toList()
+          : const ['BTCUSDT'],
+      maxLeverage: _doubleValue(json['maxLeverage'], 0),
+      dailyLoss: RiskLimitValue.fromJson(
+        json['dailyLoss'] ?? json['dailyLossLimitUsd'],
+      ),
+      maxSignalAgeSecs: _doubleValue(json['maxSignalAgeSecs'], 0).round(),
+    );
+  }
+}
+
 class AppConfig {
   const AppConfig({
     this.weexApiKey = '',
@@ -134,6 +298,7 @@ class AppConfig {
     this.hasSeenAutoApproveWarning = false,
     this.simulationMode = true,
     this.minimizeToTray = false,
+    this.risk = const RiskSettings(),
   });
 
   final String weexApiKey;
@@ -150,11 +315,14 @@ class AppConfig {
   final bool hasSeenAutoApproveWarning;
   final bool simulationMode;
   final bool minimizeToTray;
+  final RiskSettings risk;
 
   double get scaleRatio =>
       masterBalanceUsd <= 0 ? 0 : myBalanceUsd / masterBalanceUsd;
 
-  Map<String, Object> toPersistentJson() {
+  /// The credential half of the config. Encrypted at rest — never written to
+  /// `shared_preferences`. Keep in step with [applySecrets].
+  Map<String, Object> toSecretsJson() {
     return {
       'weexApiKey': weexApiKey,
       'weexSecret': weexSecret,
@@ -162,6 +330,42 @@ class AppConfig {
       'telegramApiId': telegramApiId,
       'telegramApiHash': telegramApiHash,
       'telegramPhone': telegramPhone,
+    };
+  }
+
+  /// Field names that must never appear in plaintext preferences.
+  static const secretFieldNames = <String>{
+    'weexApiKey',
+    'weexSecret',
+    'weexPassphrase',
+    'telegramApiId',
+    'telegramApiHash',
+    'telegramPhone',
+  };
+
+  /// Returns a copy carrying the credentials from [json].
+  AppConfig applySecrets(Map<String, Object?> json) {
+    return copyWith(
+      weexApiKey: _stringValue(json['weexApiKey']),
+      weexSecret: _stringValue(json['weexSecret']),
+      weexPassphrase: _stringValue(json['weexPassphrase']),
+      telegramApiId: _stringValue(json['telegramApiId']),
+      telegramApiHash: _stringValue(json['telegramApiHash']),
+      telegramPhone: _stringValue(json['telegramPhone']),
+    );
+  }
+
+  /// True when [json] still carries credentials — an unmigrated plaintext blob
+  /// left over from before the credentials were encrypted.
+  static bool containsPlaintextSecrets(Map<String, Object?> json) {
+    return secretFieldNames.any(
+      (name) => _stringValue(json[name]).isNotEmpty,
+    );
+  }
+
+  /// The non-secret half. This is what reaches `shared_preferences`.
+  Map<String, Object> toPersistentJson() {
+    return {
       'masterBalanceUsd': masterBalanceUsd,
       'myBalanceUsd': myBalanceUsd,
       'autoUpdateMaster': autoUpdateMaster,
@@ -169,6 +373,7 @@ class AppConfig {
       'hasSeenAutoApproveWarning': hasSeenAutoApproveWarning,
       'simulationMode': simulationMode,
       'minimizeToTray': minimizeToTray,
+      'risk': risk.toJson(),
     };
   }
 
@@ -187,6 +392,9 @@ class AppConfig {
       hasSeenAutoApproveWarning: _boolValue(json['hasSeenAutoApproveWarning'], false),
       simulationMode: _boolValue(json['simulationMode'], true),
       minimizeToTray: false,
+      risk: json['risk'] is Map
+          ? RiskSettings.fromJson(Map<String, Object?>.from(json['risk'] as Map))
+          : const RiskSettings(),
     );
   }
 
@@ -205,6 +413,7 @@ class AppConfig {
     bool? hasSeenAutoApproveWarning,
     bool? simulationMode,
     bool? minimizeToTray,
+    RiskSettings? risk,
   }) {
     return AppConfig(
       weexApiKey: weexApiKey ?? this.weexApiKey,
@@ -221,6 +430,7 @@ class AppConfig {
       hasSeenAutoApproveWarning: hasSeenAutoApproveWarning ?? this.hasSeenAutoApproveWarning,
       simulationMode: simulationMode ?? this.simulationMode,
       minimizeToTray: minimizeToTray ?? this.minimizeToTray,
+      risk: risk ?? this.risk,
     );
   }
 }
@@ -250,6 +460,7 @@ class PlannedOrder {
     required this.status,
     required this.source,
     this.triggerPrice,
+    this.dedupKey,
   });
 
   final String id;
@@ -265,7 +476,30 @@ class PlannedOrder {
   final String source;
   final double? triggerPrice;
 
+  /// The dedup key of the Telegram action that produced this order, when it
+  /// came from a signal. Null for manual orders.
+  ///
+  /// It is the seed for [exchangeClientOrderId], which is what makes a
+  /// crash mid-submit recoverable: the id sent to WEEX can be recomputed from
+  /// durable dedup state alone, with nothing extra to persist.
+  final String? dedupKey;
+
   bool get isConditional => triggerPrice != null;
+
+  /// The idempotency id sent to WEEX. Derived from [dedupKey] when present so
+  /// it survives a restart; otherwise from the local order id.
+  String get exchangeClientOrderId {
+    final key = dedupKey;
+    if (key == null || key.isEmpty) return 'tc-$id';
+    return clientOrderIdForDedupKey(key);
+  }
+
+  /// Same derivation, reachable without an order in hand — startup
+  /// reconciliation only has the dedup key.
+  static String clientOrderIdForDedupKey(String dedupKey) {
+    final trimmed = dedupKey.length > 24 ? dedupKey.substring(0, 24) : dedupKey;
+    return 'tc-$trimmed';
+  }
 
   PlannedOrder copyWith({TradeStatus? status}) {
     return PlannedOrder(
@@ -281,6 +515,7 @@ class PlannedOrder {
       status: status ?? this.status,
       source: source,
       triggerPrice: triggerPrice,
+      dedupKey: dedupKey,
     );
   }
 
@@ -301,6 +536,7 @@ class PlannedOrder {
       status: status,
       source: source,
       triggerPrice: triggerPrice,
+      dedupKey: dedupKey,
     );
   }
 }

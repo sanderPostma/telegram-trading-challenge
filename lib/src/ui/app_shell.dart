@@ -47,7 +47,7 @@ class _AppShellState extends State<AppShell> {
 
         if (widget.controller.requiresSetup) {
           return Scaffold(
-            appBar: tmgAppBar(
+            appBar: challengeAppBar(
               title: 'Telegram Challenge - Setup',
               isLive: !widget.controller.config.simulationMode,
               actions: [],
@@ -71,7 +71,7 @@ class _AppShellState extends State<AppShell> {
             );
 
             return Scaffold(
-              appBar: tmgAppBar(
+              appBar: challengeAppBar(
                 title: 'Telegram Challenge',
                 isLive: isLive,
                 actions: [

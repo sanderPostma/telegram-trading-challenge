@@ -6,13 +6,14 @@
 import 'frb_generated.dart';
 import 'interpreter.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'risk.dart';
 import 'scaling.dart';
 import 'telegram.dart';
 import 'weex.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chart_history`, `classify_message_actions_with_rules`, `push_point`, `weex_rejection_message`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `StateView`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 Stream<PriceTick> weexPublicPriceStream() => RustLib.instance.api.crateApiWeexPublicPriceStream();
 
@@ -40,6 +41,68 @@ Future<ApiResultString> telegramFinalizeAction({
   status: status,
   orderId: orderId,
 );
+
+/// Seals `credentials_json` into `<dir>/credentials.enc`.
+Future<ApiResultString> secretsSave({required String dir, required String credentialsJson}) =>
+    RustLib.instance.api.crateApiSecretsSave(dir: dir, credentialsJson: credentialsJson);
+
+/// Opens `<dir>/credentials.enc`. `value` is null when nothing is stored or the
+/// blob cannot be opened on this install.
+Future<ApiResultString> secretsLoad({required String dir}) =>
+    RustLib.instance.api.crateApiSecretsLoad(dir: dir);
+
+Future<ApiResultString> secretsPurge({required String dir}) =>
+    RustLib.instance.api.crateApiSecretsPurge(dir: dir);
+
+/// Tightens permissions on the data directory and the secrets inside it.
+Future<ApiResultString> secretsHarden({required String dir}) =>
+    RustLib.instance.api.crateApiSecretsHarden(dir: dir);
+
+Future<void> riskSetLimits({required RiskLimits limits}) =>
+    RustLib.instance.api.crateApiRiskSetLimits(limits: limits);
+
+Future<RiskLimits> riskLimits() => RustLib.instance.api.crateApiRiskLimits();
+
+/// Feeds the gate the live account facts it compares limits against.
+Future<void> riskUpdateContext({required RiskContext context}) =>
+    RustLib.instance.api.crateApiRiskUpdateContext(context: context);
+
+Future<RiskContext> riskContext() => RustLib.instance.api.crateApiRiskContext();
+
+/// Dry-runs the gate so the UI can warn before an order is ever sent.
+/// `value` is null when the order passes; otherwise it is the rejection reason.
+Future<ApiResultString> riskPreviewOrder({
+  required String symbol,
+  required double qtyBtc,
+  required bool reduceOnly,
+}) => RustLib.instance.api.crateApiRiskPreviewOrder(
+  symbol: symbol,
+  qtyBtc: qtyBtc,
+  reduceOnly: reduceOnly,
+);
+
+/// `value` is null when the signal is fresh enough, otherwise the reason.
+Future<ApiResultString> riskCheckSignalAge({
+  required PlatformInt64 messageTimestampMs,
+  required PlatformInt64 nowMs,
+}) => RustLib.instance.api.crateApiRiskCheckSignalAge(
+  messageTimestampMs: messageTimestampMs,
+  nowMs: nowMs,
+);
+
+/// Actions that were reserved but never finalized, newest first. Each is an
+/// order we may or may not have placed.
+Future<ApiResultPendingActions> dedupPendingActions({required String statePath}) =>
+    RustLib.instance.api.crateApiDedupPendingActions(statePath: statePath);
+
+/// Asks the exchange what became of one `client_order_id`.
+///
+/// An error means "could not determine" — never retry on the strength of it.
+/// `ok` with `found: false` means the exchange has no such order.
+Future<ApiResultWeexOrderStatus> weexLookupOrder({
+  required WeexAccountRequest request,
+  required String clientOrderId,
+}) => RustLib.instance.api.crateApiWeexLookupOrder(request: request, clientOrderId: clientOrderId);
 
 Future<ApiResultWeexAccountReconciliation> weexReconcileAccount({
   required WeexAccountRequest request,
@@ -190,6 +253,26 @@ class ApiResultActions {
           error == other.error;
 }
 
+class ApiResultPendingActions {
+  final bool ok;
+  final List<PendingAction>? value;
+  final String? error;
+
+  const ApiResultPendingActions({required this.ok, this.value, this.error});
+
+  @override
+  int get hashCode => ok.hashCode ^ value.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiResultPendingActions &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          value == other.value &&
+          error == other.error;
+}
+
 class ApiResultScaledOrder {
   final bool ok;
   final ScaledOrder? value;
@@ -290,6 +373,26 @@ class ApiResultWeexMarketOrderAck {
           error == other.error;
 }
 
+class ApiResultWeexOrderStatus {
+  final bool ok;
+  final WeexOrderStatus? value;
+  final String? error;
+
+  const ApiResultWeexOrderStatus({required this.ok, this.value, this.error});
+
+  @override
+  int get hashCode => ok.hashCode ^ value.hashCode ^ error.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ApiResultWeexOrderStatus &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          value == other.value &&
+          error == other.error;
+}
+
 class ChartData {
   final List<SeriesPoint> balance;
   final List<SeriesPoint> equity;
@@ -370,6 +473,42 @@ class ManualScaleRequest {
 }
 
 enum ManualSizeUnit { btc, usdt }
+
+/// An action reserved in the dedup store that never reached a final status.
+class PendingAction {
+  final String dedupKey;
+  final PlatformInt64 channelId;
+  final PlatformInt64 messageId;
+  final int actionOrdinal;
+  final PlatformInt64 updatedAtMs;
+
+  const PendingAction({
+    required this.dedupKey,
+    required this.channelId,
+    required this.messageId,
+    required this.actionOrdinal,
+    required this.updatedAtMs,
+  });
+
+  @override
+  int get hashCode =>
+      dedupKey.hashCode ^
+      channelId.hashCode ^
+      messageId.hashCode ^
+      actionOrdinal.hashCode ^
+      updatedAtMs.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PendingAction &&
+          runtimeType == other.runtimeType &&
+          dedupKey == other.dedupKey &&
+          channelId == other.channelId &&
+          messageId == other.messageId &&
+          actionOrdinal == other.actionOrdinal &&
+          updatedAtMs == other.updatedAtMs;
+}
 
 class SeriesPoint {
   final PlatformInt64 timestampMs;

@@ -34,6 +34,14 @@ jobs:
             runner: macos-latest
             artifact_path: trading-challenge-macos.zip
 
+    # Baked into the binary at compile time as one half of the credential
+    # sealing key (see rust/src/secrets.rs), so a published build does not seal
+    # credentials with a key that is readable in the source. When the repository
+    # secret is absent the value is empty and the build falls back to the
+    # in-source default — local builds need no setup and still work.
+    env:
+      TRADING_CHALLENGE_CREDENTIAL_KEY: ${{ secrets.TRADING_CHALLENGE_CREDENTIAL_KEY }}
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

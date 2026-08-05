@@ -62,6 +62,30 @@ pub struct ApiResultWeexMarketOrderAck {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResultWeexOrderStatus {
+    pub ok: bool,
+    pub value: Option<weex::WeexOrderStatus>,
+    pub error: Option<String>,
+}
+
+/// An action reserved in the dedup store that never reached a final status.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingAction {
+    pub dedup_key: String,
+    pub channel_id: i64,
+    pub message_id: i64,
+    pub action_ordinal: u32,
+    pub updated_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiResultPendingActions {
+    pub ok: bool,
+    pub value: Option<Vec<PendingAction>>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiResultTelegramLoginStatus {
     pub ok: bool,
     pub value: Option<telegram::TelegramLoginStatus>,
@@ -205,6 +229,181 @@ pub fn telegram_finalize_action(
             error: None,
         },
         Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+// --- credentials at rest ---------------------------------------------------
+
+/// Seals `credentials_json` into `<dir>/credentials.enc`.
+pub fn secrets_save(dir: String, credentials_json: String) -> ApiResultString {
+    match crate::secrets::save_credentials(std::path::Path::new(&dir), &credentials_json) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: Some("ok".to_string()),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Opens `<dir>/credentials.enc`. `value` is null when nothing is stored or the
+/// blob cannot be opened on this install.
+pub fn secrets_load(dir: String) -> ApiResultString {
+    match crate::secrets::load_credentials(std::path::Path::new(&dir)) {
+        Ok(value) => ApiResultString {
+            ok: true,
+            value,
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+pub fn secrets_purge(dir: String) -> ApiResultString {
+    match crate::secrets::purge_credentials(std::path::Path::new(&dir)) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: Some("ok".to_string()),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Tightens permissions on the data directory and the secrets inside it.
+pub fn secrets_harden(dir: String) -> ApiResultString {
+    match crate::secrets::harden_directory(std::path::Path::new(&dir)) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: Some("ok".to_string()),
+            error: None,
+        },
+        Err(error) => ApiResultString {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+// --- risk limits -----------------------------------------------------------
+
+pub use crate::risk::{RiskContext, RiskLimits};
+
+pub fn risk_set_limits(limits: RiskLimits) {
+    crate::risk::set_limits(limits);
+}
+
+pub fn risk_limits() -> RiskLimits {
+    crate::risk::limits()
+}
+
+/// Feeds the gate the live account facts it compares limits against.
+pub fn risk_update_context(context: RiskContext) {
+    crate::risk::update_context(context);
+}
+
+pub fn risk_context() -> RiskContext {
+    crate::risk::context()
+}
+
+/// Dry-runs the gate so the UI can warn before an order is ever sent.
+/// `value` is null when the order passes; otherwise it is the rejection reason.
+pub fn risk_preview_order(symbol: String, qty_btc: f64, reduce_only: bool) -> ApiResultString {
+    match crate::risk::check_order(&symbol, qty_btc, reduce_only) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: None,
+            error: None,
+        },
+        Err(reason) => ApiResultString {
+            ok: false,
+            value: Some(reason.clone()),
+            error: Some(reason),
+        },
+    }
+}
+
+/// `value` is null when the signal is fresh enough, otherwise the reason.
+pub fn risk_check_signal_age(message_timestamp_ms: i64, now_ms: i64) -> ApiResultString {
+    match crate::risk::evaluate_signal_age(&crate::risk::limits(), message_timestamp_ms, now_ms) {
+        Ok(()) => ApiResultString {
+            ok: true,
+            value: None,
+            error: None,
+        },
+        Err(reason) => ApiResultString {
+            ok: false,
+            value: Some(reason.clone()),
+            error: Some(reason),
+        },
+    }
+}
+
+// --- crash recovery --------------------------------------------------------
+
+/// Actions that were reserved but never finalized, newest first. Each is an
+/// order we may or may not have placed.
+pub fn dedup_pending_actions(state_path: String) -> ApiResultPendingActions {
+    match crate::dedup::DedupStore::load(std::path::Path::new(&state_path)) {
+        Ok(store) => {
+            let mut value: Vec<PendingAction> = store
+                .pending_actions()
+                .into_iter()
+                .map(|(key, record)| PendingAction {
+                    dedup_key: key.0,
+                    channel_id: record.channel_id,
+                    message_id: record.message_id,
+                    action_ordinal: record.action_ordinal,
+                    updated_at_ms: record.updated_at.timestamp_millis(),
+                })
+                .collect();
+            value.sort_by_key(|action| std::cmp::Reverse(action.updated_at_ms));
+            ApiResultPendingActions {
+                ok: true,
+                value: Some(value),
+                error: None,
+            }
+        }
+        Err(error) => ApiResultPendingActions {
+            ok: false,
+            value: None,
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+/// Asks the exchange what became of one `client_order_id`.
+///
+/// An error means "could not determine" — never retry on the strength of it.
+/// `ok` with `found: false` means the exchange has no such order.
+pub async fn weex_lookup_order(
+    request: weex::WeexAccountRequest,
+    client_order_id: String,
+) -> ApiResultWeexOrderStatus {
+    match weex::lookup_order_by_client_id(request, client_order_id).await {
+        Ok(value) => ApiResultWeexOrderStatus {
+            ok: true,
+            value: Some(value),
+            error: None,
+        },
+        Err(error) => ApiResultWeexOrderStatus {
             ok: false,
             value: None,
             error: Some(error.to_string()),

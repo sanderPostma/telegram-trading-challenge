@@ -7,7 +7,7 @@ import 'package:window_manager/window_manager.dart';
 import '../platform/linux_tray_controller.dart';
 import '../theme.dart';
 
-PreferredSizeWidget tmgAppBar({
+PreferredSizeWidget challengeAppBar({
   required String title,
   required List<Widget> actions,
   Widget? leading,

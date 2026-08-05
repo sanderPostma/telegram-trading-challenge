@@ -295,20 +295,20 @@ class AccountScalingPanel extends StatefulWidget {
 }
 
 class _AccountScalingPanelState extends State<AccountScalingPanel> {
-  late final TextEditingController _tmgBalance;
+  late final TextEditingController _masterBalance;
 
   @override
   void initState() {
     super.initState();
     final c = widget.controller.config;
-    _tmgBalance = TextEditingController(
+    _masterBalance = TextEditingController(
       text: c.masterBalanceUsd.toStringAsFixed(0),
     );
   }
 
   @override
   void dispose() {
-    _tmgBalance.dispose();
+    _masterBalance.dispose();
     super.dispose();
   }
 
@@ -348,7 +348,7 @@ class _AccountScalingPanelState extends State<AccountScalingPanel> {
                 final fields = [
                   _amountField(
                     'Challenge Account Balance',
-                    _tmgBalance,
+                    _masterBalance,
                     'USDT',
                   ),
                   _exchangeBalanceField(),
@@ -414,7 +414,7 @@ class _AccountScalingPanelState extends State<AccountScalingPanel> {
     unawaited(
       widget.controller.saveConfig(
         c.copyWith(
-          masterBalanceUsd: parse(_tmgBalance, c.masterBalanceUsd),
+          masterBalanceUsd: parse(_masterBalance, c.masterBalanceUsd),
           autoUpdateMaster: true,
         ),
         log: false,

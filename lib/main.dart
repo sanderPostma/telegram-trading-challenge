@@ -93,7 +93,7 @@ class TradingChallengeApp extends StatelessWidget {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
           title: 'Telegram Challenge',
-          theme: buildTmgTheme(),
+          theme: buildAppTheme(),
           home: AppShell(controller: controller),
         );
       },

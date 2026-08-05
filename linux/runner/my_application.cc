@@ -296,7 +296,7 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_default_size(window, 1280, 720);
 
   // Taskbar/dock icon setup like operator-control
-  gtk_window_set_icon_name(window, "com.tmg.challenge");
+  gtk_window_set_icon_name(window, "com.atomicvoid.tradingchallenge");
   {
     g_autofree gchar* self_path = g_file_read_link("/proc/self/exe", nullptr);
     if (self_path != nullptr) {

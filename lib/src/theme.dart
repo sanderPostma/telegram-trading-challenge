@@ -13,7 +13,7 @@ class Brand {
   static const text = Color(0xFFF7F1E3);
 }
 
-ThemeData buildTmgTheme() {
+ThemeData buildAppTheme() {
   final scheme = ColorScheme.fromSeed(
     seedColor: Brand.gold,
     brightness: Brightness.dark,

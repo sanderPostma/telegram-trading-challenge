@@ -10,6 +10,7 @@ import 'frb_generated.dart';
 import 'frb_generated.io.dart' if (dart.library.js_interop) 'frb_generated.web.dart';
 import 'interpreter.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
+import 'risk.dart';
 import 'scaling.dart';
 import 'telegram.dart';
 import 'weex.dart';
@@ -65,7 +66,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.12.0';
 
   @override
-  int get rustContentHash => -631656769;
+  int get rustContentHash => -1291247560;
 
   static const kDefaultExternalLibraryLoaderConfig = ExternalLibraryLoaderConfig(
     stem: 'trading_challenge_core',
@@ -93,6 +94,8 @@ abstract class RustLibApi extends BaseApi {
     required double low,
     required double high,
   });
+
+  Future<ApiResultPendingActions> crateApiDedupPendingActions({required String statePath});
 
   Future<String> crateApiDefaultPatternsYaml();
 
@@ -122,7 +125,37 @@ abstract class RustLibApi extends BaseApi {
     required double cumulativePnl,
   });
 
+  Future<ApiResultString> crateApiRiskCheckSignalAge({
+    required PlatformInt64 messageTimestampMs,
+    required PlatformInt64 nowMs,
+  });
+
+  Future<RiskContext> crateApiRiskContext();
+
+  Future<RiskLimits> crateApiRiskLimits();
+
+  Future<ApiResultString> crateApiRiskPreviewOrder({
+    required String symbol,
+    required double qtyBtc,
+    required bool reduceOnly,
+  });
+
+  Future<void> crateApiRiskSetLimits({required RiskLimits limits});
+
+  Future<void> crateApiRiskUpdateContext({required RiskContext context});
+
   Future<ApiResultScaledOrder> crateApiScaleManualOrder({required ManualScaleRequest request});
+
+  Future<ApiResultString> crateApiSecretsHarden({required String dir});
+
+  Future<ApiResultString> crateApiSecretsLoad({required String dir});
+
+  Future<ApiResultString> crateApiSecretsPurge({required String dir});
+
+  Future<ApiResultString> crateApiSecretsSave({
+    required String dir,
+    required String credentialsJson,
+  });
 
   Future<ApiResultTelegramLoginStatus> crateApiTelegramCheckPassword({required String password});
 
@@ -147,6 +180,11 @@ abstract class RustLibApi extends BaseApi {
 
   Future<ApiResultWeexMarketOrderAck> crateApiWeexCancelAlgoOrder({
     required WeexCancelAlgoRequest request,
+  });
+
+  Future<ApiResultWeexOrderStatus> crateApiWeexLookupOrder({
+    required WeexAccountRequest request,
+    required String clientOrderId,
   });
 
   Stream<PriceTick> crateApiWeexPublicPriceStream();
@@ -307,12 +345,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<ApiResultPendingActions> crateApiDedupPendingActions({required String statePath}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(statePath, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_pending_actions,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiDedupPendingActionsConstMeta,
+        argValues: [statePath],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiDedupPendingActionsConstMeta =>
+      const TaskConstMeta(debugName: "dedup_pending_actions", argNames: ["statePath"]);
+
+  @override
   Future<String> crateApiDefaultPatternsYaml() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_String, decodeErrorData: null),
         constMeta: kCrateApiDefaultPatternsYamlConstMeta,
@@ -332,7 +393,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(text, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 7, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_opt_box_autoadd_close_target,
@@ -355,7 +416,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(text, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 8, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_opt_box_autoadd_f_64, decodeErrorData: null),
         constMeta: kCrateApiExtractMasterBalanceConstMeta,
@@ -374,7 +435,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 9, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetBalanceHistoryConstMeta,
@@ -393,7 +454,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 10, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_chart_data, decodeErrorData: null),
         constMeta: kCrateApiGetChartDataConstMeta,
@@ -412,7 +473,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 11, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetEquityHistoryConstMeta,
@@ -431,7 +492,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 12, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_list_series_point, decodeErrorData: null),
         constMeta: kCrateApiGetPnlHistoryConstMeta,
@@ -450,7 +511,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 13, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_String, decodeErrorData: null),
         constMeta: kCrateApiHelloConstMeta,
@@ -474,7 +535,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(baseYaml, serializer);
           sse_encode_String(localYaml, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiMergePatternsYamlConstMeta,
@@ -502,7 +563,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_f_64(balance, serializer);
           sse_encode_f_64(equity, serializer);
           sse_encode_f_64(cumulativePnl, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
         constMeta: kCrateApiRecordChartSnapshotConstMeta,
@@ -518,13 +579,145 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<ApiResultString> crateApiRiskCheckSignalAge({
+    required PlatformInt64 messageTimestampMs,
+    required PlatformInt64 nowMs,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_i_64(messageTimestampMs, serializer);
+          sse_encode_i_64(nowMs, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiRiskCheckSignalAgeConstMeta,
+        argValues: [messageTimestampMs, nowMs],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskCheckSignalAgeConstMeta => const TaskConstMeta(
+    debugName: "risk_check_signal_age",
+    argNames: ["messageTimestampMs", "nowMs"],
+  );
+
+  @override
+  Future<RiskContext> crateApiRiskContext() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_risk_context, decodeErrorData: null),
+        constMeta: kCrateApiRiskContextConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskContextConstMeta =>
+      const TaskConstMeta(debugName: "risk_context", argNames: []);
+
+  @override
+  Future<RiskLimits> crateApiRiskLimits() {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_risk_limits, decodeErrorData: null),
+        constMeta: kCrateApiRiskLimitsConstMeta,
+        argValues: [],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskLimitsConstMeta =>
+      const TaskConstMeta(debugName: "risk_limits", argNames: []);
+
+  @override
+  Future<ApiResultString> crateApiRiskPreviewOrder({
+    required String symbol,
+    required double qtyBtc,
+    required bool reduceOnly,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(symbol, serializer);
+          sse_encode_f_64(qtyBtc, serializer);
+          sse_encode_bool(reduceOnly, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiRiskPreviewOrderConstMeta,
+        argValues: [symbol, qtyBtc, reduceOnly],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskPreviewOrderConstMeta => const TaskConstMeta(
+    debugName: "risk_preview_order",
+    argNames: ["symbol", "qtyBtc", "reduceOnly"],
+  );
+
+  @override
+  Future<void> crateApiRiskSetLimits({required RiskLimits limits}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_risk_limits(limits, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
+        constMeta: kCrateApiRiskSetLimitsConstMeta,
+        argValues: [limits],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskSetLimitsConstMeta =>
+      const TaskConstMeta(debugName: "risk_set_limits", argNames: ["limits"]);
+
+  @override
+  Future<void> crateApiRiskUpdateContext({required RiskContext context}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_risk_context(context, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
+        constMeta: kCrateApiRiskUpdateContextConstMeta,
+        argValues: [context],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiRiskUpdateContextConstMeta =>
+      const TaskConstMeta(debugName: "risk_update_context", argNames: ["context"]);
+
+  @override
   Future<ApiResultScaledOrder> crateApiScaleManualOrder({required ManualScaleRequest request}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_manual_scale_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_scaled_order,
@@ -541,13 +734,97 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "scale_manual_order", argNames: ["request"]);
 
   @override
+  Future<ApiResultString> crateApiSecretsHarden({required String dir}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dir, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiSecretsHardenConstMeta,
+        argValues: [dir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSecretsHardenConstMeta =>
+      const TaskConstMeta(debugName: "secrets_harden", argNames: ["dir"]);
+
+  @override
+  Future<ApiResultString> crateApiSecretsLoad({required String dir}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dir, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiSecretsLoadConstMeta,
+        argValues: [dir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSecretsLoadConstMeta =>
+      const TaskConstMeta(debugName: "secrets_load", argNames: ["dir"]);
+
+  @override
+  Future<ApiResultString> crateApiSecretsPurge({required String dir}) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dir, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiSecretsPurgeConstMeta,
+        argValues: [dir],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSecretsPurgeConstMeta =>
+      const TaskConstMeta(debugName: "secrets_purge", argNames: ["dir"]);
+
+  @override
+  Future<ApiResultString> crateApiSecretsSave({
+    required String dir,
+    required String credentialsJson,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(dir, serializer);
+          sse_encode_String(credentialsJson, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27, port: port_);
+        },
+        codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
+        constMeta: kCrateApiSecretsSaveConstMeta,
+        argValues: [dir, credentialsJson],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiSecretsSaveConstMeta =>
+      const TaskConstMeta(debugName: "secrets_save", argNames: ["dir", "credentialsJson"]);
+
+  @override
   Future<ApiResultTelegramLoginStatus> crateApiTelegramCheckPassword({required String password}) {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(password, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_telegram_login_status,
@@ -578,7 +855,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(dedupKey, serializer);
           sse_encode_telegram_action_status(status, serializer);
           sse_encode_opt_String(orderId, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 18, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiTelegramFinalizeActionConstMeta,
@@ -605,7 +882,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_box_autoadd_telegram_client_request(request, serializer);
             sse_encode_StreamSink_telegram_message_event_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 19, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30, port: port_);
           },
           codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
           constMeta: kCrateApiTelegramMessageStreamConstMeta,
@@ -629,7 +906,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_telegram_client_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 20, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 31, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_telegram_login_status,
@@ -652,7 +929,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(code, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 21, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 32, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_telegram_login_status,
@@ -675,7 +952,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(patternsYaml, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 22, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 33, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiValidatePatternsYamlConstMeta,
@@ -697,7 +974,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_cancel_algo_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 23, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 34, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -714,6 +991,33 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(debugName: "weex_cancel_algo_order", argNames: ["request"]);
 
   @override
+  Future<ApiResultWeexOrderStatus> crateApiWeexLookupOrder({
+    required WeexAccountRequest request,
+    required String clientOrderId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_box_autoadd_weex_account_request(request, serializer);
+          sse_encode_String(clientOrderId, serializer);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 35, port: port_);
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_api_result_weex_order_status,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWeexLookupOrderConstMeta,
+        argValues: [request, clientOrderId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWeexLookupOrderConstMeta =>
+      const TaskConstMeta(debugName: "weex_lookup_order", argNames: ["request", "clientOrderId"]);
+
+  @override
   Stream<PriceTick> crateApiWeexPublicPriceStream() {
     final sink = RustStreamSink<PriceTick>();
     unawaited(
@@ -722,7 +1026,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           callFfi: (port_) {
             final serializer = SseSerializer(generalizedFrbRustBinding);
             sse_encode_StreamSink_price_tick_Sse(sink, serializer);
-            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 24, port: port_);
+            pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 36, port: port_);
           },
           codec: SseCodec(decodeSuccessData: sse_decode_unit, decodeErrorData: null),
           constMeta: kCrateApiWeexPublicPriceStreamConstMeta,
@@ -746,7 +1050,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_account_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 25, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 37, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_account_reconciliation,
@@ -781,7 +1085,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_String(path, serializer);
           sse_encode_String(query, serializer);
           sse_encode_String(body, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 26, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 38, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_string, decodeErrorData: null),
         constMeta: kCrateApiWeexSignPreviewConstMeta,
@@ -805,7 +1109,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_algo_order_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 27, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 39, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -830,7 +1134,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_market_order_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 28, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 40, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -855,7 +1159,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_box_autoadd_weex_tp_sl_order_request(request, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 29, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 41, port: port_);
         },
         codec: SseCodec(
           decodeSuccessData: sse_decode_api_result_weex_market_order_ack,
@@ -884,7 +1188,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           sse_encode_direction(direction, serializer);
           sse_encode_f_64(triggerPrice, serializer);
           sse_encode_f_64(markPrice, serializer);
-          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 30, port: port_);
+          pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 42, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_String, decodeErrorData: null),
         constMeta: kCrateApiWeexTpSlPlanTypeConstMeta,
@@ -972,6 +1276,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiResultPendingActions dco_decode_api_result_pending_actions(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ApiResultPendingActions(
+      ok: dco_decode_bool(arr[0]),
+      value: dco_decode_opt_list_pending_action(arr[1]),
+      error: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
   ApiResultScaledOrder dco_decode_api_result_scaled_order(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1034,6 +1350,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiResultWeexOrderStatus dco_decode_api_result_weex_order_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3) throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return ApiResultWeexOrderStatus(
+      ok: dco_decode_bool(arr[0]),
+      value: dco_decode_opt_box_autoadd_weex_order_status(arr[1]),
+      error: dco_decode_opt_String(arr[2]),
+    );
+  }
+
+  @protected
   bool dco_decode_bool(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as bool;
@@ -1073,6 +1401,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ManualScaleRequest dco_decode_box_autoadd_manual_scale_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_manual_scale_request(raw);
+  }
+
+  @protected
+  RiskContext dco_decode_box_autoadd_risk_context(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_risk_context(raw);
+  }
+
+  @protected
+  RiskLimits dco_decode_box_autoadd_risk_limits(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_risk_limits(raw);
   }
 
   @protected
@@ -1136,6 +1476,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus dco_decode_box_autoadd_weex_order_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_weex_order_status(raw);
+  }
+
+  @protected
   WeexTpSlOrderRequest dco_decode_box_autoadd_weex_tp_sl_order_request(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return dco_decode_weex_tp_sl_order_request(raw);
@@ -1186,6 +1532,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Limit dco_decode_limit(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return Limit(value: dco_decode_f_64(arr[0]), percent: dco_decode_bool(arr[1]));
+  }
+
+  @protected
   List<String> dco_decode_list_String(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_String).toList();
@@ -1195,6 +1549,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   List<Action> dco_decode_list_action(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_action).toList();
+  }
+
+  @protected
+  List<PendingAction> dco_decode_list_pending_action(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_pending_action).toList();
   }
 
   @protected
@@ -1303,9 +1663,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus? dco_decode_opt_box_autoadd_weex_order_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_weex_order_status(raw);
+  }
+
+  @protected
   List<Action>? dco_decode_opt_list_action(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw == null ? null : dco_decode_list_action(raw);
+  }
+
+  @protected
+  List<PendingAction>? dco_decode_opt_list_pending_action(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_list_pending_action(raw);
+  }
+
+  @protected
+  PendingAction dco_decode_pending_action(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return PendingAction(
+      dedupKey: dco_decode_String(arr[0]),
+      channelId: dco_decode_i_64(arr[1]),
+      messageId: dco_decode_i_64(arr[2]),
+      actionOrdinal: dco_decode_u_32(arr[3]),
+      updatedAtMs: dco_decode_i_64(arr[4]),
+    );
   }
 
   @protected
@@ -1323,6 +1709,37 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receivedAtMs: dco_decode_i_64(arr[6]),
       ok: dco_decode_bool(arr[7]),
       error: dco_decode_opt_String(arr[8]),
+    );
+  }
+
+  @protected
+  RiskContext dco_decode_risk_context(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    return RiskContext(
+      referencePrice: dco_decode_f_64(arr[0]),
+      openPositionNotionalUsd: dco_decode_f_64(arr[1]),
+      leverage: dco_decode_f_64(arr[2]),
+      realizedPnlTodayUsd: dco_decode_f_64(arr[3]),
+      accountBalanceUsd: dco_decode_f_64(arr[4]),
+    );
+  }
+
+  @protected
+  RiskLimits dco_decode_risk_limits(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 8) throw Exception('unexpected arr length: expect 8 but see ${arr.length}');
+    return RiskLimits(
+      killSwitch: dco_decode_bool(arr[0]),
+      maxOrderNotional: dco_decode_limit(arr[1]),
+      maxOrderQtyBtc: dco_decode_f_64(arr[2]),
+      maxPositionNotional: dco_decode_limit(arr[3]),
+      symbolAllowlist: dco_decode_list_String(arr[4]),
+      maxLeverage: dco_decode_f_64(arr[5]),
+      dailyLoss: dco_decode_limit(arr[6]),
+      maxSignalAgeSecs: dco_decode_i_64(arr[7]),
     );
   }
 
@@ -1413,6 +1830,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receivedAtMs: dco_decode_i_64(arr[6]),
       error: dco_decode_opt_String(arr[7]),
     );
+  }
+
+  @protected
+  int dco_decode_u_32(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw as int;
   }
 
   @protected
@@ -1562,6 +1985,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus dco_decode_weex_order_status(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return WeexOrderStatus(
+      found: dco_decode_bool(arr[0]),
+      orderId: dco_decode_String(arr[1]),
+      clientOrderId: dco_decode_opt_String(arr[2]),
+      status: dco_decode_String(arr[3]),
+      filledQtyBtc: dco_decode_f_64(arr[4]),
+      avgPrice: dco_decode_f_64(arr[5]),
+    );
+  }
+
+  @protected
   WeexPositionSnapshot dco_decode_weex_position_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1676,6 +2114,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiResultPendingActions sse_decode_api_result_pending_actions(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_value = sse_decode_opt_list_pending_action(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return ApiResultPendingActions(ok: var_ok, value: var_value, error: var_error);
+  }
+
+  @protected
   ApiResultScaledOrder sse_decode_api_result_scaled_order(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_ok = sse_decode_bool(deserializer);
@@ -1727,6 +2174,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ApiResultWeexOrderStatus sse_decode_api_result_weex_order_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_value = sse_decode_opt_box_autoadd_weex_order_status(deserializer);
+    var var_error = sse_decode_opt_String(deserializer);
+    return ApiResultWeexOrderStatus(ok: var_ok, value: var_value, error: var_error);
+  }
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return deserializer.buffer.getUint8() != 0;
@@ -1766,6 +2222,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ManualScaleRequest sse_decode_box_autoadd_manual_scale_request(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_manual_scale_request(deserializer));
+  }
+
+  @protected
+  RiskContext sse_decode_box_autoadd_risk_context(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_risk_context(deserializer));
+  }
+
+  @protected
+  RiskLimits sse_decode_box_autoadd_risk_limits(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_risk_limits(deserializer));
   }
 
   @protected
@@ -1839,6 +2307,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus sse_decode_box_autoadd_weex_order_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_weex_order_status(deserializer));
+  }
+
+  @protected
   WeexTpSlOrderRequest sse_decode_box_autoadd_weex_tp_sl_order_request(
     SseDeserializer deserializer,
   ) {
@@ -1889,6 +2363,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  Limit sse_decode_limit(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_value = sse_decode_f_64(deserializer);
+    var var_percent = sse_decode_bool(deserializer);
+    return Limit(value: var_value, percent: var_percent);
+  }
+
+  @protected
   List<String> sse_decode_list_String(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -1908,6 +2390,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <Action>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_action(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<PendingAction> sse_decode_list_pending_action(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <PendingAction>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_pending_action(deserializer));
     }
     return ans_;
   }
@@ -2099,6 +2593,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus? sse_decode_opt_box_autoadd_weex_order_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_weex_order_status(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   List<Action>? sse_decode_opt_list_action(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -2107,6 +2612,34 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     } else {
       return null;
     }
+  }
+
+  @protected
+  List<PendingAction>? sse_decode_opt_list_pending_action(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_list_pending_action(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
+  PendingAction sse_decode_pending_action(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_dedupKey = sse_decode_String(deserializer);
+    var var_channelId = sse_decode_i_64(deserializer);
+    var var_messageId = sse_decode_i_64(deserializer);
+    var var_actionOrdinal = sse_decode_u_32(deserializer);
+    var var_updatedAtMs = sse_decode_i_64(deserializer);
+    return PendingAction(
+      dedupKey: var_dedupKey,
+      channelId: var_channelId,
+      messageId: var_messageId,
+      actionOrdinal: var_actionOrdinal,
+      updatedAtMs: var_updatedAtMs,
+    );
   }
 
   @protected
@@ -2131,6 +2664,46 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receivedAtMs: var_receivedAtMs,
       ok: var_ok,
       error: var_error,
+    );
+  }
+
+  @protected
+  RiskContext sse_decode_risk_context(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_referencePrice = sse_decode_f_64(deserializer);
+    var var_openPositionNotionalUsd = sse_decode_f_64(deserializer);
+    var var_leverage = sse_decode_f_64(deserializer);
+    var var_realizedPnlTodayUsd = sse_decode_f_64(deserializer);
+    var var_accountBalanceUsd = sse_decode_f_64(deserializer);
+    return RiskContext(
+      referencePrice: var_referencePrice,
+      openPositionNotionalUsd: var_openPositionNotionalUsd,
+      leverage: var_leverage,
+      realizedPnlTodayUsd: var_realizedPnlTodayUsd,
+      accountBalanceUsd: var_accountBalanceUsd,
+    );
+  }
+
+  @protected
+  RiskLimits sse_decode_risk_limits(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_killSwitch = sse_decode_bool(deserializer);
+    var var_maxOrderNotional = sse_decode_limit(deserializer);
+    var var_maxOrderQtyBtc = sse_decode_f_64(deserializer);
+    var var_maxPositionNotional = sse_decode_limit(deserializer);
+    var var_symbolAllowlist = sse_decode_list_String(deserializer);
+    var var_maxLeverage = sse_decode_f_64(deserializer);
+    var var_dailyLoss = sse_decode_limit(deserializer);
+    var var_maxSignalAgeSecs = sse_decode_i_64(deserializer);
+    return RiskLimits(
+      killSwitch: var_killSwitch,
+      maxOrderNotional: var_maxOrderNotional,
+      maxOrderQtyBtc: var_maxOrderQtyBtc,
+      maxPositionNotional: var_maxPositionNotional,
+      symbolAllowlist: var_symbolAllowlist,
+      maxLeverage: var_maxLeverage,
+      dailyLoss: var_dailyLoss,
+      maxSignalAgeSecs: var_maxSignalAgeSecs,
     );
   }
 
@@ -2237,6 +2810,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       receivedAtMs: var_receivedAtMs,
       error: var_error,
     );
+  }
+
+  @protected
+  int sse_decode_u_32(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return deserializer.buffer.getUint32();
   }
 
   @protected
@@ -2431,6 +3010,25 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WeexOrderStatus sse_decode_weex_order_status(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_found = sse_decode_bool(deserializer);
+    var var_orderId = sse_decode_String(deserializer);
+    var var_clientOrderId = sse_decode_opt_String(deserializer);
+    var var_status = sse_decode_String(deserializer);
+    var var_filledQtyBtc = sse_decode_f_64(deserializer);
+    var var_avgPrice = sse_decode_f_64(deserializer);
+    return WeexOrderStatus(
+      found: var_found,
+      orderId: var_orderId,
+      clientOrderId: var_clientOrderId,
+      status: var_status,
+      filledQtyBtc: var_filledQtyBtc,
+      avgPrice: var_avgPrice,
+    );
+  }
+
+  @protected
   WeexPositionSnapshot sse_decode_weex_position_snapshot(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_symbol = sse_decode_String(deserializer);
@@ -2569,6 +3167,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_result_pending_actions(
+    ApiResultPendingActions self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_opt_list_pending_action(self.value, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
   void sse_encode_api_result_scaled_order(ApiResultScaledOrder self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_bool(self.ok, serializer);
@@ -2618,6 +3227,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_api_result_weex_order_status(
+    ApiResultWeexOrderStatus self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_opt_box_autoadd_weex_order_status(self.value, serializer);
+    sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     serializer.buffer.putUint8(self ? 1 : 0);
@@ -2660,6 +3280,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_manual_scale_request(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_risk_context(RiskContext self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_risk_context(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_risk_limits(RiskLimits self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_risk_limits(self, serializer);
   }
 
   @protected
@@ -2747,6 +3379,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_box_autoadd_weex_order_status(WeexOrderStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_weex_order_status(self, serializer);
+  }
+
+  @protected
   void sse_encode_box_autoadd_weex_tp_sl_order_request(
     WeexTpSlOrderRequest self,
     SseSerializer serializer,
@@ -2795,6 +3433,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_limit(Limit self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_f_64(self.value, serializer);
+    sse_encode_bool(self.percent, serializer);
+  }
+
+  @protected
   void sse_encode_list_String(List<String> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
@@ -2809,6 +3454,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_32(self.length, serializer);
     for (final item in self) {
       sse_encode_action(item, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_list_pending_action(List<PendingAction> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_pending_action(item, serializer);
     }
   }
 
@@ -2977,6 +3631,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_weex_order_status(
+    WeexOrderStatus? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_weex_order_status(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_opt_list_action(List<Action>? self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
 
@@ -2984,6 +3651,26 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     if (self != null) {
       sse_encode_list_action(self, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_opt_list_pending_action(List<PendingAction>? self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_list_pending_action(self, serializer);
+    }
+  }
+
+  @protected
+  void sse_encode_pending_action(PendingAction self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.dedupKey, serializer);
+    sse_encode_i_64(self.channelId, serializer);
+    sse_encode_i_64(self.messageId, serializer);
+    sse_encode_u_32(self.actionOrdinal, serializer);
+    sse_encode_i_64(self.updatedAtMs, serializer);
   }
 
   @protected
@@ -2998,6 +3685,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_i_64(self.receivedAtMs, serializer);
     sse_encode_bool(self.ok, serializer);
     sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_risk_context(RiskContext self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_f_64(self.referencePrice, serializer);
+    sse_encode_f_64(self.openPositionNotionalUsd, serializer);
+    sse_encode_f_64(self.leverage, serializer);
+    sse_encode_f_64(self.realizedPnlTodayUsd, serializer);
+    sse_encode_f_64(self.accountBalanceUsd, serializer);
+  }
+
+  @protected
+  void sse_encode_risk_limits(RiskLimits self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.killSwitch, serializer);
+    sse_encode_limit(self.maxOrderNotional, serializer);
+    sse_encode_f_64(self.maxOrderQtyBtc, serializer);
+    sse_encode_limit(self.maxPositionNotional, serializer);
+    sse_encode_list_String(self.symbolAllowlist, serializer);
+    sse_encode_f_64(self.maxLeverage, serializer);
+    sse_encode_limit(self.dailyLoss, serializer);
+    sse_encode_i_64(self.maxSignalAgeSecs, serializer);
   }
 
   @protected
@@ -3071,6 +3781,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_String(self.text, serializer);
     sse_encode_i_64(self.receivedAtMs, serializer);
     sse_encode_opt_String(self.error, serializer);
+  }
+
+  @protected
+  void sse_encode_u_32(int self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    serializer.buffer.putUint32(self);
   }
 
   @protected
@@ -3187,6 +3903,17 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.reduceOnly, serializer);
     sse_encode_String(self.clientOrderId, serializer);
     sse_encode_f_64(self.qtyStep, serializer);
+  }
+
+  @protected
+  void sse_encode_weex_order_status(WeexOrderStatus self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.found, serializer);
+    sse_encode_String(self.orderId, serializer);
+    sse_encode_opt_String(self.clientOrderId, serializer);
+    sse_encode_String(self.status, serializer);
+    sse_encode_f_64(self.filledQtyBtc, serializer);
+    sse_encode_f_64(self.avgPrice, serializer);
   }
 
   @protected

@@ -24,7 +24,7 @@ class _WizardPageState extends State<WizardPage> {
   late final TextEditingController _apiHash;
   late final TextEditingController _telegramCode;
   late final TextEditingController _telegramPassword;
-  late final TextEditingController _tmgBalance;
+  late final TextEditingController _masterBalance;
   late final TextEditingController _myBalance;
 
   @override
@@ -39,7 +39,7 @@ class _WizardPageState extends State<WizardPage> {
     _apiHash = TextEditingController(text: c.telegramApiHash);
     _telegramCode = TextEditingController();
     _telegramPassword = TextEditingController();
-    _tmgBalance = TextEditingController(
+    _masterBalance = TextEditingController(
       text: c.masterBalanceUsd.toStringAsFixed(0),
     );
     _myBalance = TextEditingController(text: c.myBalanceUsd.toStringAsFixed(0));
@@ -55,7 +55,7 @@ class _WizardPageState extends State<WizardPage> {
     _apiHash.dispose();
     _telegramCode.dispose();
     _telegramPassword.dispose();
-    _tmgBalance.dispose();
+    _masterBalance.dispose();
     _myBalance.dispose();
     super.dispose();
   }
@@ -104,7 +104,7 @@ class _WizardPageState extends State<WizardPage> {
               const _InstructionList(
                 items: [
                   'Open WEEX API management and create a new API key. Apply for API access first if WEEX asks you to.',
-                  'Use any label, for example tmg-bot. The label stays on WEEX and is not needed by this app.',
+                  'Use any label, for example challenge-bot. The label stays on WEEX and is not needed by this app.',
                   'Set a passphrase and save it here. WEEX uses it as an extra API credential during signed requests.',
                   'Enable Futures permission. Read-only may remain checked; Spot is not required for this app.',
                   'Optional on WEEX: restrict the key to your current public IP address. Use the helper link below if you want to do that on the WEEX form.',
@@ -233,7 +233,7 @@ class _WizardPageState extends State<WizardPage> {
                 style: TextStyle(color: Brand.muted),
               ),
               const SizedBox(height: 16),
-              _field(_tmgBalance, 'Challenge Account Balance', suffix: 'USDT'),
+              _field(_masterBalance, 'Challenge Account Balance', suffix: 'USDT'),
               _field(_myBalance, 'My Account Balance', suffix: 'USDT'),
             ],
           ),
@@ -344,7 +344,7 @@ class _WizardPageState extends State<WizardPage> {
         telegramPhone: _phone.text,
         telegramApiId: _apiId.text,
         telegramApiHash: _apiHash.text,
-        masterBalanceUsd: parse(_tmgBalance, current.masterBalanceUsd),
+        masterBalanceUsd: parse(_masterBalance, current.masterBalanceUsd),
         myBalanceUsd: parse(_myBalance, current.myBalanceUsd),
         markPrice: current.markPrice,
         autoUpdateMaster: current.autoUpdateMaster,

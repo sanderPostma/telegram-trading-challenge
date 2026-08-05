@@ -5,7 +5,9 @@ pub mod execution;
 mod frb_generated;
 pub mod interpreter;
 pub mod patterns;
+pub mod risk;
 pub mod scaling;
+pub mod secrets;
 pub mod telegram;
 pub mod weex;
 

@@ -422,6 +422,54 @@ class WeexMarketOrderRequest {
           qtyStep == other.qtyStep;
 }
 
+/// What the exchange knows about one `client_order_id`.
+///
+/// `found: false` is a positive statement — the exchange answered and has no
+/// such order, so it never landed. An `Err` from [`lookup_order_by_client_id`]
+/// means the opposite: we could not find out, and nothing should be retried on
+/// the strength of it.
+class WeexOrderStatus {
+  final bool found;
+  final String orderId;
+  final String? clientOrderId;
+
+  /// Exchange status verbatim (NEW, PARTIALLY_FILLED, FILLED, CANCELED,
+  /// REJECTED), uppercased. Empty when the order is absent.
+  final String status;
+  final double filledQtyBtc;
+  final double avgPrice;
+
+  const WeexOrderStatus({
+    required this.found,
+    required this.orderId,
+    this.clientOrderId,
+    required this.status,
+    required this.filledQtyBtc,
+    required this.avgPrice,
+  });
+
+  @override
+  int get hashCode =>
+      found.hashCode ^
+      orderId.hashCode ^
+      clientOrderId.hashCode ^
+      status.hashCode ^
+      filledQtyBtc.hashCode ^
+      avgPrice.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WeexOrderStatus &&
+          runtimeType == other.runtimeType &&
+          found == other.found &&
+          orderId == other.orderId &&
+          clientOrderId == other.clientOrderId &&
+          status == other.status &&
+          filledQtyBtc == other.filledQtyBtc &&
+          avgPrice == other.avgPrice;
+}
+
 class WeexPositionSnapshot {
   final String symbol;
   final String direction;

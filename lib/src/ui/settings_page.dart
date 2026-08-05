@@ -22,6 +22,11 @@ class _SettingsPageState extends State<SettingsPage> {
   late final TextEditingController _tgApiHash;
   late final TextEditingController _tgCode;
   late final TextEditingController _tgPassword;
+  late final TextEditingController _maxOrderNotional;
+  late final TextEditingController _maxPositionNotional;
+  late final TextEditingController _maxLeverage;
+  late final TextEditingController _dailyLossLimit;
+  late final TextEditingController _maxSignalAge;
 
   @override
   void initState() {
@@ -35,6 +40,24 @@ class _SettingsPageState extends State<SettingsPage> {
     _tgApiHash = TextEditingController(text: c.telegramApiHash);
     _tgCode = TextEditingController();
     _tgPassword = TextEditingController();
+    final risk = c.risk;
+    _maxOrderNotional = TextEditingController(text: risk.maxOrderNotional.text);
+    _maxPositionNotional =
+        TextEditingController(text: risk.maxPositionNotional.text);
+    _maxLeverage = TextEditingController(text: _limitText(risk.maxLeverage));
+    _dailyLossLimit = TextEditingController(text: risk.dailyLoss.text);
+    _maxSignalAge =
+        TextEditingController(text: _limitText(risk.maxSignalAgeSecs.toDouble()));
+  }
+
+  /// An unset limit shows as an empty field, not "0".
+  static String _limitText(double value) =>
+      value > 0 ? value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2) : '';
+
+  static double _limitValue(String raw) {
+    final parsed = double.tryParse(raw.trim().replaceAll(',', '.'));
+    if (parsed == null || !parsed.isFinite || parsed <= 0) return 0;
+    return parsed;
   }
 
   @override
@@ -47,6 +70,11 @@ class _SettingsPageState extends State<SettingsPage> {
     _tgApiHash.dispose();
     _tgCode.dispose();
     _tgPassword.dispose();
+    _maxOrderNotional.dispose();
+    _maxPositionNotional.dispose();
+    _maxLeverage.dispose();
+    _dailyLossLimit.dispose();
+    _maxSignalAge.dispose();
     super.dispose();
   }
 
@@ -129,6 +157,7 @@ class _SettingsPageState extends State<SettingsPage> {
             title: const Text('Auto-approve high-confidence parsed actions'),
           ),
         ]),
+        _riskSection(),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -147,6 +176,79 @@ class _SettingsPageState extends State<SettingsPage> {
         ),
       ],
     );
+  }
+
+  /// Hard limits enforced in Rust on the submit path, below the signal
+  /// parser. Blank means the rail is off.
+  Widget _riskSection() {
+    final risk = widget.controller.config.risk;
+    final theme = Theme.of(context);
+    return _section('Risk limits', [
+      Text(
+        'Applied to every order — signal, auto-approved, or manual. '
+        'Leave a field blank to leave that limit off. Closing a position is '
+        'never blocked.',
+        style: theme.textTheme.bodySmall,
+      ),
+      const SizedBox(height: 14),
+      SwitchListTile(
+        value: risk.killSwitch,
+        onChanged: (value) => widget.controller.setRiskSettings(
+          risk.copyWith(killSwitch: value),
+        ),
+        title: const Text('Kill switch'),
+        subtitle: const Text('Block all new positions. Closing still works.'),
+        secondary: Icon(
+          Icons.power_settings_new,
+          color: risk.killSwitch ? theme.colorScheme.error : null,
+        ),
+      ),
+      if (!risk.hasAnyLimit)
+        Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          child: Row(
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 18,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'No size or loss limit is set. Nothing caps what a single '
+                  'signal can do to this account.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      const SizedBox(height: 8),
+      _field(
+        _maxOrderNotional,
+        'Max order size',
+        helper: 'USDT, or % of balance — 5000 or 15%',
+      ),
+      _field(
+        _maxPositionNotional,
+        'Max total exposure',
+        helper: 'USDT, or % of balance — 20000 or 40%',
+      ),
+      _field(_maxLeverage, 'Max leverage (x)'),
+      _field(
+        _dailyLossLimit,
+        'Daily loss limit',
+        helper: 'USDT, or % of balance — 500 or 8%',
+      ),
+      _field(_maxSignalAge, 'Ignore signals older than (seconds)'),
+      Text(
+        'Symbols allowed: ${risk.symbolAllowlist.isEmpty ? 'any' : risk.symbolAllowlist.join(', ')}',
+        style: theme.textTheme.bodySmall,
+      ),
+    ]);
   }
 
   Widget _section(String title, List<Widget> children) {
@@ -169,6 +271,7 @@ class _SettingsPageState extends State<SettingsPage> {
     TextEditingController controller,
     String label, {
     bool reveal = false,
+    String? helper,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -176,7 +279,7 @@ class _SettingsPageState extends State<SettingsPage> {
           ? _RevealTextField(controller: controller, label: label)
           : TextField(
               controller: controller,
-              decoration: InputDecoration(labelText: label),
+              decoration: InputDecoration(labelText: label, helperText: helper),
             ),
     );
   }
@@ -196,8 +299,16 @@ class _SettingsPageState extends State<SettingsPage> {
         markPrice: current.markPrice,
         autoUpdateMaster: current.autoUpdateMaster,
         autoApprove: current.autoApprove,
+        hasSeenAutoApproveWarning: current.hasSeenAutoApproveWarning,
         simulationMode: current.simulationMode,
         minimizeToTray: false,
+        risk: current.risk.copyWith(
+          maxOrderNotional: RiskLimitValue.parse(_maxOrderNotional.text),
+          maxPositionNotional: RiskLimitValue.parse(_maxPositionNotional.text),
+          maxLeverage: _limitValue(_maxLeverage.text),
+          dailyLoss: RiskLimitValue.parse(_dailyLossLimit.text),
+          maxSignalAgeSecs: _limitValue(_maxSignalAge.text).round(),
+        ),
       ),
     );
   }
