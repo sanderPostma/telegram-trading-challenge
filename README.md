@@ -37,6 +37,79 @@ Before using real funds, independently review and test the application, its conf
 4. **Execute:** The order is securely signed locally in Rust and dispatched to the WEEX API for instant execution.
 5. **Reconcile:** The app continually polls WEEX to verify order fills, sync the latest balance, and map PnL to your historical equity chart.
 
+## ⬇️ Downloading, Installing & Running
+
+Prebuilt desktop bundles for every tagged version are on the
+[**Releases page**](https://github.com/sanderPostma/telegram-trading-challenge/releases).
+Download the asset for your platform from the latest release:
+
+| Platform | Asset |
+| --- | --- |
+| Linux (x64) | `trading-challenge-linux-x64.tar.gz` |
+| Windows (x64) | `trading-challenge-windows-x64.zip` |
+| macOS | `trading-challenge-macos.zip` |
+
+There is no installer. Each asset is a self-contained bundle — unpack it wherever you like and run it from there. Keep the executable together with the `lib/` and `data/` folders next to it; moving the executable out on its own will not work.
+
+### Linux
+
+```bash
+mkdir -p ~/apps/trading-challenge
+tar -xzf trading-challenge-linux-x64.tar.gz -C ~/apps/trading-challenge
+~/apps/trading-challenge/trading_challenge
+```
+
+The bundle needs GTK 3 and the app-indicator library for the tray icon. On Debian/Ubuntu:
+
+```bash
+sudo apt-get install libgtk-3-0 libayatana-appindicator3-1
+```
+
+To get a desktop launcher entry, create `~/.local/share/applications/trading-challenge.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Trading Challenge Copy-Trader
+Exec=/home/YOUR_USER/apps/trading-challenge/trading_challenge
+Terminal=false
+Categories=Office;Finance;
+```
+
+### Windows
+
+Unzip `trading-challenge-windows-x64.zip` and run `trading_challenge.exe` from the extracted folder.
+
+The binary is unsigned, so SmartScreen shows "Windows protected your PC" on first launch. Choose **More info → Run anyway** if you trust the download.
+
+### macOS
+
+Unzip `trading-challenge-macos.zip` and move `trading_challenge.app` to `/Applications`.
+
+The app is neither signed nor notarized, so Gatekeeper blocks it on first launch. Either right-click the app and choose **Open** (then confirm), or clear the quarantine flag:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/trading_challenge.app
+```
+
+### First run
+
+The setup wizard asks for your WEEX API key, secret, and passphrase, plus your Telegram phone number, API ID, and API hash (from [my.telegram.org](https://my.telegram.org)). Telegram sends a login code you enter in the app.
+
+Credentials are encrypted into your local application data directory — `~/.local/share/com.atomicvoid.tradingchallenge` on Linux, `~/Library/Application Support/com.atomicvoid.tradingchallenge` on macOS, `%APPDATA%\com.atomicvoid.tradingchallenge` on Windows. See [Security & Keys](#-security--keys) below.
+
+Before trading real funds:
+
+- Leave **Simulation mode** on until you have watched it parse live signals correctly.
+- Leave **Auto-approve** off until you trust the parsing.
+- Set the **Risk limits** in Settings — they are all off by default.
+- Use a WEEX API key with **withdrawals disabled**.
+- Run **one** auto-approving instance per exchange account. There is no cross-device lock.
+
+### Verifying a download
+
+Release assets are built by [GitHub Actions](.github/workflows/build-binaries.yml) from the tagged commit; the run and its logs are public under the Actions tab. They are not code-signed. If you would rather not trust a prebuilt binary, build from source as below — the result is equivalent apart from the credential-sealing key.
+
 ## 📦 Building & Running
 
 ### Requirements

@@ -99,6 +99,22 @@ jobs:
           cargo --version
           rustc --version
 
+      # A release built without the secret falls back to the in-source
+      # embedded key (see rust/src/secrets.rs), which is readable by anyone
+      # with the repository. That is fine for a local build and not fine for a
+      # published binary, and it fails silently — so fail loudly here instead.
+      # Only the length is printed; the value itself would be masked anyway.
+      - name: Verify credential key is present
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          if [ -z "${TRADING_CHALLENGE_CREDENTIAL_KEY:-}" ]; then
+            echo "::error::Release build has no TRADING_CHALLENGE_CREDENTIAL_KEY." >&2
+            echo "Credentials would be sealed with the public in-source key. Refusing." >&2
+            exit 1
+          fi
+          echo "credential key present (${#TRADING_CHALLENGE_CREDENTIAL_KEY} chars)"
+
       - name: Get Flutter dependencies
         run: flutter pub get
 
