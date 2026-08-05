@@ -29,3 +29,10 @@ tokio-tungstenite = { version = "0.27", default-features = false, features = ["c
 
 [dev-dependencies]
 tempfile = "3"
+
+# The symbol table dominates the shipped library: the macOS universal dylib is
+# 56 MB unstripped against a 28 MB Flutter engine, and 37.9 MB stripped. Panic
+# backtraces lose function names in return, which costs little here because
+# flutter_rust_bridge surfaces panics to Dart as messages, not backtraces.
+[profile.release]
+strip = "symbols"

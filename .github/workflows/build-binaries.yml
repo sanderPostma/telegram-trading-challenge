@@ -27,9 +27,12 @@ jobs:
           - name: windows
             runner: windows-latest
             artifact_path: build/windows/x64/runner/Release
+          # macOS uploads an already-packaged zip, not the .app directory:
+          # upload-artifact does not preserve symlinks, and a .app is full of
+          # them. See the "Package macOS app" step.
           - name: macos
             runner: macos-latest
-            artifact_path: build/macos/Build/Products/Release/trading_challenge.app
+            artifact_path: trading-challenge-macos.zip
 
     steps:
       - name: Check out repository
@@ -109,6 +112,28 @@ jobs:
         if: runner.os == 'macOS'
         run: flutter build macos --release
 
+      - name: Package macOS app
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          # `ditto` is the macOS-native archiver: it keeps the framework
+          # symlinks (Versions/Current -> A, and the top-level binary alias).
+          # Uploading the .app directory instead lets upload-artifact follow
+          # those links and store every framework binary three times, which
+          # tripled the download and left a bundle that cannot be code-signed.
+          ditto -c -k --keepParent \
+            build/macos/Build/Products/Release/trading_challenge.app \
+            trading-challenge-macos.zip
+          # Fail loudly if the symlinks ever stop surviving the packaging.
+          symlinks=$(zipinfo trading-challenge-macos.zip | grep -c '^l' || true)
+          echo "symlink entries in archive: $symlinks"
+          if [ "$symlinks" -lt 1 ]; then
+            echo "Framework symlinks were not preserved — the bundle is invalid." >&2
+            exit 1
+          fi
+          ls -lh trading-challenge-macos.zip
+
       - name: Upload ${{ matrix.platform.name }} bundle
         uses: actions/upload-artifact@v4
         with:
@@ -136,8 +161,12 @@ jobs:
           (
             cd dist
             zip -r ../release/trading-challenge-windows-x64.zip trading-challenge-windows
-            zip -r ../release/trading-challenge-macos.zip trading-challenge-macos
           )
+          # The macOS asset was already packaged with `ditto` on the macOS
+          # runner. Re-zipping it here would flatten the symlinks again, so it
+          # is only moved into place.
+          mv dist/trading-challenge-macos/trading-challenge-macos.zip release/trading-challenge-macos.zip
+          ls -lh release/
 
       - name: Create release
         uses: softprops/action-gh-release@v2
