@@ -11,9 +11,15 @@ import 'package:trading_challenge/src/patterns/default_patterns.dart';
 /// working and simply misreads a signal shape whenever it falls back.
 void main() {
   /// The `patterns:` block with comments and blank lines removed.
+  ///
+  /// Line endings are normalized first: a Windows checkout rewrites the YAML
+  /// on disk to CRLF while the Dart string literal keeps LF, so comparing raw
+  /// lines fails there and nowhere else.
   List<String> ruleLines(String yaml) => yaml
+      .replaceAll('\r\n', '\n')
       .split('\n')
-      .where((line) => line.trim().isNotEmpty && !line.trimLeft().startsWith('#'))
+      .map((line) => line.trimRight())
+      .where((line) => line.isNotEmpty && !line.trimLeft().startsWith('#'))
       .toList();
 
   test('the Dart fallback carries the same rules as the source YAML', () {
@@ -24,5 +30,14 @@ void main() {
       reason: 'lib/src/patterns/default_patterns.dart has drifted from '
           'config/telegram_patterns.yaml — copy the rules across',
     );
+  });
+
+  test('the comparison does not depend on the checkout line endings', () {
+    // Guards the check itself: on a Windows runner the YAML arrives as CRLF
+    // and the Dart literal as LF, which failed the comparison above for a
+    // reason that had nothing to do with drift.
+    final source = File('config/telegram_patterns.yaml').readAsStringSync();
+    final asCrlf = source.replaceAll('\r\n', '\n').replaceAll('\n', '\r\n');
+    expect(ruleLines(asCrlf), ruleLines(source));
   });
 }
