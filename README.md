@@ -39,6 +39,9 @@ Before using real funds, independently review and test the application, its conf
 
 ## ⬇️ Downloading, Installing & Running
 
+> [!WARNING]
+> Read the [**Risk Disclaimer**](#risk-disclaimer) before you download. This software submits real orders to a real exchange with your own money, from signals it did not write and cannot verify. You are solely responsible for every order it places.
+
 Prebuilt desktop bundles for every tagged version are on the
 [**Releases page**](https://github.com/sanderPostma/telegram-trading-challenge/releases).
 Download the asset for your platform from the latest release:
