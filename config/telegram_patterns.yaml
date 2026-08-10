@@ -61,9 +61,10 @@ patterns:
     enabled: true
   # --- Trade signals (verb anchored to line start). -------------------------
   # Entry verbs cover both the terse past-tense channel style ("STARTED 0.5BTC
-  # SHORT") and the newer scalp style ("OPENING $50000 SCALP BITCOIN LONG").
-  # entry captures a BTC quantity; entry_usd captures a USD notional. The "SCALP
-  # BITCOIN" filler between the amount and direction is skipped by `.*?`.
+  # SHORT") and the newer scalp style ("OPENING $50000 SCALP BITCOIN LONG",
+  # "OPENED $30,000 SCALP SHORT BTC"). entry captures a BTC quantity; entry_usd
+  # captures a USD notional. Filler between the amount and the direction is
+  # skipped by `.*?`, so the asset may sit on either side of SHORT/LONG.
   - name: entry
     regex: '(?im)^\s*(?:STARTED|OPENING|OPENED)\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
@@ -101,13 +102,19 @@ patterns:
   # add_btc has the lower priority number so a bare BTC quantity ("ADDED 0.5
   # BTC") wins the tie against add_usd, which would otherwise read the digits as
   # dollars.
+  # Adds also carry the scalp filler ("ADDED $10,000 SCALP SHORT BTC"). Unlike
+  # the entry rules this is an explicit word list, not `.*?`: a lazy wildcard
+  # here would run past an "... AND ADDING ..." boundary to find a later
+  # direction and swallow the second instruction of a compound message. A
+  # direction the author states must win — without it the add silently inherits
+  # the last remembered side and can be sent against a flipped position.
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:(?:\s+(?:SCALP|BITCOIN|BTC|XBT))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
   - name: add_btc
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:(?:\s+(?:SCALP|BITCOIN|BTC|XBT))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 20
     enabled: true

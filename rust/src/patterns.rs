@@ -345,6 +345,75 @@ mod tests {
     }
 
     #[test]
+    fn scalp_signals_name_the_asset_after_the_direction() {
+        let rules = default_rules();
+
+        // The channel also writes the asset last: "OPENED $30,000 SCALP SHORT
+        // BTC". The trailing "BTC" must not be read as a BTC quantity, and the
+        // direction must survive the "SCALP" filler.
+        for (text, direction) in [
+            ("OPENED $30,000 SCALP SHORT BTC", Direction::Short),
+            ("OPENED $30,000 SCALP LONG BTC", Direction::Long),
+            ("OPENING $30,000 SCALP SHORT BTC", Direction::Short),
+            ("opened $30,000 scalp short btc", Direction::Short),
+        ] {
+            let hit = match_first(text, &rules).unwrap().unwrap();
+            assert_eq!(hit.action, RuleAction::Enter, "{text:?}");
+            assert_eq!(hit.direction, Some(direction), "{text:?}");
+            assert_eq!(hit.size, Some(Size::Usd(30_000.0)), "{text:?}");
+        }
+
+        // Trailing commentary on later lines does not disturb the signal line.
+        let with_comment =
+            match_first("OPENED $30,000 SCALP SHORT BTC\n\nlets see how this goes", &rules)
+                .unwrap()
+                .unwrap();
+        assert_eq!(with_comment.direction, Some(Direction::Short));
+        assert_eq!(with_comment.size, Some(Size::Usd(30_000.0)));
+
+        // A genuine BTC quantity in the same word order still reads as BTC.
+        let btc_qty = match_first("OPENED 0.5 BTC SCALP SHORT", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(btc_qty.size, Some(Size::Btc(0.5)));
+        assert_eq!(btc_qty.direction, Some(Direction::Short));
+    }
+
+    #[test]
+    fn adds_keep_a_direction_stated_across_scalp_filler() {
+        let rules = default_rules();
+
+        // Without this the direction is dropped and the add inherits whichever
+        // side the interpreter last remembered — the wrong side after a flip.
+        for text in [
+            "ADDED $10,000 SCALP SHORT BTC",
+            "ADDED $10,000 SCALP BITCOIN SHORT",
+            "ADDING $10,000 BTC SHORT",
+        ] {
+            let hit = match_first(text, &rules).unwrap().unwrap();
+            assert_eq!(hit.action, RuleAction::Add, "{text:?}");
+            assert_eq!(hit.direction, Some(Direction::Short), "{text:?}");
+            assert_eq!(hit.size, Some(Size::Usd(10_000.0)), "{text:?}");
+        }
+
+        let btc = match_first("ADDED 0.25 BTC SCALP SHORT", &rules)
+            .unwrap()
+            .unwrap();
+        assert_eq!(btc.action, RuleAction::Add);
+        assert_eq!(btc.direction, Some(Direction::Short));
+        assert_eq!(btc.size, Some(Size::Btc(0.25)));
+
+        // The filler must not run past an "AND" boundary and swallow the second
+        // instruction while hunting for a direction later on the line.
+        let compound = match_actions("ADDED $5000 AND ADDING $5000 TO SHORT", &rules).unwrap();
+        assert_eq!(compound.len(), 2, "got {compound:?}");
+        assert_eq!(compound[0].size, Some(Size::Usd(5000.0)));
+        assert_eq!(compound[0].direction, None);
+        assert_eq!(compound[1].size, Some(Size::Usd(5000.0)));
+        assert_eq!(compound[1].direction, Some(Direction::Short));
+    }
+
+    #[test]
     fn shorthand_and_verbless_entries_classify() {
         let rules = default_rules();
 
