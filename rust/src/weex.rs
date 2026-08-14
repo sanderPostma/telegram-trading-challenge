@@ -160,6 +160,10 @@ pub struct WeexPositionSnapshot {
 pub struct WeexExecutionSnapshot {
     pub exec_id: String,
     pub order_id: String,
+    /// The contract this fill belongs to. Needed once more than one book can
+    /// be open: without it, reconciliation cannot tell an ETH fill from a BTC
+    /// one and would apply both to the same position.
+    pub symbol: String,
     pub side: String,
     pub position_side: String,
     pub kind: String,
@@ -227,6 +231,8 @@ struct ContractTicker {
 struct ContractTrade {
     id: Value,
     order_id: Value,
+    #[serde(default)]
+    symbol: String,
     #[serde(default)]
     price: String,
     #[serde(default)]
@@ -785,6 +791,7 @@ impl SignedRestClient {
                 WeexExecutionSnapshot {
                     exec_id: json_id_to_string(&trade.id),
                     order_id: json_id_to_string(&trade.order_id),
+                    symbol: trade.symbol.to_uppercase(),
                     side: if trade.side.eq_ignore_ascii_case("BUY") {
                         "buy".to_string()
                     } else {
@@ -1648,6 +1655,7 @@ mod tests {
     fn test_execution(id: &str, side: &str, qty: f64) -> WeexExecutionSnapshot {
         WeexExecutionSnapshot {
             exec_id: id.to_string(),
+            symbol: "BTCUSDT".to_string(),
             order_id: id.to_string(),
             side: side.to_lowercase(),
             position_side: if side.eq_ignore_ascii_case("SELL") {

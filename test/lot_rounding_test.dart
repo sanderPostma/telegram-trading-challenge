@@ -23,13 +23,13 @@ void main() {
           unrealizedPnlUsd: 0,
         );
 
-      final reduceBtc = controller.previewManualReduceBtc(
+      final reduceQty = controller.previewManualReduceQty(
         amount: 100,
         unit: SizeUnit.usdt,
         isPercent: true,
       );
       expect(
-        reduceBtc,
+        reduceQty,
         closeTo(qty, 1e-9),
         reason: '100% reduce of $qty BTC must leave no dust',
       );

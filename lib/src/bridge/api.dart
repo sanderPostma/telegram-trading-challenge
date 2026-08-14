@@ -189,12 +189,22 @@ Future<ApiResultString> validatePatternsYaml({required String patternsYaml}) =>
 Future<ApiResultString> mergePatternsYaml({required String baseYaml, required String localYaml}) =>
     RustLib.instance.api.crateApiMergePatternsYaml(baseYaml: baseYaml, localYaml: localYaml);
 
+/// Classifies a message against `patterns_yaml`.
+///
+/// `active_assets` are the books with open exposure. They matter because a
+/// message that names no asset ("REDUCED 25%") inherits one — and when more
+/// than one book is live that reference is ambiguous, so the action comes back
+/// with no asset and needs manual review rather than a guess.
 Future<ApiResultActions> classifyMessageActionsWithPatterns({
   required String text,
   required String patternsYaml,
+  required List<Asset> activeAssets,
+  Asset? lastAsset,
 }) => RustLib.instance.api.crateApiClassifyMessageActionsWithPatterns(
   text: text,
   patternsYaml: patternsYaml,
+  activeAssets: activeAssets,
+  lastAsset: lastAsset,
 );
 
 Future<ApiResultScaledOrder> scaleManualOrder({required ManualScaleRequest request}) =>

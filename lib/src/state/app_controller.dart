@@ -92,6 +92,18 @@ class AppController extends ChangeNotifier {
 
   AssetBook bookFor(Asset asset) => books[asset] ?? AssetBook(asset: asset);
 
+  /// Switches which book the detail panels act on. Signals are unaffected —
+  /// they are routed by the asset named in the message.
+  void selectAsset(Asset asset) {
+    if (selectedAsset == asset) return;
+    selectedAsset = asset;
+    // The manual-trade path reads config.markPrice, so it has to follow the
+    // selection or a manual order would be sized off the other book's price.
+    final mark = bookFor(asset).markPrice;
+    if (mark > 0) config = config.copyWith(markPrice: mark);
+    notifyListeners();
+  }
+
   AssetBook get selectedBook => bookFor(selectedAsset);
 
   void _updateBook(Asset asset, AssetBook Function(AssetBook) update) {
@@ -129,6 +141,9 @@ class AppController extends ChangeNotifier {
   bool _weexRestPollInFlight = false;
   Future<void>? _weexReconcile;
   bool _hasExchangePnlBaseline = false;
+  /// The asset of the most recent actionable signal, used to resolve a
+  /// follow-up message that names none while the account is flat.
+  Asset? _lastSignalAsset;
   final Map<Asset, String> _lastWeexPriceSource = {};
   final Map<Asset, DateTime> _lastWeexPriceAt = {};
   final Map<Asset, DateTime> _lastWeexPriceLogAt = {};
@@ -549,7 +564,7 @@ class AppController extends ChangeNotifier {
     final order = rustScaled == null
         ? fallbackOrder
         : fallbackOrder.copyWithScaled(
-            scaledBtc: rustScaled.qty,
+            scaledQty: rustScaled.qty,
             scaledNotionalUsd: rustScaled.notionalUsd,
           );
 
@@ -559,7 +574,7 @@ class AppController extends ChangeNotifier {
     }
     _reservedIds.add(order.id);
     _log(
-      'Manual trade scaled: ${order.scaledBtc.toStringAsFixed(4)} BTC, ${order.scaledNotionalUsd.toStringAsFixed(2)} USDT.',
+      'Manual trade scaled: ${order.scaledQty.toStringAsFixed(4)} BTC, ${order.scaledNotionalUsd.toStringAsFixed(2)} USDT.',
     );
 
     if (config.autoApprove) {
@@ -577,7 +592,7 @@ class AppController extends ChangeNotifier {
   /// scales the master's size to our book — a manual reduce acts directly on our
   /// own position: a percentage is relative to what we hold, and USDT/BTC are
   /// our own book units. Returns 0 when there is nothing to reduce.
-  double previewManualReduceBtc({
+  double previewManualReduceQty({
     required double amount,
     required SizeUnit unit,
     required bool isPercent,
@@ -611,7 +626,7 @@ class AppController extends ChangeNotifier {
       _log('Manual reduce rejected: waiting for live WEEX BTC price.');
       return;
     }
-    final quantity = previewManualReduceBtc(
+    final quantity = previewManualReduceQty(
       amount: amount,
       unit: unit,
       isPercent: isPercent,
@@ -638,10 +653,11 @@ class AppController extends ChangeNotifier {
     final order = PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
       kind: TradeKind.reduce,
+      asset: selectedAsset,
       direction: position.direction!,
       sourceAmount: quantity,
       sourceUnit: SizeUnit.coin,
-      scaledBtc: quantity,
+      scaledQty: quantity,
       scaledNotionalUsd: quantity * mark,
       markPrice: mark,
       createdAt: DateTime.now(),
@@ -730,6 +746,10 @@ class AppController extends ChangeNotifier {
       final result = await rust.classifyMessageActionsWithPatterns(
         text: rawText,
         patternsYaml: patternsYaml,
+        // Which books are live decides whether an unqualified "REDUCED 25%"
+        // can be resolved at all; Rust refuses to guess when both are open.
+        activeAssets: openAssets,
+        lastAsset: _lastSignalAsset,
       );
       final actions = result.value;
       if (!result.ok || actions == null || actions.isEmpty) {
@@ -798,6 +818,19 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.rejected;
     }
 
+    // Rust resolves the asset, inheriting it from the live book when the
+    // message omits one and refusing to guess when two books are open. A null
+    // here is that refusal, not a parse gap, so it must not be defaulted.
+    final asset = action.asset;
+    if (asset == null) {
+      _log(
+        'Telegram needs review: $summary — the message names no asset and '
+        '${openAssets.length > 1 ? 'both books are open' : 'no book is live'}, '
+        'so it is ambiguous.',
+      );
+      return rust_telegram.TelegramActionStatus.rejected;
+    }
+
     final requiresPositionDirection =
         kind == TradeKind.add && action.direction == null ||
         kind == TradeKind.reduce;
@@ -805,18 +838,21 @@ class AppController extends ChangeNotifier {
       await _refreshExchangePositionForTelegramAction();
     }
 
+    _lastSignalAsset = asset;
+    final signalPosition = positionFor(asset);
     final explicitDirection = _tradeDirectionFromParsed(action.direction);
     final direction = kind == TradeKind.reduce
-        ? position.direction
+        ? signalPosition.direction
         : explicitDirection ?? _inferredTelegramDirection();
     if (explicitDirection == null && direction != null) {
       _log(
-        'Telegram direction inferred as ${direction.name.toUpperCase()} from ${position.isFlat ? 'latest trade history' : 'current WEEX position'}.',
+        'Telegram direction inferred as ${direction.name.toUpperCase()} from ${signalPosition.isFlat ? 'latest trade history' : 'current WEEX position'}.',
       );
     }
 
     final order = switch (kind) {
       TradeKind.reduce => _buildParsedReductionOrder(
+        asset: asset,
         direction: direction,
         size: action.size,
         source: 'Telegram $channel: $summary',
@@ -824,6 +860,7 @@ class AppController extends ChangeNotifier {
       ),
       _ => _buildParsedEntryOrAddOrder(
         kind: kind,
+        asset: asset,
         direction: direction,
         size: _sizeFromParsed(action.size),
         triggerPrice: action.triggerPrice,
@@ -835,12 +872,13 @@ class AppController extends ChangeNotifier {
       _log('Telegram needs review: $summary.');
       return rust_telegram.TelegramActionStatus.rejected;
     }
-    if (config.markPrice <= 0) {
-      _log('Telegram trade skipped: waiting for live WEEX BTC price.');
+    if (bookFor(asset).markPrice <= 0) {
+      _log('Telegram trade skipped: waiting for live WEEX '
+          '${displayOf(asset)} price.');
       return rust_telegram.TelegramActionStatus.failed;
     }
 
-    if (order.scaledBtc <= 0 || order.scaledNotionalUsd <= 0) {
+    if (order.scaledQty <= 0 || order.scaledNotionalUsd <= 0) {
       await AppLog.write(
         'Telegram scaled order rejected: ${_describe(order)} from $summary.',
       );
@@ -899,10 +937,11 @@ class AppController extends ChangeNotifier {
     final order = PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
       kind: TradeKind.close,
+      asset: selectedAsset,
       direction: position.direction!,
       sourceAmount: quantity,
       sourceUnit: SizeUnit.coin,
-      scaledBtc: quantity,
+      scaledQty: quantity,
       scaledNotionalUsd: quantity * mark,
       markPrice: mark,
       createdAt: DateTime.now(),
@@ -1586,10 +1625,11 @@ class AppController extends ChangeNotifier {
       final order = PlannedOrder(
         id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
         kind: TradeKind.close,
+        asset: selectedAsset,
         direction: position.direction!,
         sourceAmount: quantity,
         sourceUnit: SizeUnit.coin,
-        scaledBtc: quantity,
+        scaledQty: quantity,
         scaledNotionalUsd: quantity * mark,
         markPrice: mark,
         createdAt: DateTime.now(),
@@ -2342,6 +2382,7 @@ class AppController extends ChangeNotifier {
   PlannedOrder _buildOrder({
     required TradeKind kind,
     required TradeDirection direction,
+    Asset? asset,
     required double sourceAmount,
     required SizeUnit sourceUnit,
     required String source,
@@ -2349,25 +2390,31 @@ class AppController extends ChangeNotifier {
     double? triggerPrice,
     String? dedupKey,
   }) {
+    final orderAsset = asset ?? selectedAsset;
     final ratio = config.scaleRatio;
-    final mark = config.markPrice;
-    final scaledBtc = sourceUnit == SizeUnit.coin
+    // Price and lot step both come from the order's own book: sizing an ETH
+    // order off the BTC mark, or rounding it to BTC's finer step, would submit
+    // a quantity the exchange either rejects or fills at the wrong size.
+    final book = bookFor(orderAsset);
+    final mark = book.markPrice > 0 ? book.markPrice : config.markPrice;
+    final scaledQty = sourceUnit == SizeUnit.coin
         ? sourceAmount * ratio
         : mark > 0
         ? (sourceAmount * ratio) / mark
         : 0.0;
-    final roundedBtc = _roundDown(scaledBtc, 0.0001);
+    final roundedQty = _roundDown(scaledQty, lotStepFor(orderAsset));
     final notionalPrice = triggerPrice ?? mark;
-    final notional = notionalPrice > 0 ? roundedBtc * notionalPrice : 0.0;
+    final notional = notionalPrice > 0 ? roundedQty * notionalPrice : 0.0;
     final now = DateTime.now();
     final nonce = '${now.microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
     return PlannedOrder(
       id: nonce,
       kind: kind,
+      asset: orderAsset,
       direction: direction,
       sourceAmount: sourceAmount,
       sourceUnit: sourceUnit,
-      scaledBtc: roundedBtc,
+      scaledQty: roundedQty,
       scaledNotionalUsd: notional,
       markPrice: mark,
       createdAt: now,
@@ -2380,6 +2427,7 @@ class AppController extends ChangeNotifier {
 
   PlannedOrder? _buildParsedEntryOrAddOrder({
     required TradeKind kind,
+    required Asset asset,
     required TradeDirection? direction,
     required (double, SizeUnit)? size,
     required double? triggerPrice,
@@ -2392,6 +2440,7 @@ class AppController extends ChangeNotifier {
     }
     return _buildOrder(
       kind: kind,
+      asset: asset,
       direction: direction,
       sourceAmount: size.$1,
       sourceUnit: size.$2,
@@ -2405,6 +2454,7 @@ class AppController extends ChangeNotifier {
   }
 
   PlannedOrder? _buildParsedReductionOrder({
+    required Asset asset,
     required TradeDirection? direction,
     required rust_interpreter.Size? size,
     required String source,
@@ -2412,15 +2462,20 @@ class AppController extends ChangeNotifier {
   }) {
     if (direction == null) return null;
     // A reduction only makes sense against a live position on the same side;
-    // a stray "REDUCED …" with no matching position never trades.
+    // a stray "REDUCED …" with no matching position never trades. This reads
+    // the signal's own book, not the selected one — reducing whichever asset
+    // the user happens to be looking at would be the wrong position entirely.
+    final book = bookFor(asset);
+    final position = book.position;
     if (position.isFlat ||
         position.direction != direction ||
         position.qty <= 0) {
       return null;
     }
-    final mark = config.markPrice;
+    final mark = book.markPrice;
+    final step = lotStepFor(asset);
     // The channel expresses reductions as a percentage of the position, or as
-    // a dollar / BTC amount of the master's book. Dollar and BTC amounts are
+    // a dollar / coin amount of the master's book. Dollar and coin amounts are
     // scaled like adds and capped at what we actually hold; percentages are
     // relative to our own position and need no scaling. Reductions are always
     // reduce-only, so overshooting simply flattens.
@@ -2428,14 +2483,14 @@ class AppController extends ChangeNotifier {
       rust_interpreter.Size_Pct(:final field0)
           when field0 > 0 && field0 <= 1 =>
         (
-          _roundDown(position.qty * field0, 0.0001),
+          _roundDown(position.qty * field0, step),
           'reduce ${(field0 * 100).toStringAsFixed(0)}%',
         ),
       rust_interpreter.Size_Usdt(:final field0) when field0 > 0 && mark > 0 =>
         (
           _roundDown(
             min((field0 * config.scaleRatio) / mark, position.qty),
-            0.0001,
+            step,
           ),
           'reduce \$${field0.toStringAsFixed(0)}',
         ),
@@ -2443,9 +2498,9 @@ class AppController extends ChangeNotifier {
         (
           _roundDown(
             min(field0 * config.scaleRatio, position.qty),
-            0.0001,
+            step,
           ),
-          'reduce ${field0.toStringAsFixed(4)} BTC',
+          'reduce ${field0.toStringAsFixed(4)} ${displayOf(asset)}',
         ),
       _ => (0.0, ''),
     };
@@ -2453,10 +2508,11 @@ class AppController extends ChangeNotifier {
     return PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
       kind: TradeKind.reduce,
+      asset: asset,
       direction: direction,
       sourceAmount: quantity,
       sourceUnit: SizeUnit.coin,
-      scaledBtc: quantity,
+      scaledQty: quantity,
       scaledNotionalUsd: quantity * mark,
       markPrice: mark,
       createdAt: DateTime.now(),
@@ -2523,7 +2579,7 @@ class AppController extends ChangeNotifier {
       final triggerPrice = order.triggerPrice!;
       final orderType = _conditionalOrderType(order.direction, triggerPrice);
       _log(
-        'Submitting WEEX $orderType LIMIT $side ${order.scaledBtc.toStringAsFixed(4)} BTC at trigger ${triggerPrice.toStringAsFixed(2)} USDT, simulation OFF.',
+        'Submitting WEEX $orderType LIMIT $side ${order.scaledQty.toStringAsFixed(4)} BTC at trigger ${triggerPrice.toStringAsFixed(2)} USDT, simulation OFF.',
       );
       try {
         final result = await rust.weexSubmitAlgoOrder(
@@ -2534,7 +2590,7 @@ class AppController extends ChangeNotifier {
             symbol: 'BTCUSDT',
             baseUrl: 'https://api-contract.weex.com',
             side: side,
-            qty: order.scaledBtc,
+            qty: order.scaledQty,
             triggerPrice: triggerPrice,
             limitPrice: triggerPrice,
             orderType: orderType,
@@ -2554,7 +2610,7 @@ class AppController extends ChangeNotifier {
       }
     }
     _log(
-      'Submitting WEEX MARKET $side ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), reduce_only=$reduceOnly, simulation OFF.',
+      'Submitting WEEX MARKET $side ${order.scaledQty.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), reduce_only=$reduceOnly, simulation OFF.',
     );
     try {
       final result = await rust.weexSubmitMarketOrder(
@@ -2565,7 +2621,7 @@ class AppController extends ChangeNotifier {
           symbol: 'BTCUSDT',
           baseUrl: 'https://api-contract.weex.com',
           side: side,
-          qty: order.scaledBtc,
+          qty: order.scaledQty,
           reduceOnly: reduceOnly,
           clientOrderId: order.exchangeClientOrderId,
           qtyStep: 0.0001,
@@ -2602,7 +2658,7 @@ class AppController extends ChangeNotifier {
 
   void _applyLocallyPlacedOrder(PlannedOrder order) {
     if (order.kind == TradeKind.reduce || order.kind == TradeKind.close) {
-      final remaining = (position.qty - order.scaledBtc).clamp(
+      final remaining = (position.qty - order.scaledQty).clamp(
         0.0,
         double.infinity,
       );
@@ -2620,8 +2676,8 @@ class AppController extends ChangeNotifier {
     final sameDirection =
         position.direction == order.direction && !position.isFlat;
     final quantity = sameDirection
-        ? position.qty + order.scaledBtc
-        : order.scaledBtc;
+        ? position.qty + order.scaledQty
+        : order.scaledQty;
     final notional = sameDirection
         ? position.notionalUsd + order.scaledNotionalUsd
         : order.scaledNotionalUsd;
@@ -2923,10 +2979,14 @@ class AppController extends ChangeNotifier {
         PlannedOrder(
           id: id,
           kind: _kindFromExchange(execution.kind),
+          asset: Asset.values.firstWhere(
+            (a) => symbolOf(a) == execution.symbol.toUpperCase(),
+            orElse: () => selectedAsset,
+          ),
           direction: direction,
           sourceAmount: execution.qty,
           sourceUnit: SizeUnit.coin,
-          scaledBtc: execution.qty,
+          scaledQty: execution.qty,
           scaledNotionalUsd: execution.notionalUsdt,
           markPrice: execution.price,
           createdAt: DateTime.fromMillisecondsSinceEpoch(execution.timestampMs),
@@ -3103,7 +3163,7 @@ class AppController extends ChangeNotifier {
     final trigger = order.triggerPrice == null
         ? ''
         : ' limit trigger ${order.triggerPrice!.toStringAsFixed(2)} USDT';
-    return '${order.direction.name.toUpperCase()} ${order.scaledBtc.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)$trigger';
+    return '${order.direction.name.toUpperCase()} ${order.scaledQty.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)$trigger';
   }
 
   @override

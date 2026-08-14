@@ -163,7 +163,11 @@ class _AppShellState extends State<AppShell> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _kv('Side', order.direction.name.toUpperCase()),
-              _kv('Scaled size', '${order.scaledBtc.toStringAsFixed(4)} BTC'),
+              _kv(
+                'Scaled size',
+                '${order.scaledQty.toStringAsFixed(4)} '
+                    '${order.asset.name.toUpperCase()}',
+              ),
               _kv(
                 'Notional',
                 '${order.scaledNotionalUsd.toStringAsFixed(2)} USDT',
@@ -226,7 +230,11 @@ class _AppShellState extends State<AppShell> {
                   ),
                   _kv('Live price', '${live.toStringAsFixed(2)} USDT'),
                   _kv('Side', position.direction?.name.toUpperCase() ?? 'FLAT'),
-                  _kv('Size', '${position.qty.toStringAsFixed(4)} BTC'),
+                  _kv(
+                    'Size',
+                    '${position.qty.toStringAsFixed(4)} '
+                        '${controller.selectedAsset.name.toUpperCase()}',
+                  ),
                   _kv(
                     'Unrealized P&L',
                     '${position.unrealizedPnlUsd.toStringAsFixed(2)} USDT',

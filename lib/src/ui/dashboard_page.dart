@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../bridge/interpreter.dart' show Asset;
 import '../models/trading.dart';
 import '../state/app_controller.dart';
 import '../theme.dart';
@@ -160,6 +161,8 @@ class _DashboardPageState extends State<DashboardPage> {
               children: [
                 AccountScalingPanel(controller: widget.controller),
                 const SizedBox(height: 16),
+                _PositionsTable(controller: widget.controller),
+                const SizedBox(height: 16),
                 if (isDesktop)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -200,7 +203,7 @@ class _DashboardPageState extends State<DashboardPage> {
               runSpacing: 12,
               children: [
                 _StatCard(
-                  title: 'WEEX BTC live',
+                  title: 'WEEX ${widget.controller.displayOf(widget.controller.selectedAsset)} live',
                   value: _weexPriceValue(widget.controller),
                   icon: Icons.show_chart,
                 ),
@@ -473,9 +476,12 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<SizeUnit>(
-                segments: const [
-                  ButtonSegment(value: SizeUnit.usdt, label: Text('USDT')),
-                  ButtonSegment(value: SizeUnit.coin, label: Text('BTC')),
+                segments: [
+                  const ButtonSegment(value: SizeUnit.usdt, label: Text('USDT')),
+                  ButtonSegment(
+                    value: SizeUnit.coin,
+                    label: Text(widget.controller.displayOf(widget.controller.selectedAsset)),
+                  ),
                 ],
                 selected: {_unit},
                 onSelectionChanged: (value) =>
@@ -506,7 +512,10 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
                 spacing: 20,
                 runSpacing: 8,
                 children: [
-                  _Metric('Scaled BTC', preview.scaledBtc.toStringAsFixed(4)),
+                  _Metric(
+                    'Scaled ${widget.controller.displayOf(widget.controller.selectedAsset)}',
+                    preview.scaledQty.toStringAsFixed(4),
+                  ),
                   _Metric(
                     'Scaled USDT',
                     preview.scaledNotionalUsd.toStringAsFixed(2),
@@ -567,7 +576,7 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
 
 /// Reduce mode for [ManualReducePanel]. `percent` reduces a share of the open
 /// position; `usdt`/`btc` reduce a fixed amount of our own book.
-enum _ReduceMode { percent, usdt, btc }
+enum _ReduceMode { percent, usdt, coin }
 
 /// One-line status strip with a cancel action, used for the resting exchange
 /// take-profit and the app-side close-watch.
@@ -631,7 +640,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
   }
 
   SizeUnit get _unit =>
-      _mode == _ReduceMode.btc ? SizeUnit.coin : SizeUnit.usdt;
+      _mode == _ReduceMode.coin ? SizeUnit.coin : SizeUnit.usdt;
   bool get _isPercent => _mode == _ReduceMode.percent;
 
   @override
@@ -642,15 +651,15 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
     final takeProfit = controller.exchangeTakeProfit;
     final flat = position.isFlat || position.qty <= 0;
     final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
-    final reduceBtc = controller.previewManualReduceBtc(
+    final reduceQty = controller.previewManualReduceQty(
       amount: amount,
       unit: _unit,
       isPercent: _isPercent,
     );
-    final reduceUsd = reduceBtc * controller.config.markPrice;
-    final remaining = (position.qty - reduceBtc).clamp(0.0, double.infinity);
+    final reduceUsd = reduceQty * controller.config.markPrice;
+    final remaining = (position.qty - reduceQty).clamp(0.0, double.infinity);
     final pctOfPosition = position.qty > 0
-        ? (reduceBtc / position.qty) * 100
+        ? (reduceQty / position.qty) * 100
         : 0.0;
 
     return Card(
@@ -675,7 +684,10 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
             Text(
               flat
                   ? 'No open position to reduce.'
-                  : 'Open ${position.direction!.name.toUpperCase()} ${position.qty.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
+                  : 'Open ${position.direction!.name.toUpperCase()} '
+                        '${position.qty.toStringAsFixed(4)} '
+                        '${widget.controller.displayOf(widget.controller.selectedAsset)} '
+                        '(${position.notionalUsd.toStringAsFixed(2)} USDT).',
               style: const TextStyle(color: Brand.muted, fontSize: 12),
             ),
             // A resting exchange plan closes on its own; the app-side watch
@@ -703,10 +715,15 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
             SizedBox(
               width: double.infinity,
               child: SegmentedButton<_ReduceMode>(
-                segments: const [
-                  ButtonSegment(value: _ReduceMode.percent, label: Text('%')),
-                  ButtonSegment(value: _ReduceMode.usdt, label: Text('USDT')),
-                  ButtonSegment(value: _ReduceMode.btc, label: Text('BTC')),
+                segments: [
+                  const ButtonSegment(
+                      value: _ReduceMode.percent, label: Text('%')),
+                  const ButtonSegment(
+                      value: _ReduceMode.usdt, label: Text('USDT')),
+                  ButtonSegment(
+                    value: _ReduceMode.coin,
+                    label: Text(widget.controller.displayOf(widget.controller.selectedAsset)),
+                  ),
                 ],
                 selected: {_mode},
                 onSelectionChanged: flat
@@ -725,7 +742,8 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
                 labelText: switch (_mode) {
                   _ReduceMode.percent => 'Percent of position',
                   _ReduceMode.usdt => 'Reduce USDT',
-                  _ReduceMode.btc => 'Reduce BTC',
+                  _ReduceMode.coin =>
+                    'Reduce ${widget.controller.displayOf(widget.controller.selectedAsset)}',
                 },
               ),
               onChanged: (_) => setState(() {}),
@@ -758,10 +776,16 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
                 spacing: 20,
                 runSpacing: 8,
                 children: [
-                  _Metric('Reduce BTC', reduceBtc.toStringAsFixed(4)),
+                  _Metric(
+                    'Reduce ${widget.controller.displayOf(widget.controller.selectedAsset)}',
+                    reduceQty.toStringAsFixed(4),
+                  ),
                   _Metric('Reduce USDT', reduceUsd.toStringAsFixed(2)),
                   _Metric('% of position', '${pctOfPosition.toStringAsFixed(0)}%'),
-                  _Metric('Remaining BTC', remaining.toStringAsFixed(4)),
+                  _Metric(
+                    'Remaining ${widget.controller.displayOf(widget.controller.selectedAsset)}',
+                    remaining.toStringAsFixed(4),
+                  ),
                 ],
               ),
             ),
@@ -771,7 +795,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
                 final narrow = constraints.maxWidth < 280;
                 final reduceBtn = FilledButton.icon(
                   style: FilledButton.styleFrom(backgroundColor: Brand.danger),
-                  onPressed: (flat || reduceBtc <= 0) ? null : _reduce,
+                  onPressed: (flat || reduceQty <= 0) ? null : _reduce,
                   icon: const Icon(Icons.remove),
                   label: const Text('Reduce', softWrap: false),
                 );
@@ -913,7 +937,11 @@ class _PositionPanel extends StatelessWidget {
               position.direction?.name.toUpperCase() ?? 'FLAT',
             ),
             const SizedBox(height: 10),
-            _Metric('Quantity', '${position.qty.toStringAsFixed(4)} BTC'),
+            _Metric(
+              'Quantity',
+              '${position.qty.toStringAsFixed(4)} '
+                  '${controller.displayOf(controller.selectedAsset)}',
+            ),
             const SizedBox(height: 10),
             _Metric(
               'Notional',
@@ -1269,4 +1297,119 @@ String _weexPriceValue(AppController controller) {
     WeexPriceStatus.live => 'Waiting',
     WeexPriceStatus.unavailable => 'Unavailable',
   };
+}
+
+/// All books at a glance, with the selected row driving the detail panels
+/// below. BTC and ETH can be open at once, so a single-position view would
+/// hide half of the account's exposure.
+class _PositionsTable extends StatelessWidget {
+  const _PositionsTable({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Positions', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(
+              'Select an asset to act on it below.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            for (final asset in Asset.values)
+              _PositionRow(
+                controller: controller,
+                asset: asset,
+                selected: controller.selectedAsset == asset,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PositionRow extends StatelessWidget {
+  const _PositionRow({
+    required this.controller,
+    required this.asset,
+    required this.selected,
+  });
+
+  final AppController controller;
+  final Asset asset;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final book = controller.bookFor(asset);
+    final position = book.position;
+    final display = controller.displayOf(asset);
+    final step = controller.lotStepFor(asset);
+    // Quantity precision follows the asset's own lot step, so ETH is not shown
+    // with two digits of noise it cannot actually trade in.
+    final decimals = step >= 1 ? 0 : step.toString().split('.').last.length;
+    final pnl = position.unrealizedPnlUsd;
+    final pnlColor = pnl == 0
+        ? theme.colorScheme.onSurfaceVariant
+        : (pnl > 0 ? Colors.green.shade700 : theme.colorScheme.error);
+
+    return InkWell(
+      onTap: () => controller.selectAsset(asset),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primary.withValues(alpha: 0.08)
+              : null,
+          border: Border(
+            left: BorderSide(
+              width: 3,
+              color: selected ? theme.colorScheme.primary : Colors.transparent,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 56,
+              child: Text(display, style: theme.textTheme.titleSmall),
+            ),
+            Expanded(
+              child: Text(
+                position.isFlat
+                    ? 'Flat'
+                    : '${position.direction!.name.toUpperCase()} '
+                        '${position.qty.toStringAsFixed(decimals)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                book.markPrice > 0
+                    ? book.markPrice.toStringAsFixed(2)
+                    : '—',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            Expanded(
+              child: Text(
+                position.isFlat ? '—' : '${pnl.toStringAsFixed(2)} USDT',
+                textAlign: TextAlign.end,
+                style: theme.textTheme.bodyMedium?.copyWith(color: pnlColor),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -234,6 +234,8 @@ fn wire__crate__api__classify_message_actions_with_patterns_impl(
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_text = <String>::sse_decode(&mut deserializer);
             let api_patterns_yaml = <String>::sse_decode(&mut deserializer);
+            let api_active_assets = <Vec<crate::interpreter::Asset>>::sse_decode(&mut deserializer);
+            let api_last_asset = <Option<crate::interpreter::Asset>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, ()>((move || {
@@ -241,6 +243,8 @@ fn wire__crate__api__classify_message_actions_with_patterns_impl(
                         Result::<_, ()>::Ok(crate::api::classify_message_actions_with_patterns(
                             api_text,
                             api_patterns_yaml,
+                            api_active_assets,
+                            api_last_asset,
                         ))?;
                     Ok(output_ok)
                 })())
@@ -1973,6 +1977,18 @@ impl SseDecode for Vec<crate::interpreter::Action> {
     }
 }
 
+impl SseDecode for Vec<crate::interpreter::Asset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::interpreter::Asset>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::api::AssetSpec> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2585,6 +2601,7 @@ impl SseDecode for crate::weex::WeexExecutionSnapshot {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_execId = <String>::sse_decode(deserializer);
         let mut var_orderId = <String>::sse_decode(deserializer);
+        let mut var_symbol = <String>::sse_decode(deserializer);
         let mut var_side = <String>::sse_decode(deserializer);
         let mut var_positionSide = <String>::sse_decode(deserializer);
         let mut var_kind = <String>::sse_decode(deserializer);
@@ -2598,6 +2615,7 @@ impl SseDecode for crate::weex::WeexExecutionSnapshot {
         return crate::weex::WeexExecutionSnapshot {
             exec_id: var_execId,
             order_id: var_orderId,
+            symbol: var_symbol,
             side: var_side,
             position_side: var_positionSide,
             kind: var_kind,
@@ -3572,6 +3590,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexExecutionSnapshot {
         [
             self.exec_id.into_into_dart().into_dart(),
             self.order_id.into_into_dart().into_dart(),
+            self.symbol.into_into_dart().into_dart(),
             self.side.into_into_dart().into_dart(),
             self.position_side.into_into_dart().into_dart(),
             self.kind.into_into_dart().into_dart(),
@@ -3995,6 +4014,16 @@ impl SseEncode for Vec<crate::interpreter::Action> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::interpreter::Action>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::interpreter::Asset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::interpreter::Asset>::sse_encode(item, serializer);
         }
     }
 }
@@ -4465,6 +4494,7 @@ impl SseEncode for crate::weex::WeexExecutionSnapshot {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.exec_id, serializer);
         <String>::sse_encode(self.order_id, serializer);
+        <String>::sse_encode(self.symbol, serializer);
         <String>::sse_encode(self.side, serializer);
         <String>::sse_encode(self.position_side, serializer);
         <String>::sse_encode(self.kind, serializer);

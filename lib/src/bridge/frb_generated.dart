@@ -90,6 +90,8 @@ abstract class RustLibApi extends BaseApi {
   Future<ApiResultActions> crateApiClassifyMessageActionsWithPatterns({
     required String text,
     required String patternsYaml,
+    required List<Asset> activeAssets,
+    Asset? lastAsset,
   });
 
   Future<bool> crateApiCloseTargetShouldFire({
@@ -335,6 +337,8 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   Future<ApiResultActions> crateApiClassifyMessageActionsWithPatterns({
     required String text,
     required String patternsYaml,
+    required List<Asset> activeAssets,
+    Asset? lastAsset,
   }) {
     return handler.executeNormal(
       NormalTask(
@@ -342,11 +346,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(text, serializer);
           sse_encode_String(patternsYaml, serializer);
+          sse_encode_list_asset(activeAssets, serializer);
+          sse_encode_opt_box_autoadd_asset(lastAsset, serializer);
           pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 6, port: port_);
         },
         codec: SseCodec(decodeSuccessData: sse_decode_api_result_actions, decodeErrorData: null),
         constMeta: kCrateApiClassifyMessageActionsWithPatternsConstMeta,
-        argValues: [text, patternsYaml],
+        argValues: [text, patternsYaml, activeAssets, lastAsset],
         apiImpl: this,
       ),
     );
@@ -354,7 +360,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiClassifyMessageActionsWithPatternsConstMeta => const TaskConstMeta(
     debugName: "classify_message_actions_with_patterns",
-    argNames: ["text", "patternsYaml"],
+    argNames: ["text", "patternsYaml", "activeAssets", "lastAsset"],
   );
 
   @override
@@ -1624,6 +1630,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<Asset> dco_decode_list_asset(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_asset).toList();
+  }
+
+  @protected
   List<AssetSpec> dco_decode_list_asset_spec(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_asset_spec).toList();
@@ -2017,20 +2029,21 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   WeexExecutionSnapshot dco_decode_weex_execution_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 12) throw Exception('unexpected arr length: expect 12 but see ${arr.length}');
+    if (arr.length != 13) throw Exception('unexpected arr length: expect 13 but see ${arr.length}');
     return WeexExecutionSnapshot(
       execId: dco_decode_String(arr[0]),
       orderId: dco_decode_String(arr[1]),
-      side: dco_decode_String(arr[2]),
-      positionSide: dco_decode_String(arr[3]),
-      kind: dco_decode_String(arr[4]),
-      direction: dco_decode_String(arr[5]),
-      price: dco_decode_f_64(arr[6]),
-      qty: dco_decode_f_64(arr[7]),
-      notionalUsdt: dco_decode_f_64(arr[8]),
-      realizedPnlUsdt: dco_decode_f_64(arr[9]),
-      feeUsdt: dco_decode_f_64(arr[10]),
-      timestampMs: dco_decode_i_64(arr[11]),
+      symbol: dco_decode_String(arr[2]),
+      side: dco_decode_String(arr[3]),
+      positionSide: dco_decode_String(arr[4]),
+      kind: dco_decode_String(arr[5]),
+      direction: dco_decode_String(arr[6]),
+      price: dco_decode_f_64(arr[7]),
+      qty: dco_decode_f_64(arr[8]),
+      notionalUsdt: dco_decode_f_64(arr[9]),
+      realizedPnlUsdt: dco_decode_f_64(arr[10]),
+      feeUsdt: dco_decode_f_64(arr[11]),
+      timestampMs: dco_decode_i_64(arr[12]),
     );
   }
 
@@ -2507,6 +2520,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     var ans_ = <Action>[];
     for (var idx_ = 0; idx_ < len_; ++idx_) {
       ans_.add(sse_decode_action(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
+  List<Asset> sse_decode_list_asset(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <Asset>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_asset(deserializer));
     }
     return ans_;
   }
@@ -3077,6 +3102,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_execId = sse_decode_String(deserializer);
     var var_orderId = sse_decode_String(deserializer);
+    var var_symbol = sse_decode_String(deserializer);
     var var_side = sse_decode_String(deserializer);
     var var_positionSide = sse_decode_String(deserializer);
     var var_kind = sse_decode_String(deserializer);
@@ -3090,6 +3116,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     return WeexExecutionSnapshot(
       execId: var_execId,
       orderId: var_orderId,
+      symbol: var_symbol,
       side: var_side,
       positionSide: var_positionSide,
       kind: var_kind,
@@ -3620,6 +3647,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_asset(List<Asset> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_asset(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_asset_spec(List<AssetSpec> self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_i_32(self.length, serializer);
@@ -4048,6 +4084,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.execId, serializer);
     sse_encode_String(self.orderId, serializer);
+    sse_encode_String(self.symbol, serializer);
     sse_encode_String(self.side, serializer);
     sse_encode_String(self.positionSide, serializer);
     sse_encode_String(self.kind, serializer);

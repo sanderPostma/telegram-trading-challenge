@@ -516,10 +516,11 @@ class PlannedOrder {
   const PlannedOrder({
     required this.id,
     required this.kind,
+    required this.asset,
     required this.direction,
     required this.sourceAmount,
     required this.sourceUnit,
-    required this.scaledBtc,
+    required this.scaledQty,
     required this.scaledNotionalUsd,
     required this.markPrice,
     required this.createdAt,
@@ -531,10 +532,15 @@ class PlannedOrder {
 
   final String id;
   final TradeKind kind;
+
+  /// The book this order belongs to. Carried on the order itself so an
+  /// approval dialog names the asset the signal asked for, not whichever book
+  /// the user happens to be looking at.
+  final Asset asset;
   final TradeDirection direction;
   final double sourceAmount;
   final SizeUnit sourceUnit;
-  final double scaledBtc;
+  final double scaledQty;
   final double scaledNotionalUsd;
   final double markPrice;
   final DateTime createdAt;
@@ -571,10 +577,11 @@ class PlannedOrder {
     return PlannedOrder(
       id: id,
       kind: kind,
+      asset: asset,
       direction: direction,
       sourceAmount: sourceAmount,
       sourceUnit: sourceUnit,
-      scaledBtc: scaledBtc,
+      scaledQty: scaledQty,
       scaledNotionalUsd: scaledNotionalUsd,
       markPrice: markPrice,
       createdAt: createdAt,
@@ -586,16 +593,17 @@ class PlannedOrder {
   }
 
   PlannedOrder copyWithScaled({
-    required double scaledBtc,
+    required double scaledQty,
     required double scaledNotionalUsd,
   }) {
     return PlannedOrder(
       id: id,
       kind: kind,
+      asset: asset,
       direction: direction,
       sourceAmount: sourceAmount,
       sourceUnit: sourceUnit,
-      scaledBtc: scaledBtc,
+      scaledQty: scaledQty,
       scaledNotionalUsd: scaledNotionalUsd,
       markPrice: markPrice,
       createdAt: createdAt,

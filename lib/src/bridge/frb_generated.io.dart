@@ -170,6 +170,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Action> dco_decode_list_action(dynamic raw);
 
   @protected
+  List<Asset> dco_decode_list_asset(dynamic raw);
+
+  @protected
   List<AssetSpec> dco_decode_list_asset_spec(dynamic raw);
 
   @protected
@@ -471,6 +474,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   List<Action> sse_decode_list_action(SseDeserializer deserializer);
+
+  @protected
+  List<Asset> sse_decode_list_asset(SseDeserializer deserializer);
 
   @protected
   List<AssetSpec> sse_decode_list_asset_spec(SseDeserializer deserializer);
@@ -813,6 +819,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_list_action(List<Action> self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_list_asset(List<Asset> self, SseSerializer serializer);
 
   @protected
   void sse_encode_list_asset_spec(List<AssetSpec> self, SseSerializer serializer);

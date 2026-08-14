@@ -272,6 +272,11 @@ class WeexCancelAlgoRequest {
 class WeexExecutionSnapshot {
   final String execId;
   final String orderId;
+
+  /// The contract this fill belongs to. Needed once more than one book can
+  /// be open: without it, reconciliation cannot tell an ETH fill from a BTC
+  /// one and would apply both to the same position.
+  final String symbol;
   final String side;
   final String positionSide;
   final String kind;
@@ -286,6 +291,7 @@ class WeexExecutionSnapshot {
   const WeexExecutionSnapshot({
     required this.execId,
     required this.orderId,
+    required this.symbol,
     required this.side,
     required this.positionSide,
     required this.kind,
@@ -302,6 +308,7 @@ class WeexExecutionSnapshot {
   int get hashCode =>
       execId.hashCode ^
       orderId.hashCode ^
+      symbol.hashCode ^
       side.hashCode ^
       positionSide.hashCode ^
       kind.hashCode ^
@@ -320,6 +327,7 @@ class WeexExecutionSnapshot {
           runtimeType == other.runtimeType &&
           execId == other.execId &&
           orderId == other.orderId &&
+          symbol == other.symbol &&
           side == other.side &&
           positionSide == other.positionSide &&
           kind == other.kind &&

@@ -667,7 +667,7 @@ pub fn classify_message(text: String) -> ApiResultAction {
 
 pub fn classify_message_actions(text: String) -> ApiResultActions {
     let rules = default_rules();
-    classify_message_actions_with_rules(text, rules)
+    classify_message_actions_with_rules(text, rules, &InterpreterState::default())
 }
 
 pub fn default_patterns_yaml() -> String {
@@ -704,12 +704,25 @@ pub fn merge_patterns_yaml(base_yaml: String, local_yaml: String) -> ApiResultSt
     }
 }
 
+/// Classifies a message against `patterns_yaml`.
+///
+/// `active_assets` are the books with open exposure. They matter because a
+/// message that names no asset ("REDUCED 25%") inherits one — and when more
+/// than one book is live that reference is ambiguous, so the action comes back
+/// with no asset and needs manual review rather than a guess.
 pub fn classify_message_actions_with_patterns(
     text: String,
     patterns_yaml: String,
+    active_assets: Vec<Asset>,
+    last_asset: Option<Asset>,
 ) -> ApiResultActions {
+    let state = InterpreterState {
+        active_assets,
+        last_asset,
+        ..Default::default()
+    };
     match parse_pattern_document(&patterns_yaml) {
-        Ok(rules) => classify_message_actions_with_rules(text, rules),
+        Ok(rules) => classify_message_actions_with_rules(text, rules, &state),
         Err(error) => ApiResultActions {
             ok: false,
             value: None,
@@ -721,14 +734,15 @@ pub fn classify_message_actions_with_patterns(
 fn classify_message_actions_with_rules(
     text: String,
     rules: Vec<crate::patterns::PatternRule>,
+    state: &InterpreterState,
 ) -> ApiResultActions {
     match match_actions(&text, &rules) {
         Ok(hits) => {
             let actions = if hits.is_empty() {
-                vec![interpret(&text, None, &InterpreterState::default())]
+                vec![interpret(&text, None, state)]
             } else {
                 hits.into_iter()
-                    .map(|hit| interpret(&text, Some(hit), &InterpreterState::default()))
+                    .map(|hit| interpret(&text, Some(hit), state))
                     .collect()
             };
             ApiResultActions {
