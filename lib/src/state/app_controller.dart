@@ -21,13 +21,21 @@ import '../security/credential_store.dart';
 
 enum WeexPriceStatus { idle, connecting, live, unavailable }
 
-/// How a parsed Telegram CLOSE signal should be handled. CLOSE is never
-/// auto-executed: whenever there is a live position it queues a full flatten
-/// for the user to confirm — in both manual and auto-approve mode — and does
-/// nothing when the book is already flat.
+/// How a parsed Telegram CLOSE signal should be handled.
+///
+/// A close follows the auto-approve toggle like any other action: with
+/// auto-approve on it flattens immediately, with it off it queues for
+/// confirmation. It does nothing when the book is already flat.
+///
+/// Closing only ever reduces exposure — `rust/src/risk.rs` deliberately lets a
+/// reduce-only order past every rail — so auto-executing one cannot grow a
+/// position. The exception is an ambiguous close: if the message names no
+/// asset while both books are open, there is no safe choice to make
+/// automatically and it queues regardless of the toggle.
 enum TelegramCloseDisposition {
   ignoredNoPosition,
   queueForApproval,
+  executeImmediately,
 }
 
 class AppController extends ChangeNotifier {
@@ -850,7 +858,12 @@ class AppController extends ChangeNotifier {
     // user to confirm via the approval dialog, in both manual and auto-approve
     // mode.
     if (action.kind == rust_interpreter.ActionKind.close) {
-      return _handleParsedTelegramClose(summary: summary, channel: channel);
+      return _handleParsedTelegramClose(
+        summary: summary,
+        channel: channel,
+        asset: action.asset,
+        dedupKey: dedupKey,
+      );
     }
 
     final kind = tradeKindFromParsed(action.kind);
@@ -957,30 +970,50 @@ class AppController extends ChangeNotifier {
   Future<rust_telegram.TelegramActionStatus> _handleParsedTelegramClose({
     required String summary,
     required String channel,
+    Asset? asset,
+    String? dedupKey,
   }) async {
     await _refreshExchangePositionForTelegramAction();
-    if (closeDisposition(autoApprove: config.autoApprove, position: position) !=
-        TelegramCloseDisposition.queueForApproval) {
-      _log('Telegram CLOSE ignored: no open position to flatten ($summary).');
+
+    // Resolve which book to flatten. A close that names its asset is
+    // unambiguous; one that does not can still be resolved when exactly one
+    // book is open. With two open and nothing to go on, the choice goes to the
+    // user rather than being guessed — flattening the wrong book would be the
+    // most damaging thing this path could do.
+    final open = openAssets;
+    final ambiguous = asset == null && open.length > 1;
+    final target = asset ?? (open.length == 1 ? open.first : selectedAsset);
+
+    final targetPosition = positionFor(target);
+    final disposition = closeDisposition(
+      autoApprove: config.autoApprove,
+      position: targetPosition,
+      assetAmbiguous: ambiguous,
+    );
+    if (disposition == TelegramCloseDisposition.ignoredNoPosition) {
+      _log('Telegram CLOSE ignored: no open ${displayOf(target)} position to '
+          'flatten ($summary).');
       return rust_telegram.TelegramActionStatus.rejected;
     }
-    if (config.markPrice <= 0) {
+
+    final mark = bookFor(target).markPrice;
+    if (mark <= 0) {
       _log('Telegram CLOSE skipped: waiting for live WEEX '
-          '${displayOf(selectedAsset)} price.');
+          '${displayOf(target)} price.');
       return rust_telegram.TelegramActionStatus.failed;
     }
 
-    final mark = config.markPrice;
-    final quantity = _roundDown(position.qty, 0.0001);
+    final quantity = _roundDown(targetPosition.qty, lotStepFor(target));
     if (quantity <= 0) {
-      _log('Telegram CLOSE ignored: position smaller than one lot ($summary).');
+      _log('Telegram CLOSE ignored: ${displayOf(target)} position smaller '
+          'than one lot ($summary).');
       return rust_telegram.TelegramActionStatus.rejected;
     }
     final order = PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
       kind: TradeKind.close,
-      asset: selectedAsset,
-      direction: position.direction!,
+      asset: target,
+      direction: targetPosition.direction!,
       sourceAmount: quantity,
       sourceUnit: SizeUnit.coin,
       scaledQty: quantity,
@@ -989,14 +1022,30 @@ class AppController extends ChangeNotifier {
       createdAt: DateTime.now(),
       status: TradeStatus.pendingApproval,
       source: 'Telegram $channel: $summary, close position',
+      dedupKey: dedupKey,
     );
+
+    if (disposition == TelegramCloseDisposition.executeImmediately) {
+      orders.insert(0, order);
+      await AppLog.write(
+        'Telegram CLOSE auto-executing: ${_describe(order)} '
+        '(auto-approve on).',
+      );
+      _log('Telegram CLOSE auto-executing: ${_describe(order)}.');
+      notifyListeners();
+      await _place(order);
+      return rust_telegram.TelegramActionStatus.submitted;
+    }
+
     pendingApproval = order;
     orders.insert(0, order);
     await AppLog.write(
       'Telegram CLOSE queued for approval: ${_describe(order)} '
-      '(auto-approve=${config.autoApprove}; a close always requires confirmation).',
+      '(auto-approve=${config.autoApprove}'
+      '${ambiguous ? '; the message names no asset and both books are open' : ''}).',
     );
-    _log('Telegram CLOSE requires approval: ${_describe(order)}.');
+    _log('Telegram CLOSE requires approval: ${_describe(order)}'
+        '${ambiguous ? ' — the message names no asset and both books are open' : ''}.');
     notifyListeners();
     return rust_telegram.TelegramActionStatus.pending;
   }
@@ -3174,13 +3223,18 @@ class AppController extends ChangeNotifier {
   static TelegramCloseDisposition closeDisposition({
     required bool autoApprove,
     required PositionView position,
+    bool assetAmbiguous = false,
   }) {
     if (position.isFlat ||
         position.qty <= 0 ||
         position.direction == null) {
       return TelegramCloseDisposition.ignoredNoPosition;
     }
-    return TelegramCloseDisposition.queueForApproval;
+    // Which book to flatten is not a question auto-approve can answer.
+    if (assetAmbiguous) return TelegramCloseDisposition.queueForApproval;
+    return autoApprove
+        ? TelegramCloseDisposition.executeImmediately
+        : TelegramCloseDisposition.queueForApproval;
   }
 
   @visibleForTesting

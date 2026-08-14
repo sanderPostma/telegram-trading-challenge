@@ -47,15 +47,40 @@ void main() {
       unrealizedPnlUsd: 0,
     );
 
-    test('auto-approve ON with an open position queues for approval', () {
-      // A CLOSE never auto-executes: even under auto-approve it must surface
-      // the confirmation dialog rather than being silently ignored.
+    test('auto-approve ON with an open position flattens immediately', () {
+      // A close follows the auto-approve toggle like any other action. It can
+      // only reduce exposure, so executing one unattended cannot grow a
+      // position.
       expect(
         AppController.closeDisposition(
           autoApprove: true,
           position: openPosition,
         ),
+        TelegramCloseDisposition.executeImmediately,
+      );
+    });
+
+    test('an ambiguous asset queues even under auto-approve', () {
+      // Auto-approve says "act without asking"; it does not say which book to
+      // flatten. Guessing wrong here closes a position nobody asked to close.
+      expect(
+        AppController.closeDisposition(
+          autoApprove: true,
+          position: openPosition,
+          assetAmbiguous: true,
+        ),
         TelegramCloseDisposition.queueForApproval,
+      );
+    });
+
+    test('an ambiguous asset with no position is still a no-op', () {
+      expect(
+        AppController.closeDisposition(
+          autoApprove: true,
+          position: flatPosition,
+          assetAmbiguous: true,
+        ),
+        TelegramCloseDisposition.ignoredNoPosition,
       );
     });
 
