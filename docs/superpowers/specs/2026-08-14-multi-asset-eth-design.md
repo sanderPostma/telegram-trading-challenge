@@ -300,11 +300,28 @@ A combined positions table plus detail pane.
 - Cross-device position leasing (the existing single-instance caveat is
   unchanged and still applies per README).
 
+## Resolved During Implementation
+
+- **ETH contract specs confirmed** from WEEX `/capi/v2/market/contracts`:
+  `size_increment: 3` -> `qty_step 0.001`, `tick_size: 2` -> `price_step 0.01`,
+  `minOrderSize 0.001`. The reading of those fields is corroborated by BTC's
+  reported values reproducing the constants already in `weex.rs`.
+- **Length guard set** at 4 non-empty lines / 320 characters, validated against
+  the existing corpus: the compound `... AND ADDING ...` form and a signal
+  carrying an `Account balance $10,000` line both still fire.
+- **Dedup needs no asset.** Keys are `channel:message:ordinal`
+  (`rust/src/dedup.rs:38`), already unique per action within a message, so two
+  assets in one message cannot collide. The concern raised above was unfounded.
+- **A fresh install's default allowlist** had the same defect as the v1
+  migration — BTCUSDT only, with no prompt to catch it — and now names every
+  tradable asset.
+
 ## Open Questions
 
 1. **The screenshot of the triggering message was never received.** The
    both-ends anchoring is designed from the paraphrase `10 ETH LONG`. If the
    real message carries trailing text, the rule will not fire and the anchoring
-   must be revisited.
-2. Exact length-guard threshold, pending validation against the test corpus.
-3. ETH's real WEEX `qty_step` / `price_step`.
+   must be revisited. This is the one open risk of rework.
+2. **Not verified against a live account.** Everything is covered by unit tests
+   and the app builds, but no ETH order has been placed, and the two-book
+   reconciliation has not been observed against a real exchange response.
