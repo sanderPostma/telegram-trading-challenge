@@ -1311,6 +1311,11 @@ class AppController extends ChangeNotifier {
       // so only the first pass applies them; the rest carry position and fills
       // for their own symbol.
       var appliedAccountLevel = false;
+      // Trade history, the equity chart and today's realized PnL are
+      // account-wide, so they are built from every book's fills together.
+      // Applying them per book would leave each pass overwriting the last and
+      // the UI flip-flopping between one asset's history and the other's.
+      final allExecutions = <rust_weex.WeexExecutionSnapshot>[];
       for (final asset in Asset.values) {
         final result = await rust.weexReconcileAccount(
           request: rust_weex.WeexAccountRequest(
@@ -1332,9 +1337,12 @@ class AppController extends ChangeNotifier {
           candles: candles,
           asset: asset,
           applyAccountLevel: !appliedAccountLevel,
+          mergeExecutions: false,
         );
+        allExecutions.addAll(result.value!.recentExecutions);
         appliedAccountLevel = true;
       }
+      _applyAccountWideExecutions(allExecutions, candles: candles);
     } catch (error, stackTrace) {
       weexAccountConnected = false;
       weexReconciliationError = error.toString();
@@ -1506,6 +1514,9 @@ class AppController extends ChangeNotifier {
     List<PriceCandle> candles = const [],
     Asset? asset,
     bool applyAccountLevel = true,
+    /// False while reconciling book by book: the caller merges every book's
+    /// fills together afterwards instead.
+    bool mergeExecutions = true,
   }) {
     // Prefer the symbol the exchange reported: it is the authority on which
     // book this payload describes.
@@ -1565,17 +1576,43 @@ class AppController extends ChangeNotifier {
       // released the plan; drop the local record with it.
       _forgetExchangeTakeProfitIfFlat();
     }
-    _mergeReconciledExecutions(update.recentExecutions, candles: candles);
-    // Refresh the facts the risk gate measures limits against, now that
-    // position, mark price, and today's realized PnL are all current.
-    unawaited(
-      _pushRiskContext(
-        realizedPnlTodayUsd: _realizedPnlToday(update.recentExecutions),
-      ),
-    );
+    if (mergeExecutions) {
+      _applyAccountWideExecutions(update.recentExecutions, candles: candles);
+    }
     _lastWeexReconciledAt = DateTime.now();
     weexAccountConnected = true;
     weexReconciliationError = null;
+    notifyListeners();
+  }
+
+  @visibleForTesting
+  void applyAccountWideExecutionsForTest(
+    List<rust_weex.WeexExecutionSnapshot> executions, {
+    List<PriceCandle> candles = const [],
+  }) =>
+      _applyAccountWideExecutions(executions, candles: candles);
+
+  /// Rebuilds the account-wide views from every book's fills at once.
+  ///
+  /// Fills are deduplicated by exchange execution id: each book is fetched
+  /// separately, and a repeated id would otherwise double-count its PnL.
+  void _applyAccountWideExecutions(
+    List<rust_weex.WeexExecutionSnapshot> executions, {
+    List<PriceCandle> candles = const [],
+  }) {
+    final byId = <String, rust_weex.WeexExecutionSnapshot>{};
+    for (final execution in executions) {
+      byId[execution.execId] = execution;
+    }
+    final combined = byId.values.toList()
+      ..sort((a, b) => a.timestampMs.compareTo(b.timestampMs));
+
+    _mergeReconciledExecutions(combined, candles: candles);
+    // Refresh the facts the risk gate measures limits against, now that
+    // position, mark price, and today's realized PnL are all current.
+    unawaited(
+      _pushRiskContext(realizedPnlTodayUsd: _realizedPnlToday(combined)),
+    );
     unawaited(_snapshotChartState(force: true));
     notifyListeners();
   }
@@ -2187,11 +2224,30 @@ class AppController extends ChangeNotifier {
   Future<void> _pushRiskContext({required double realizedPnlTodayUsd}) async {
     if (!useRustBridge) return;
     try {
+      // Every book's mark, so the gate values an order at its own symbol's
+      // price, and every book's notional, so the account-wide exposure rail
+      // sees the whole account rather than the selected asset.
+      final prices = [
+        for (final asset in Asset.values)
+          if (bookFor(asset).markPrice > 0)
+            rust_risk.SymbolPrice(
+              symbol: symbolOf(asset),
+              price: bookFor(asset).markPrice,
+            ),
+      ];
+      final totalNotional = Asset.values.fold<double>(
+        0,
+        (sum, asset) => sum + positionFor(asset).notionalUsd,
+      );
+      final leverage = Asset.values
+          .map((asset) => positionFor(asset).crossCombinedLeverage)
+          .fold<double>(0, (a, b) => a > b ? a : b);
       await rust.riskUpdateContext(
         context: rust_risk.RiskContext(
           referencePrice: config.markPrice,
-          openPositionNotionalUsd: position.notionalUsd,
-          leverage: position.crossCombinedLeverage,
+          referencePrices: prices,
+          openPositionNotionalUsd: totalNotional,
+          leverage: leverage,
           realizedPnlTodayUsd: realizedPnlTodayUsd,
           // Percentage limits are measured against this.
           accountBalanceUsd: config.myBalanceUsd,

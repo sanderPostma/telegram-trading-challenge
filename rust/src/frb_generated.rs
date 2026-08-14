@@ -2037,6 +2037,18 @@ impl SseDecode for Vec<crate::api::SeriesPoint> {
     }
 }
 
+impl SseDecode for Vec<crate::risk::SymbolPrice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::risk::SymbolPrice>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
 impl SseDecode for Vec<crate::weex::WeexExecutionSnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -2300,12 +2312,14 @@ impl SseDecode for crate::risk::RiskContext {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_referencePrice = <f64>::sse_decode(deserializer);
+        let mut var_referencePrices = <Vec<crate::risk::SymbolPrice>>::sse_decode(deserializer);
         let mut var_openPositionNotionalUsd = <f64>::sse_decode(deserializer);
         let mut var_leverage = <f64>::sse_decode(deserializer);
         let mut var_realizedPnlTodayUsd = <f64>::sse_decode(deserializer);
         let mut var_accountBalanceUsd = <f64>::sse_decode(deserializer);
         return crate::risk::RiskContext {
             reference_price: var_referencePrice,
+            reference_prices: var_referencePrices,
             open_position_notional_usd: var_openPositionNotionalUsd,
             leverage: var_leverage,
             realized_pnl_today_usd: var_realizedPnlTodayUsd,
@@ -2386,6 +2400,18 @@ impl SseDecode for crate::interpreter::Size {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseDecode for crate::risk::SymbolPrice {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_symbol = <String>::sse_decode(deserializer);
+        let mut var_price = <f64>::sse_decode(deserializer);
+        return crate::risk::SymbolPrice {
+            symbol: var_symbol,
+            price: var_price,
+        };
     }
 }
 
@@ -3258,6 +3284,7 @@ impl flutter_rust_bridge::IntoDart for crate::risk::RiskContext {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.reference_price.into_into_dart().into_dart(),
+            self.reference_prices.into_into_dart().into_dart(),
             self.open_position_notional_usd.into_into_dart().into_dart(),
             self.leverage.into_into_dart().into_dart(),
             self.realized_pnl_today_usd.into_into_dart().into_dart(),
@@ -3351,6 +3378,22 @@ impl flutter_rust_bridge::IntoDart for crate::interpreter::Size {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::interpreter::Size {}
 impl flutter_rust_bridge::IntoIntoDart<crate::interpreter::Size> for crate::interpreter::Size {
     fn into_into_dart(self) -> crate::interpreter::Size {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::risk::SymbolPrice {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.symbol.into_into_dart().into_dart(),
+            self.price.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::risk::SymbolPrice {}
+impl flutter_rust_bridge::IntoIntoDart<crate::risk::SymbolPrice> for crate::risk::SymbolPrice {
+    fn into_into_dart(self) -> crate::risk::SymbolPrice {
         self
     }
 }
@@ -4068,6 +4111,16 @@ impl SseEncode for Vec<crate::api::SeriesPoint> {
     }
 }
 
+impl SseEncode for Vec<crate::risk::SymbolPrice> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::risk::SymbolPrice>::sse_encode(item, serializer);
+        }
+    }
+}
+
 impl SseEncode for Vec<crate::weex::WeexExecutionSnapshot> {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -4286,6 +4339,7 @@ impl SseEncode for crate::risk::RiskContext {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <f64>::sse_encode(self.reference_price, serializer);
+        <Vec<crate::risk::SymbolPrice>>::sse_encode(self.reference_prices, serializer);
         <f64>::sse_encode(self.open_position_notional_usd, serializer);
         <f64>::sse_encode(self.leverage, serializer);
         <f64>::sse_encode(self.realized_pnl_today_usd, serializer);
@@ -4346,6 +4400,14 @@ impl SseEncode for crate::interpreter::Size {
                 unimplemented!("");
             }
         }
+    }
+}
+
+impl SseEncode for crate::risk::SymbolPrice {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <String>::sse_encode(self.symbol, serializer);
+        <f64>::sse_encode(self.price, serializer);
     }
 }
 

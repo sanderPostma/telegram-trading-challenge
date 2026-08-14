@@ -37,10 +37,18 @@ class Limit {
 
 /// Live account facts the gate compares limits against.
 class RiskContext {
-  /// Latest mark price, used to turn quantities into notional.
+  /// Fallback mark price, used when the order's symbol has no entry in
+  /// [`RiskContext::reference_prices`].
   final double referencePrice;
 
-  /// Notional of the currently open position, 0 when flat.
+  /// Mark price per symbol. An order must be valued at its own symbol's
+  /// price: sizing a 2 ETH order off the BTC mark overstates its notional
+  /// thirtyfold, and the reverse understates it — one spuriously trips a cap
+  /// and the other silently waves an oversized order through.
+  final List<SymbolPrice> referencePrices;
+
+  /// Combined notional of every open position, 0 when flat. This is an
+  /// account-wide rail, so it must span all books, not just one.
   final double openPositionNotionalUsd;
 
   /// Account leverage currently in effect.
@@ -54,6 +62,7 @@ class RiskContext {
 
   const RiskContext({
     required this.referencePrice,
+    required this.referencePrices,
     required this.openPositionNotionalUsd,
     required this.leverage,
     required this.realizedPnlTodayUsd,
@@ -63,6 +72,7 @@ class RiskContext {
   @override
   int get hashCode =>
       referencePrice.hashCode ^
+      referencePrices.hashCode ^
       openPositionNotionalUsd.hashCode ^
       leverage.hashCode ^
       realizedPnlTodayUsd.hashCode ^
@@ -74,6 +84,7 @@ class RiskContext {
       other is RiskContext &&
           runtimeType == other.runtimeType &&
           referencePrice == other.referencePrice &&
+          referencePrices == other.referencePrices &&
           openPositionNotionalUsd == other.openPositionNotionalUsd &&
           leverage == other.leverage &&
           realizedPnlTodayUsd == other.realizedPnlTodayUsd &&
@@ -135,4 +146,23 @@ class RiskLimits {
           maxLeverage == other.maxLeverage &&
           dailyLoss == other.dailyLoss &&
           maxSignalAgeSecs == other.maxSignalAgeSecs;
+}
+
+/// The mark price of one traded symbol.
+class SymbolPrice {
+  final String symbol;
+  final double price;
+
+  const SymbolPrice({required this.symbol, required this.price});
+
+  @override
+  int get hashCode => symbol.hashCode ^ price.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SymbolPrice &&
+          runtimeType == other.runtimeType &&
+          symbol == other.symbol &&
+          price == other.price;
 }

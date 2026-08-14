@@ -1660,6 +1660,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<SymbolPrice> dco_decode_list_symbol_price(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_symbol_price).toList();
+  }
+
+  @protected
   List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return (raw as List<dynamic>).map(dco_decode_weex_execution_snapshot).toList();
@@ -1812,13 +1818,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RiskContext dco_decode_risk_context(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
-    if (arr.length != 5) throw Exception('unexpected arr length: expect 5 but see ${arr.length}');
+    if (arr.length != 6) throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
     return RiskContext(
       referencePrice: dco_decode_f_64(arr[0]),
-      openPositionNotionalUsd: dco_decode_f_64(arr[1]),
-      leverage: dco_decode_f_64(arr[2]),
-      realizedPnlTodayUsd: dco_decode_f_64(arr[3]),
-      accountBalanceUsd: dco_decode_f_64(arr[4]),
+      referencePrices: dco_decode_list_symbol_price(arr[1]),
+      openPositionNotionalUsd: dco_decode_f_64(arr[2]),
+      leverage: dco_decode_f_64(arr[3]),
+      realizedPnlTodayUsd: dco_decode_f_64(arr[4]),
+      accountBalanceUsd: dco_decode_f_64(arr[5]),
     );
   }
 
@@ -1873,6 +1880,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw Exception("unreachable");
     }
+  }
+
+  @protected
+  SymbolPrice dco_decode_symbol_price(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 2) throw Exception('unexpected arr length: expect 2 but see ${arr.length}');
+    return SymbolPrice(symbol: dco_decode_String(arr[0]), price: dco_decode_f_64(arr[1]));
   }
 
   @protected
@@ -2580,6 +2595,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<SymbolPrice> sse_decode_list_symbol_price(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <SymbolPrice>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_symbol_price(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   List<WeexExecutionSnapshot> sse_decode_list_weex_execution_snapshot(
     SseDeserializer deserializer,
   ) {
@@ -2836,12 +2863,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RiskContext sse_decode_risk_context(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_referencePrice = sse_decode_f_64(deserializer);
+    var var_referencePrices = sse_decode_list_symbol_price(deserializer);
     var var_openPositionNotionalUsd = sse_decode_f_64(deserializer);
     var var_leverage = sse_decode_f_64(deserializer);
     var var_realizedPnlTodayUsd = sse_decode_f_64(deserializer);
     var var_accountBalanceUsd = sse_decode_f_64(deserializer);
     return RiskContext(
       referencePrice: var_referencePrice,
+      referencePrices: var_referencePrices,
       openPositionNotionalUsd: var_openPositionNotionalUsd,
       leverage: var_leverage,
       realizedPnlTodayUsd: var_realizedPnlTodayUsd,
@@ -2907,6 +2936,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       default:
         throw UnimplementedError('');
     }
+  }
+
+  @protected
+  SymbolPrice sse_decode_symbol_price(SseDeserializer deserializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_symbol = sse_decode_String(deserializer);
+    var var_price = sse_decode_f_64(deserializer);
+    return SymbolPrice(symbol: var_symbol, price: var_price);
   }
 
   @protected
@@ -3690,6 +3727,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_symbol_price(List<SymbolPrice> self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_symbol_price(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_list_weex_execution_snapshot(
     List<WeexExecutionSnapshot> self,
     SseSerializer serializer,
@@ -3908,6 +3954,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_risk_context(RiskContext self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_f_64(self.referencePrice, serializer);
+    sse_encode_list_symbol_price(self.referencePrices, serializer);
     sse_encode_f_64(self.openPositionNotionalUsd, serializer);
     sse_encode_f_64(self.leverage, serializer);
     sse_encode_f_64(self.realizedPnlTodayUsd, serializer);
@@ -3957,6 +4004,13 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       case Size_FullClose():
         sse_encode_i_32(3, serializer);
     }
+  }
+
+  @protected
+  void sse_encode_symbol_price(SymbolPrice self, SseSerializer serializer) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.symbol, serializer);
+    sse_encode_f_64(self.price, serializer);
   }
 
   @protected

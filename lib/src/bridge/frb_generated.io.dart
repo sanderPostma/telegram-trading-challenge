@@ -185,6 +185,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SeriesPoint> dco_decode_list_series_point(dynamic raw);
 
   @protected
+  List<SymbolPrice> dco_decode_list_symbol_price(dynamic raw);
+
+  @protected
   List<WeexExecutionSnapshot> dco_decode_list_weex_execution_snapshot(dynamic raw);
 
   @protected
@@ -258,6 +261,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Size dco_decode_size(dynamic raw);
+
+  @protected
+  SymbolPrice dco_decode_symbol_price(dynamic raw);
 
   @protected
   TelegramActionStatus dco_decode_telegram_action_status(dynamic raw);
@@ -491,6 +497,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<SeriesPoint> sse_decode_list_series_point(SseDeserializer deserializer);
 
   @protected
+  List<SymbolPrice> sse_decode_list_symbol_price(SseDeserializer deserializer);
+
+  @protected
   List<WeexExecutionSnapshot> sse_decode_list_weex_execution_snapshot(SseDeserializer deserializer);
 
   @protected
@@ -570,6 +579,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Size sse_decode_size(SseDeserializer deserializer);
+
+  @protected
+  SymbolPrice sse_decode_symbol_price(SseDeserializer deserializer);
 
   @protected
   TelegramActionStatus sse_decode_telegram_action_status(SseDeserializer deserializer);
@@ -836,6 +848,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_series_point(List<SeriesPoint> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_symbol_price(List<SymbolPrice> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_weex_execution_snapshot(
     List<WeexExecutionSnapshot> self,
     SseSerializer serializer,
@@ -924,6 +939,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_size(Size self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_symbol_price(SymbolPrice self, SseSerializer serializer);
 
   @protected
   void sse_encode_telegram_action_status(TelegramActionStatus self, SseSerializer serializer);

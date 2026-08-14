@@ -134,12 +134,38 @@ impl Default for RiskLimits {
     }
 }
 
+/// The mark price of one traded symbol.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SymbolPrice {
+    pub symbol: String,
+    pub price: f64,
+}
+
+impl RiskContext {
+    /// The mark price to value `symbol` at, falling back to the single
+    /// reference price when the symbol has no entry of its own.
+    pub fn price_for(&self, symbol: &str) -> f64 {
+        self.reference_prices
+            .iter()
+            .find(|entry| entry.symbol.eq_ignore_ascii_case(symbol))
+            .map(|entry| entry.price)
+            .unwrap_or(self.reference_price)
+    }
+}
+
 /// Live account facts the gate compares limits against.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct RiskContext {
-    /// Latest mark price, used to turn quantities into notional.
+    /// Fallback mark price, used when the order's symbol has no entry in
+    /// [`RiskContext::reference_prices`].
     pub reference_price: f64,
-    /// Notional of the currently open position, 0 when flat.
+    /// Mark price per symbol. An order must be valued at its own symbol's
+    /// price: sizing a 2 ETH order off the BTC mark overstates its notional
+    /// thirtyfold, and the reverse understates it — one spuriously trips a cap
+    /// and the other silently waves an oversized order through.
+    pub reference_prices: Vec<SymbolPrice>,
+    /// Combined notional of every open position, 0 when flat. This is an
+    /// account-wide rail, so it must span all books, not just one.
     pub open_position_notional_usd: f64,
     /// Account leverage currently in effect.
     pub leverage: f64,
@@ -196,9 +222,10 @@ pub fn evaluate(
         );
     }
 
-    let notional = intent.qty * context.reference_price;
+    let reference_price = context.price_for(&intent.symbol);
+    let notional = intent.qty * reference_price;
     if !limits.max_order_notional.is_off() {
-        if context.reference_price <= 0.0 {
+        if reference_price <= 0.0 {
             return Err(
                 "Risk limit: no mark price available to size-check this order".to_string(),
             );
@@ -218,7 +245,7 @@ pub fn evaluate(
     }
 
     if !limits.max_position_notional.is_off() {
-        if context.reference_price <= 0.0 {
+        if reference_price <= 0.0 {
             return Err(
                 "Risk limit: no mark price available to check total exposure".to_string(),
             );
@@ -374,6 +401,7 @@ mod tests {
     fn context() -> RiskContext {
         RiskContext {
             reference_price: 60_000.0,
+            reference_prices: Vec::new(),
             open_position_notional_usd: 0.0,
             leverage: 5.0,
             realized_pnl_today_usd: 0.0,
@@ -641,5 +669,72 @@ mod tests {
     fn signal_age_is_unrestricted_by_default() {
         let now = 1_700_000_000_000;
         assert!(evaluate_signal_age(&RiskLimits::default(), now - 86_400_000, now).is_ok());
+    }
+
+    #[test]
+    fn an_order_is_valued_at_its_own_symbols_price() {
+        // The multi-asset trap: valuing a 2 ETH order at the BTC mark makes it
+        // look like a $126k order and trips a cap it should clear.
+        let limits = RiskLimits {
+            max_order_notional: Limit::usd(10_000.0),
+            ..Default::default()
+        };
+        let context = RiskContext {
+            reference_price: 63_000.0,
+            reference_prices: vec![
+                SymbolPrice {
+                    symbol: "BTCUSDT".to_string(),
+                    price: 63_000.0,
+                },
+                SymbolPrice {
+                    symbol: "ETHUSDT".to_string(),
+                    price: 1_877.0,
+                },
+            ],
+            ..Default::default()
+        };
+
+        // 2 ETH at 1877 = $3,754 — under the cap.
+        let eth = OrderIntent {
+            symbol: "ETHUSDT".to_string(),
+            qty: 2.0,
+            reduce_only: false,
+        };
+        assert!(
+            evaluate(&limits, &context, &eth).is_ok(),
+            "an ETH order must be valued at the ETH mark"
+        );
+
+        // 2 BTC at 63000 = $126,000 — over it.
+        let btc = OrderIntent {
+            symbol: "BTCUSDT".to_string(),
+            qty: 2.0,
+            reduce_only: false,
+        };
+        assert!(evaluate(&limits, &context, &btc).is_err());
+    }
+
+    #[test]
+    fn an_unknown_symbol_falls_back_to_the_single_reference_price() {
+        let context = RiskContext {
+            reference_price: 63_000.0,
+            reference_prices: Vec::new(),
+            ..Default::default()
+        };
+        assert_eq!(context.price_for("BTCUSDT"), 63_000.0);
+        assert_eq!(context.price_for("SOLUSDT"), 63_000.0);
+    }
+
+    #[test]
+    fn symbol_price_lookup_ignores_case() {
+        let context = RiskContext {
+            reference_price: 1.0,
+            reference_prices: vec![SymbolPrice {
+                symbol: "ETHUSDT".to_string(),
+                price: 1_877.0,
+            }],
+            ..Default::default()
+        };
+        assert_eq!(context.price_for("ethusdt"), 1_877.0);
     }
 }
