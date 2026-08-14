@@ -578,11 +578,13 @@ class AppController extends ChangeNotifier {
     required TradeDirection direction,
   }) async {
     if (amount <= 0 || !amount.isFinite) {
-      _log('Manual order rejected: enter a positive BTC or USDT amount.');
+      _log('Manual order rejected: enter a positive '
+          '${displayOf(selectedAsset)} or USDT amount.');
       return;
     }
     if (config.markPrice <= 0) {
-      _log('Manual order rejected: waiting for live WEEX BTC price.');
+      _log('Manual order rejected: waiting for live WEEX '
+          '${displayOf(selectedAsset)} price.');
       return;
     }
 
@@ -612,7 +614,7 @@ class AppController extends ChangeNotifier {
     }
     _reservedIds.add(order.id);
     _log(
-      'Manual trade scaled: ${order.scaledQty.toStringAsFixed(4)} BTC, ${order.scaledNotionalUsd.toStringAsFixed(2)} USDT.',
+      'Manual trade scaled: ${order.scaledQty.toStringAsFixed(4)} ${displayOf(order.asset)}, ${order.scaledNotionalUsd.toStringAsFixed(2)} USDT.',
     );
 
     if (config.autoApprove) {
@@ -661,7 +663,8 @@ class AppController extends ChangeNotifier {
       return;
     }
     if (config.markPrice <= 0) {
-      _log('Manual reduce rejected: waiting for live WEEX BTC price.');
+      _log('Manual reduce rejected: waiting for live WEEX '
+          '${displayOf(selectedAsset)} price.');
       return;
     }
     final quantity = previewManualReduceQty(
@@ -686,7 +689,7 @@ class AppController extends ChangeNotifier {
     final label = isPercent
         ? 'reduce ${amount.toStringAsFixed(0)}%'
         : unit == SizeUnit.coin
-        ? 'reduce ${amount.toStringAsFixed(4)} BTC'
+        ? 'reduce ${amount.toStringAsFixed(4)} ${displayOf(selectedAsset)}'
         : 'reduce \$${amount.toStringAsFixed(0)}';
     final order = PlannedOrder(
       id: '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}',
@@ -962,7 +965,8 @@ class AppController extends ChangeNotifier {
       return rust_telegram.TelegramActionStatus.rejected;
     }
     if (config.markPrice <= 0) {
-      _log('Telegram CLOSE skipped: waiting for live WEEX BTC price.');
+      _log('Telegram CLOSE skipped: waiting for live WEEX '
+          '${displayOf(selectedAsset)} price.');
       return rust_telegram.TelegramActionStatus.failed;
     }
 
@@ -1302,23 +1306,35 @@ class AppController extends ChangeNotifier {
 
   Future<void> _reconcileFromExchangeOnce() async {
     try {
-      final result = await rust.weexReconcileAccount(
-        request: rust_weex.WeexAccountRequest(
-          apiKey: config.weexApiKey,
-          apiSecret: config.weexSecret,
-          passphrase: config.weexPassphrase,
-          symbol: 'BTCUSDT',
-          baseUrl: 'https://api-contract.weex.com',
-          recentLookbackMs: _exchangeHistoryLookback.inMilliseconds,
-        ),
-      );
-      if (!result.ok || result.value == null) {
-        throw StateError(
-          result.error ?? 'WEEX reconciliation returned no data',
-        );
-      }
       final candles = await _getHistoricalCandles();
-      applyWeexReconciliation(result.value!, candles: candles);
+      // One reconcile per book. Balance and chart history are account-level,
+      // so only the first pass applies them; the rest carry position and fills
+      // for their own symbol.
+      var appliedAccountLevel = false;
+      for (final asset in Asset.values) {
+        final result = await rust.weexReconcileAccount(
+          request: rust_weex.WeexAccountRequest(
+            apiKey: config.weexApiKey,
+            apiSecret: config.weexSecret,
+            passphrase: config.weexPassphrase,
+            symbol: symbolOf(asset),
+            baseUrl: 'https://api-contract.weex.com',
+            recentLookbackMs: _exchangeHistoryLookback.inMilliseconds,
+          ),
+        );
+        if (!result.ok || result.value == null) {
+          throw StateError(
+            result.error ?? 'WEEX reconciliation returned no data',
+          );
+        }
+        applyWeexReconciliation(
+          result.value!,
+          candles: candles,
+          asset: asset,
+          applyAccountLevel: !appliedAccountLevel,
+        );
+        appliedAccountLevel = true;
+      }
     } catch (error, stackTrace) {
       weexAccountConnected = false;
       weexReconciliationError = error.toString();
@@ -1360,7 +1376,7 @@ class AppController extends ChangeNotifier {
       if (anySucceeded) {
         // handled per asset above
       } else {
-        _handleWeexPriceFailure('WEEX contract REST returned no BTCUSDT price');
+        _handleWeexPriceFailure('WEEX contract REST returned no price');
       }
     } catch (error, stackTrace) {
       _log(
@@ -1488,10 +1504,18 @@ class AppController extends ChangeNotifier {
   void applyWeexReconciliation(
     rust_weex.WeexAccountReconciliation update, {
     List<PriceCandle> candles = const [],
+    Asset? asset,
+    bool applyAccountLevel = true,
   }) {
+    // Prefer the symbol the exchange reported: it is the authority on which
+    // book this payload describes.
+    final target = Asset.values.firstWhere(
+      (a) => symbolOf(a) == update.position.symbol.toUpperCase(),
+      orElse: () => asset ?? selectedAsset,
+    );
     final balance = update.balance;
     final exchangeBalance = balance.walletBalance;
-    if (exchangeBalance > 0 && exchangeBalance.isFinite) {
+    if (applyAccountLevel && exchangeBalance > 0 && exchangeBalance.isFinite) {
       if (!_hasExchangePnlBaseline) {
         _hasExchangePnlBaseline = true;
         if (balanceHistory.length <= 1 && equityHistory.length <= 1) {
@@ -1508,12 +1532,15 @@ class AppController extends ChangeNotifier {
     final direction = _directionFromExchange(reconciledPosition.direction);
     final markPrice = reconciledPosition.markPrice > 0
         ? reconciledPosition.markPrice
-        : config.markPrice;
+        : bookFor(target).markPrice;
     if (markPrice > 0) {
-      config = config.copyWith(markPrice: markPrice);
+      _updateBook(target, (book) => book.copyWith(markPrice: markPrice));
+      if (target == selectedAsset) {
+        config = config.copyWith(markPrice: markPrice);
+      }
     }
-    final closeWatchWasOpen = !position.isFlat;
-    position = PositionView(
+    final closeWatchWasOpen = !positionFor(target).isFlat;
+    final reconciled = PositionView(
       direction: direction,
       qty: direction == null ? 0 : reconciledPosition.qty,
       notionalUsd: direction == null
@@ -1528,10 +1555,11 @@ class AppController extends ChangeNotifier {
           ? 0
           : reconciledPosition.leverage,
     );
+    _updateBook(target, (book) => book.copyWith(position: reconciled));
     // Edge-trigger: only disarm on an open->flat transition observed by this
     // reconcile. A watch armed while flat (or restored from persistence on
     // restart while flat) must persist until a position exists to flatten.
-    if (closeWatchWasOpen && position.isFlat) {
+    if (closeWatchWasOpen && reconciled.isFlat) {
       _disarmCloseTarget();
       // The position that carried the exchange TP is gone, so WEEX has already
       // released the plan; drop the local record with it.
@@ -1638,12 +1666,12 @@ class AppController extends ChangeNotifier {
             _log(
               attempt == 1
                   ? 'Manual flatten ignored: position smaller than one lot.'
-                  : 'Manual flatten left ${remaining.toStringAsFixed(6)} BTC below one lot; it cannot be closed.',
+                  : 'Manual flatten left ${remaining.toStringAsFixed(6)} ${displayOf(selectedAsset)} below one lot; it cannot be closed.',
             );
           case FlattenStep.giveUp:
             _log(
               'Manual flatten gave up after $_flattenMaxAttempts attempts; '
-              '${remaining.toStringAsFixed(4)} BTC is still open.',
+              '${remaining.toStringAsFixed(4)} ${displayOf(selectedAsset)} is still open.',
             );
           case FlattenStep.submit:
             break;
@@ -1654,7 +1682,8 @@ class AppController extends ChangeNotifier {
 
       final mark = config.markPrice;
       if (mark <= 0) {
-        _log('Manual flatten skipped: waiting for live WEEX BTC price.');
+        _log('Manual flatten skipped: waiting for live WEEX '
+            '${displayOf(selectedAsset)} price.');
         notifyListeners();
         return;
       }
@@ -1700,7 +1729,7 @@ class AppController extends ChangeNotifier {
       }
       _log(
         'Manual flatten incomplete: WEEX still reports '
-        '${position.qty.toStringAsFixed(4)} BTC open.',
+        '${position.qty.toStringAsFixed(4)} ${displayOf(selectedAsset)} open.',
       );
     }
   }
@@ -1837,7 +1866,7 @@ class AppController extends ChangeNotifier {
           apiKey: config.weexApiKey,
           apiSecret: config.weexSecret,
           passphrase: config.weexPassphrase,
-          symbol: 'BTCUSDT',
+          symbol: symbolOf(selectedAsset),
           baseUrl: 'https://api-contract.weex.com',
           positionSide: direction == TradeDirection.long ? 'LONG' : 'SHORT',
           planType: planType,
@@ -1901,7 +1930,7 @@ class AppController extends ChangeNotifier {
           apiKey: config.weexApiKey,
           apiSecret: config.weexSecret,
           passphrase: config.weexPassphrase,
-          symbol: 'BTCUSDT',
+          symbol: symbolOf(selectedAsset),
           baseUrl: 'https://api-contract.weex.com',
           orderId: existing.orderId,
         ),
@@ -2231,7 +2260,7 @@ class AppController extends ChangeNotifier {
           );
           _log(
             'Unfinished action $clientOrderId did reach WEEX '
-            '(${status.status}, filled ${status.filledQty.toStringAsFixed(4)} BTC); '
+            '(${status.status}, filled ${status.filledQty.toStringAsFixed(4)} ${displayOf(selectedAsset)}); '
             'recorded as submitted.',
           );
         } else {
@@ -2270,7 +2299,7 @@ class AppController extends ChangeNotifier {
           apiKey: config.weexApiKey,
           apiSecret: config.weexSecret,
           passphrase: config.weexPassphrase,
-          symbol: 'BTCUSDT',
+          symbol: symbolOf(selectedAsset),
           baseUrl: 'https://api-contract.weex.com',
           recentLookbackMs: _exchangeHistoryLookback.inMilliseconds,
         ),
@@ -2617,7 +2646,7 @@ class AppController extends ChangeNotifier {
       final triggerPrice = order.triggerPrice!;
       final orderType = _conditionalOrderType(order.direction, triggerPrice);
       _log(
-        'Submitting WEEX $orderType LIMIT $side ${order.scaledQty.toStringAsFixed(4)} BTC at trigger ${triggerPrice.toStringAsFixed(2)} USDT, simulation OFF.',
+        'Submitting WEEX $orderType LIMIT $side ${order.scaledQty.toStringAsFixed(4)} ${displayOf(order.asset)} at trigger ${triggerPrice.toStringAsFixed(2)} USDT, simulation OFF.',
       );
       try {
         final result = await rust.weexSubmitAlgoOrder(
@@ -2625,7 +2654,7 @@ class AppController extends ChangeNotifier {
             apiKey: config.weexApiKey,
             apiSecret: config.weexSecret,
             passphrase: config.weexPassphrase,
-            symbol: 'BTCUSDT',
+            symbol: symbolOf(order.asset),
             baseUrl: 'https://api-contract.weex.com',
             side: side,
             qty: order.scaledQty,
@@ -2633,8 +2662,8 @@ class AppController extends ChangeNotifier {
             limitPrice: triggerPrice,
             orderType: orderType,
             clientAlgoId: 'tc-${order.id}-trigger',
-            qtyStep: 0.0001,
-            priceStep: 0.1,
+            qtyStep: lotStepFor(order.asset),
+            priceStep: priceStepFor(order.asset),
           ),
         );
         return _readWeexOrderResult(result, 'conditional order');
@@ -2648,7 +2677,7 @@ class AppController extends ChangeNotifier {
       }
     }
     _log(
-      'Submitting WEEX MARKET $side ${order.scaledQty.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), reduce_only=$reduceOnly, simulation OFF.',
+      'Submitting WEEX MARKET $side ${order.scaledQty.toStringAsFixed(4)} ${displayOf(order.asset)} (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT), reduce_only=$reduceOnly, simulation OFF.',
     );
     try {
       final result = await rust.weexSubmitMarketOrder(
@@ -2656,13 +2685,13 @@ class AppController extends ChangeNotifier {
           apiKey: config.weexApiKey,
           apiSecret: config.weexSecret,
           passphrase: config.weexPassphrase,
-          symbol: 'BTCUSDT',
+          symbol: symbolOf(order.asset),
           baseUrl: 'https://api-contract.weex.com',
           side: side,
           qty: order.scaledQty,
           reduceOnly: reduceOnly,
           clientOrderId: order.exchangeClientOrderId,
-          qtyStep: 0.0001,
+          qtyStep: lotStepFor(order.asset),
         ),
       );
       return _readWeexOrderResult(result, 'order');
@@ -3180,7 +3209,7 @@ class AppController extends ChangeNotifier {
       rust_interpreter.Size_Usdt(:final field0) =>
         '${field0.toStringAsFixed(2)} USDT',
       rust_interpreter.Size_Coin(:final field0) =>
-        '${field0.toStringAsFixed(4)} BTC',
+        '${field0.toStringAsFixed(4)} coin',
       rust_interpreter.Size_Pct(:final field0) =>
         '${(field0 * 100).toStringAsFixed(0)}%',
       rust_interpreter.Size_FullClose() => 'full close',
@@ -3201,7 +3230,7 @@ class AppController extends ChangeNotifier {
     final trigger = order.triggerPrice == null
         ? ''
         : ' limit trigger ${order.triggerPrice!.toStringAsFixed(2)} USDT';
-    return '${order.direction.name.toUpperCase()} ${order.scaledQty.toStringAsFixed(4)} BTC (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)$trigger';
+    return '${order.direction.name.toUpperCase()} ${order.scaledQty.toStringAsFixed(4)} ${displayOf(order.asset)} (${order.scaledNotionalUsd.toStringAsFixed(2)} USDT)$trigger';
   }
 
   @override
