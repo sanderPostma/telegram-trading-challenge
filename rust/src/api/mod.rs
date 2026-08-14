@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Mutex, OnceLock};
 
 use crate::{
-    interpreter::{interpret, Action, Direction, InterpreterState},
+    interpreter::{interpret, Action, Asset, Direction, InterpreterState},
     patterns::{
         close_target_should_fire as patterns_close_target_should_fire, default_rules,
         extract_close_target_range, extract_master_balance as patterns_extract_master_balance,
@@ -118,7 +118,8 @@ pub struct ManualScaleRequest {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ManualSizeUnit {
-    Btc,
+    /// A base-asset quantity, in units of whichever asset the order is for.
+    Coin,
     Usdt,
 }
 
@@ -153,9 +154,12 @@ fn push_point(series: &mut Vec<SeriesPoint>, point: SeriesPoint) {
 pub use crate::telegram::{TelegramActionStatus, TelegramClientRequest, TelegramMessageEvent};
 pub use crate::weex::PriceTick;
 
-pub async fn weex_public_price_stream(sink: crate::frb_generated::StreamSink<PriceTick>) {
+pub async fn weex_public_price_stream(
+    asset: Asset,
+    sink: crate::frb_generated::StreamSink<PriceTick>,
+) {
     weex::stream_public_price(
-        "BTCUSDT".to_string(),
+        asset.symbol().to_string(),
         "wss://ws-contract.weex.com/v3/ws/public".to_string(),
         sink,
     )
@@ -325,8 +329,8 @@ pub fn risk_context() -> RiskContext {
 
 /// Dry-runs the gate so the UI can warn before an order is ever sent.
 /// `value` is null when the order passes; otherwise it is the rejection reason.
-pub fn risk_preview_order(symbol: String, qty_btc: f64, reduce_only: bool) -> ApiResultString {
-    match crate::risk::check_order(&symbol, qty_btc, reduce_only) {
+pub fn risk_preview_order(symbol: String, qty: f64, reduce_only: bool) -> ApiResultString {
+    match crate::risk::check_order(&symbol, qty, reduce_only) {
         Ok(()) => ApiResultString {
             ok: true,
             value: None,
@@ -728,8 +732,8 @@ fn weex_rejection_message(value: &weex::WeexMarketOrderAck) -> String {
 
 pub fn scale_manual_order(request: ManualScaleRequest) -> ApiResultScaledOrder {
     let size = match request.unit {
-        ManualSizeUnit::Btc => Size::Btc(request.amount),
-        ManualSizeUnit::Usdt => Size::Usd(request.amount),
+        ManualSizeUnit::Coin => Size::Coin(request.amount),
+        ManualSizeUnit::Usdt => Size::Usdt(request.amount),
     };
     match scale_order(
         size,

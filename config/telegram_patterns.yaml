@@ -51,7 +51,7 @@
 # preserves the named capture groups and action semantics above. Test the
 # resulting YAML against a real sample before publishing it.
 
-version: 1
+version: 2
 patterns:
   # --- Guard: message-level veto for hypothetical / discussion posts. --------
   - name: hypothetical
@@ -66,7 +66,7 @@ patterns:
   # captures a USD notional. Filler between the amount and the direction is
   # skipped by `.*?`, so the asset may sit on either side of SHORT/LONG.
   - name: entry
-    regex: '(?im)^\s*(?:STARTED|OPENING|OPENED)\b.*?(?P<btc>[\d.]+)\s*BTC.*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?:STARTED|OPENING|OPENED)\b.*?(?P<qty>[\d.]+)\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\b.*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 10
     enabled: true
@@ -89,14 +89,26 @@ patterns:
   # k/m suffix marks the number as a notional; a bare "0.5 BTC LONG" headline
   # stays unmatched rather than being read as $0.50.
   - name: entry_verbless
-    regex: '(?im)^\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM]))?\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*\$(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM]))?\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 13
     enabled: true
   - name: entry_verbless_short
-    regex: '(?im)^\s*(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\s*(?:BTC|XBT|BITCOIN)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
+    regex: '(?im)^\s*(?P<usd>[\d,]+(?:\.\d+)?)\s*(?P<mult>[KM])\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\b[^\n]*?\b(?P<dir>SHORT|LONG)\b'
     action: enter
     priority: 14
+    enabled: true
+  # Bare quantity headline: "10 ETH LONG". No verb and no "$", so the usual
+  # line-start verb anchor cannot protect this rule — the whole line must
+  # therefore BE the signal and nothing else. "10 ETH LONG was the right call"
+  # is narrative and must not fire, which the trailing $ anchor enforces. The
+  # cost is that a genuine signal with a trailing comment stays unmatched; that
+  # is the correct direction to fail in an app that submits real orders.
+  # See also MAX_SIGNAL_LINES / MAX_SIGNAL_CHARS in rust/src/patterns.rs.
+  - name: entry_bare_qty
+    regex: '(?im)^\s*(?P<qty>[\d.]+)\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\s+(?P<dir>SHORT|LONG)\s*[.!]?\s*$'
+    action: enter
+    priority: 15
     enabled: true
   # The "$" is optional so a bare notional ("ADDED 10000") is still a USD add.
   # add_btc has the lower priority number so a bare BTC quantity ("ADDED 0.5
@@ -109,12 +121,12 @@ patterns:
   # direction the author states must win — without it the add silently inherits
   # the last remembered side and can be sent against a flipped position.
   - name: add_usd
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:(?:\s+(?:SCALP|BITCOIN|BTC|XBT))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*\$?(?P<usd>[\d,]+(?:\.\d+)?)(?:\s*(?P<mult>[KM])\b)?(?:(?:\s+(?:SCALP|BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 21
     enabled: true
-  - name: add_btc
-    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC(?:(?:\s+(?:SCALP|BITCOIN|BTC|XBT))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
+  - name: add_coin
+    regex: '(?im)(?:^|\bAND\s+)\s*ADD(?:ED|ING)\b\s*(?P<qty>[\d.]+)\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\b(?:(?:\s+(?:SCALP|BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH))*\s+(?:TO\s+)?(?P<dir>SHORT|LONG)\b)?(?:\s+TO\s+LIMIT\s+TRIGGER\s+AT\s*\$?(?P<trigger>[\d,]+(?:\.\d+)?))?'
     action: add
     priority: 20
     enabled: true
@@ -125,8 +137,8 @@ patterns:
     action: reduce
     priority: 30
     enabled: true
-  - name: reduce_btc
-    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*(?P<btc>[\d.]+)\s*BTC'
+  - name: reduce_coin
+    regex: '(?im)^\s*REDUC(?:E|ED|ING)\b\s*(?P<qty>[\d.]+)\s*(?P<asset>BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\b'
     action: reduce
     priority: 31
     enabled: true

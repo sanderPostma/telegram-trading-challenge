@@ -107,8 +107,6 @@ pub struct RiskLimits {
     pub kill_switch: bool,
     /// Largest notional (qty x reference price) a single opening order may have.
     pub max_order_notional: Limit,
-    /// Largest quantity a single opening order may have.
-    pub max_order_qty_btc: f64,
     /// Largest total position notional allowed after the order fills.
     pub max_position_notional: Limit,
     /// Symbols that may be traded at all. Empty means "no allowlist configured".
@@ -127,7 +125,6 @@ impl Default for RiskLimits {
         Self {
             kill_switch: false,
             max_order_notional: Limit::off(),
-            max_order_qty_btc: 0.0,
             max_position_notional: Limit::off(),
             symbol_allowlist: Vec::new(),
             max_leverage: 0.0,
@@ -155,7 +152,7 @@ pub struct RiskContext {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OrderIntent {
     pub symbol: String,
-    pub qty_btc: f64,
+    pub qty: f64,
     /// Reduce-only orders are exits and bypass the opening-risk gates.
     pub reduce_only: bool,
 }
@@ -182,7 +179,7 @@ pub fn evaluate(
         ));
     }
 
-    if !intent.qty_btc.is_finite() || intent.qty_btc <= 0.0 {
+    if !intent.qty.is_finite() || intent.qty <= 0.0 {
         return Err("Risk limit: order quantity must be a positive number".to_string());
     }
 
@@ -199,14 +196,7 @@ pub fn evaluate(
         );
     }
 
-    if limits.max_order_qty_btc > 0.0 && intent.qty_btc > limits.max_order_qty_btc {
-        return Err(format!(
-            "Risk limit: order size {:.4} BTC exceeds the {:.4} BTC per-order cap",
-            intent.qty_btc, limits.max_order_qty_btc
-        ));
-    }
-
-    let notional = intent.qty_btc * context.reference_price;
+    let notional = intent.qty * context.reference_price;
     if !limits.max_order_notional.is_off() {
         if context.reference_price <= 0.0 {
             return Err(
@@ -348,7 +338,7 @@ pub fn check_symbol(symbol: &str) -> Result<(), String> {
 }
 
 /// Gate used by the WEEX submit path.
-pub fn check_order(symbol: &str, qty_btc: f64, reduce_only: bool) -> Result<(), String> {
+pub fn check_order(symbol: &str, qty: f64, reduce_only: bool) -> Result<(), String> {
     let (limits, context) = match state().lock() {
         Ok(guard) => (guard.0.clone(), guard.1.clone()),
         // A poisoned lock means a panic left the limits unreadable. Refuse to
@@ -363,7 +353,7 @@ pub fn check_order(symbol: &str, qty_btc: f64, reduce_only: bool) -> Result<(), 
         &context,
         &OrderIntent {
             symbol: symbol.to_string(),
-            qty_btc,
+            qty,
             reduce_only,
         },
     )
@@ -376,7 +366,7 @@ mod tests {
     fn intent(qty: f64) -> OrderIntent {
         OrderIntent {
             symbol: "BTCUSDT".to_string(),
-            qty_btc: qty,
+            qty,
             reduce_only: false,
         }
     }
@@ -431,16 +421,6 @@ mod tests {
             .contains("per-order cap"));
         // 0.01 BTC at 60k = $600.
         assert!(evaluate(&limits, &context(), &intent(0.01)).is_ok());
-    }
-
-    #[test]
-    fn blocks_oversized_order_by_quantity() {
-        let limits = RiskLimits {
-            max_order_qty_btc: 0.05,
-            ..Default::default()
-        };
-        assert!(evaluate(&limits, &context(), &intent(0.06)).is_err());
-        assert!(evaluate(&limits, &context(), &intent(0.04)).is_ok());
     }
 
     #[test]
@@ -570,7 +550,7 @@ mod tests {
         ctx.account_balance_usd = 0.0;
         let exit = OrderIntent {
             symbol: "BTCUSDT".to_string(),
-            qty_btc: 5.0,
+            qty: 5.0,
             reduce_only: true,
         };
         assert!(evaluate(&limits, &ctx, &exit).is_ok());
@@ -605,7 +585,6 @@ mod tests {
         let limits = RiskLimits {
             kill_switch: true,
             max_order_notional: Limit::usd(1.0),
-            max_order_qty_btc: 0.0001,
             max_position_notional: Limit::usd(1.0),
             symbol_allowlist: vec!["BTCUSDT".to_string()],
             max_leverage: 1.0,
@@ -617,7 +596,7 @@ mod tests {
         ctx.open_position_notional_usd = 50_000.0;
         let exit = OrderIntent {
             symbol: "BTCUSDT".to_string(),
-            qty_btc: 5.0,
+            qty: 5.0,
             reduce_only: true,
         };
         assert!(evaluate(&limits, &ctx, &exit).is_ok());
@@ -632,7 +611,7 @@ mod tests {
         };
         let exit = OrderIntent {
             symbol: "ETHUSDT".to_string(),
-            qty_btc: 1.0,
+            qty: 1.0,
             reduce_only: true,
         };
         assert!(evaluate(&limits, &context(), &exit).is_err());

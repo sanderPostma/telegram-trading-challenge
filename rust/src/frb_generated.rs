@@ -722,14 +722,14 @@ fn wire__crate__api__risk_preview_order_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_symbol = <String>::sse_decode(&mut deserializer);
-            let api_qty_btc = <f64>::sse_decode(&mut deserializer);
+            let api_qty = <f64>::sse_decode(&mut deserializer);
             let api_reduce_only = <bool>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| {
                 transform_result_sse::<_, ()>((move || {
                     let output_ok = Result::<_, ()>::Ok(crate::api::risk_preview_order(
                         api_symbol,
-                        api_qty_btc,
+                        api_qty,
                         api_reduce_only,
                     ))?;
                     Ok(output_ok)
@@ -1309,6 +1309,7 @@ fn wire__crate__api__weex_public_price_stream_impl(
             };
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_asset = <crate::interpreter::Asset>::sse_decode(&mut deserializer);
             let api_sink = <StreamSink<
                 crate::weex::PriceTick,
                 flutter_rust_bridge::for_generated::SseCodec,
@@ -1318,7 +1319,7 @@ fn wire__crate__api__weex_public_price_stream_impl(
                 transform_result_sse::<_, ()>(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok({
-                            crate::api::weex_public_price_stream(api_sink).await;
+                            crate::api::weex_public_price_stream(api_asset, api_sink).await;
                         })?;
                         Ok(output_ok)
                     })()
@@ -1610,6 +1611,7 @@ impl SseDecode for crate::interpreter::Action {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_kind = <crate::interpreter::ActionKind>::sse_decode(deserializer);
+        let mut var_asset = <Option<crate::interpreter::Asset>>::sse_decode(deserializer);
         let mut var_direction = <Option<crate::interpreter::Direction>>::sse_decode(deserializer);
         let mut var_size = <Option<crate::interpreter::Size>>::sse_decode(deserializer);
         let mut var_triggerPrice = <Option<f64>>::sse_decode(deserializer);
@@ -1618,6 +1620,7 @@ impl SseDecode for crate::interpreter::Action {
         let mut var_rawText = <String>::sse_decode(deserializer);
         return crate::interpreter::Action {
             kind: var_kind,
+            asset: var_asset,
             direction: var_direction,
             size: var_size,
             trigger_price: var_triggerPrice,
@@ -1767,6 +1770,18 @@ impl SseDecode for crate::api::ApiResultWeexOrderStatus {
             ok: var_ok,
             value: var_value,
             error: var_error,
+        };
+    }
+}
+
+impl SseDecode for crate::interpreter::Asset {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut inner = <i32>::sse_decode(deserializer);
+        return match inner {
+            0 => crate::interpreter::Asset::Btc,
+            1 => crate::interpreter::Asset::Eth,
+            _ => unreachable!("Invalid variant for Asset: {}", inner),
         };
     }
 }
@@ -1948,7 +1963,7 @@ impl SseDecode for crate::api::ManualSizeUnit {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut inner = <i32>::sse_decode(deserializer);
         return match inner {
-            0 => crate::api::ManualSizeUnit::Btc,
+            0 => crate::api::ManualSizeUnit::Coin,
             1 => crate::api::ManualSizeUnit::Usdt,
             _ => unreachable!("Invalid variant for ManualSizeUnit: {}", inner),
         };
@@ -1971,6 +1986,17 @@ impl SseDecode for Option<crate::interpreter::Action> {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         if (<bool>::sse_decode(deserializer)) {
             return Some(<crate::interpreter::Action>::sse_decode(deserializer));
+        } else {
+            return None;
+        }
+    }
+}
+
+impl SseDecode for Option<crate::interpreter::Asset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        if (<bool>::sse_decode(deserializer)) {
+            return Some(<crate::interpreter::Asset>::sse_decode(deserializer));
         } else {
             return None;
         }
@@ -2180,7 +2206,6 @@ impl SseDecode for crate::risk::RiskLimits {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_killSwitch = <bool>::sse_decode(deserializer);
         let mut var_maxOrderNotional = <crate::risk::Limit>::sse_decode(deserializer);
-        let mut var_maxOrderQtyBtc = <f64>::sse_decode(deserializer);
         let mut var_maxPositionNotional = <crate::risk::Limit>::sse_decode(deserializer);
         let mut var_symbolAllowlist = <Vec<String>>::sse_decode(deserializer);
         let mut var_maxLeverage = <f64>::sse_decode(deserializer);
@@ -2189,7 +2214,6 @@ impl SseDecode for crate::risk::RiskLimits {
         return crate::risk::RiskLimits {
             kill_switch: var_killSwitch,
             max_order_notional: var_maxOrderNotional,
-            max_order_qty_btc: var_maxOrderQtyBtc,
             max_position_notional: var_maxPositionNotional,
             symbol_allowlist: var_symbolAllowlist,
             max_leverage: var_maxLeverage,
@@ -2203,11 +2227,11 @@ impl SseDecode for crate::scaling::ScaledOrder {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_ratio = <f64>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_notionalUsd = <f64>::sse_decode(deserializer);
         return crate::scaling::ScaledOrder {
             ratio: var_ratio,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             notional_usd: var_notionalUsd,
         };
     }
@@ -2232,11 +2256,11 @@ impl SseDecode for crate::interpreter::Size {
         match tag_ {
             0 => {
                 let mut var_field0 = <f64>::sse_decode(deserializer);
-                return crate::interpreter::Size::Usd(var_field0);
+                return crate::interpreter::Size::Usdt(var_field0);
             }
             1 => {
                 let mut var_field0 = <f64>::sse_decode(deserializer);
-                return crate::interpreter::Size::Btc(var_field0);
+                return crate::interpreter::Size::Coin(var_field0);
             }
             2 => {
                 let mut var_field0 = <f64>::sse_decode(deserializer);
@@ -2696,6 +2720,7 @@ impl flutter_rust_bridge::IntoDart for crate::interpreter::Action {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.kind.into_into_dart().into_dart(),
+            self.asset.into_into_dart().into_dart(),
             self.direction.into_into_dart().into_dart(),
             self.size.into_into_dart().into_dart(),
             self.trigger_price.into_into_dart().into_dart(),
@@ -2926,6 +2951,22 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ApiResultWeexOrderStatus>
     }
 }
 // Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::interpreter::Asset {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        match self {
+            Self::Btc => 0.into_dart(),
+            Self::Eth => 1.into_dart(),
+            _ => unreachable!(),
+        }
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::interpreter::Asset {}
+impl flutter_rust_bridge::IntoIntoDart<crate::interpreter::Asset> for crate::interpreter::Asset {
+    fn into_into_dart(self) -> crate::interpreter::Asset {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
 impl flutter_rust_bridge::IntoDart for crate::api::ChartData {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
@@ -3021,7 +3062,7 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::ManualScaleRequest>
 impl flutter_rust_bridge::IntoDart for crate::api::ManualSizeUnit {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
-            Self::Btc => 0.into_dart(),
+            Self::Coin => 0.into_dart(),
             Self::Usdt => 1.into_dart(),
             _ => unreachable!(),
         }
@@ -3100,7 +3141,6 @@ impl flutter_rust_bridge::IntoDart for crate::risk::RiskLimits {
         [
             self.kill_switch.into_into_dart().into_dart(),
             self.max_order_notional.into_into_dart().into_dart(),
-            self.max_order_qty_btc.into_into_dart().into_dart(),
             self.max_position_notional.into_into_dart().into_dart(),
             self.symbol_allowlist.into_into_dart().into_dart(),
             self.max_leverage.into_into_dart().into_dart(),
@@ -3121,7 +3161,7 @@ impl flutter_rust_bridge::IntoDart for crate::scaling::ScaledOrder {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         [
             self.ratio.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.notional_usd.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -3155,10 +3195,10 @@ impl flutter_rust_bridge::IntoIntoDart<crate::api::SeriesPoint> for crate::api::
 impl flutter_rust_bridge::IntoDart for crate::interpreter::Size {
     fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
         match self {
-            crate::interpreter::Size::Usd(field0) => {
+            crate::interpreter::Size::Usdt(field0) => {
                 [0.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
-            crate::interpreter::Size::Btc(field0) => {
+            crate::interpreter::Size::Coin(field0) => {
                 [1.into_dart(), field0.into_into_dart().into_dart()].into_dart()
             }
             crate::interpreter::Size::Pct(field0) => {
@@ -3613,6 +3653,7 @@ impl SseEncode for crate::interpreter::Action {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <crate::interpreter::ActionKind>::sse_encode(self.kind, serializer);
+        <Option<crate::interpreter::Asset>>::sse_encode(self.asset, serializer);
         <Option<crate::interpreter::Direction>>::sse_encode(self.direction, serializer);
         <Option<crate::interpreter::Size>>::sse_encode(self.size, serializer);
         <Option<f64>>::sse_encode(self.trigger_price, serializer);
@@ -3719,6 +3760,22 @@ impl SseEncode for crate::api::ApiResultWeexOrderStatus {
         <bool>::sse_encode(self.ok, serializer);
         <Option<crate::weex::WeexOrderStatus>>::sse_encode(self.value, serializer);
         <Option<String>>::sse_encode(self.error, serializer);
+    }
+}
+
+impl SseEncode for crate::interpreter::Asset {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(
+            match self {
+                crate::interpreter::Asset::Btc => 0,
+                crate::interpreter::Asset::Eth => 1,
+                _ => {
+                    unimplemented!("");
+                }
+            },
+            serializer,
+        );
     }
 }
 
@@ -3868,7 +3925,7 @@ impl SseEncode for crate::api::ManualSizeUnit {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <i32>::sse_encode(
             match self {
-                crate::api::ManualSizeUnit::Btc => 0,
+                crate::api::ManualSizeUnit::Coin => 0,
                 crate::api::ManualSizeUnit::Usdt => 1,
                 _ => {
                     unimplemented!("");
@@ -3895,6 +3952,16 @@ impl SseEncode for Option<crate::interpreter::Action> {
         <bool>::sse_encode(self.is_some(), serializer);
         if let Some(value) = self {
             <crate::interpreter::Action>::sse_encode(value, serializer);
+        }
+    }
+}
+
+impl SseEncode for Option<crate::interpreter::Asset> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <bool>::sse_encode(self.is_some(), serializer);
+        if let Some(value) = self {
+            <crate::interpreter::Asset>::sse_encode(value, serializer);
         }
     }
 }
@@ -4061,7 +4128,6 @@ impl SseEncode for crate::risk::RiskLimits {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <bool>::sse_encode(self.kill_switch, serializer);
         <crate::risk::Limit>::sse_encode(self.max_order_notional, serializer);
-        <f64>::sse_encode(self.max_order_qty_btc, serializer);
         <crate::risk::Limit>::sse_encode(self.max_position_notional, serializer);
         <Vec<String>>::sse_encode(self.symbol_allowlist, serializer);
         <f64>::sse_encode(self.max_leverage, serializer);
@@ -4074,7 +4140,7 @@ impl SseEncode for crate::scaling::ScaledOrder {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <f64>::sse_encode(self.ratio, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <f64>::sse_encode(self.notional_usd, serializer);
     }
 }
@@ -4091,11 +4157,11 @@ impl SseEncode for crate::interpreter::Size {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         match self {
-            crate::interpreter::Size::Usd(field0) => {
+            crate::interpreter::Size::Usdt(field0) => {
                 <i32>::sse_encode(0, serializer);
                 <f64>::sse_encode(field0, serializer);
             }
-            crate::interpreter::Size::Btc(field0) => {
+            crate::interpreter::Size::Coin(field0) => {
                 <i32>::sse_encode(1, serializer);
                 <f64>::sse_encode(field0, serializer);
             }
