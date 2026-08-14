@@ -17,6 +17,8 @@ use std::sync::{Mutex, OnceLock};
 
 use serde::{Deserialize, Serialize};
 
+use crate::interpreter::Asset;
+
 /// A limit expressed either as an absolute USD amount or as a percentage of
 /// account balance.
 ///
@@ -192,6 +194,24 @@ pub fn evaluate(
     context: &RiskContext,
     intent: &OrderIntent,
 ) -> Result<(), String> {
+    if !intent.qty.is_finite() || intent.qty <= 0.0 {
+        return Err("Risk limit: order quantity must be a positive number".to_string());
+    }
+
+    // Everything below restrains opening risk only. An exit must always be
+    // possible, so reduce-only stops here.
+    //
+    // This sits above the allowlist, but only for a symbol this build can
+    // actually trade. The allowlist is a preference about what may be
+    // *opened*; enforcing it on an exit would strand a position on an asset
+    // later dropped from the list — or one opened before it was narrowed —
+    // with no way out of it from the app. A reduce-only on a symbol that is
+    // not a known asset at all is still a bug rather than an exit, and is
+    // left to the allowlist check below.
+    if intent.reduce_only && Asset::from_symbol(&intent.symbol).is_some() {
+        return Ok(());
+    }
+
     if !limits.symbol_allowlist.is_empty()
         && !limits
             .symbol_allowlist
@@ -203,16 +223,6 @@ pub fn evaluate(
             intent.symbol,
             limits.symbol_allowlist.join(", ")
         ));
-    }
-
-    if !intent.qty.is_finite() || intent.qty <= 0.0 {
-        return Err("Risk limit: order quantity must be a positive number".to_string());
-    }
-
-    // Everything below restrains opening risk only. An exit must always be
-    // possible, so reduce-only stops here.
-    if intent.reduce_only {
-        return Ok(());
     }
 
     if limits.kill_switch {
@@ -631,18 +641,28 @@ mod tests {
     }
 
     #[test]
-    fn allowlist_still_applies_to_exits() {
-        // A reduce-only order on an unexpected symbol is a bug, not an exit.
+    fn allowlist_still_applies_to_exits_on_unknown_symbols() {
+        // A reduce-only order on a symbol this build cannot trade is a bug,
+        // not an exit, and is still refused.
         let limits = RiskLimits {
             symbol_allowlist: vec!["BTCUSDT".to_string()],
             ..Default::default()
         };
-        let exit = OrderIntent {
+        let bogus = OrderIntent {
+            symbol: "SOLUSDT".to_string(),
+            qty: 1.0,
+            reduce_only: true,
+        };
+        assert!(evaluate(&limits, &context(), &bogus).is_err());
+
+        // A tradable asset missing from the allowlist is a different case:
+        // the position exists and must remain closable.
+        let eth = OrderIntent {
             symbol: "ETHUSDT".to_string(),
             qty: 1.0,
             reduce_only: true,
         };
-        assert!(evaluate(&limits, &context(), &exit).is_err());
+        assert!(evaluate(&limits, &context(), &eth).is_ok());
     }
 
     #[test]
@@ -736,5 +756,77 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(context.price_for("ethusdt"), 1_877.0);
+    }
+
+    #[test]
+    fn a_btc_only_allowlist_rejects_every_eth_order() {
+        // The upgrade trap: an allowlist inherited from a BTC-only install
+        // silently rejects ETH at the gate while the UI shows ETH as
+        // supported. Nothing downstream reports this as a configuration
+        // problem, so it is pinned here.
+        let limits = RiskLimits {
+            symbol_allowlist: vec!["BTCUSDT".to_string()],
+            ..Default::default()
+        };
+        let context = RiskContext {
+            reference_price: 1_877.0,
+            ..Default::default()
+        };
+        let eth = OrderIntent {
+            symbol: "ETHUSDT".to_string(),
+            qty: 2.0,
+            reduce_only: false,
+        };
+        let error = evaluate(&limits, &context, &eth).unwrap_err();
+        assert!(error.contains("allowlist"), "got {error}");
+    }
+
+    #[test]
+    fn an_allowlist_naming_both_assets_admits_both() {
+        let limits = RiskLimits {
+            symbol_allowlist: vec!["BTCUSDT".to_string(), "ETHUSDT".to_string()],
+            ..Default::default()
+        };
+        let context = RiskContext {
+            reference_price: 63_000.0,
+            reference_prices: vec![
+                SymbolPrice { symbol: "BTCUSDT".to_string(), price: 63_000.0 },
+                SymbolPrice { symbol: "ETHUSDT".to_string(), price: 1_877.0 },
+            ],
+            ..Default::default()
+        };
+        for symbol in ["BTCUSDT", "ETHUSDT"] {
+            let intent = OrderIntent {
+                symbol: symbol.to_string(),
+                qty: 0.1,
+                reduce_only: false,
+            };
+            assert!(
+                evaluate(&limits, &context, &intent).is_ok(),
+                "{symbol} must be tradable"
+            );
+        }
+    }
+
+    #[test]
+    fn a_close_is_never_blocked_by_a_narrow_allowlist() {
+        // Exiting must always be possible, including on a book the allowlist
+        // does not admit — otherwise a position opened before the list was
+        // narrowed can never be closed from the app.
+        let limits = RiskLimits {
+            symbol_allowlist: vec!["BTCUSDT".to_string()],
+            kill_switch: true,
+            max_order_notional: Limit::usd(1.0),
+            ..Default::default()
+        };
+        let close = OrderIntent {
+            symbol: "ETHUSDT".to_string(),
+            qty: 2.0,
+            reduce_only: true,
+        };
+        assert!(
+            evaluate(&limits, &RiskContext::default(), &close).is_ok(),
+            "a close must pass every rail, allowlist included"
+        );
     }
 }
