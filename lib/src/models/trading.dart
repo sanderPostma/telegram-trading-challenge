@@ -201,6 +201,12 @@ class RiskLimitValue {
 /// upgrade changes nothing until the user sets a number. The exception is
 /// [symbolAllowlist], which is empty for "no allowlist".
 ///
+/// The allowlist defaults to every asset this build can trade. A default that
+/// named only some of them would reject those signals at the risk gate while
+/// the UI presented them as supported — a silent failure. Narrowing it is a
+/// deliberate user action; an existing BTC-only list is never widened without
+/// being asked (see AppConfig.ethAllowlistPromptPending).
+///
 /// The authoritative copy lives in Rust; this mirrors it for the UI and for
 /// persistence. See `rust/src/risk.rs`.
 class RiskSettings {
@@ -208,7 +214,7 @@ class RiskSettings {
     this.killSwitch = false,
     this.maxOrderNotional = const RiskLimitValue.off(),
     this.maxPositionNotional = const RiskLimitValue.off(),
-    this.symbolAllowlist = const ['BTCUSDT'],
+    this.symbolAllowlist = const ['BTCUSDT', 'ETHUSDT'],
     this.maxLeverage = 0,
     this.dailyLoss = const RiskLimitValue.off(),
     this.maxSignalAgeSecs = 0,
@@ -276,7 +282,7 @@ class RiskSettings {
               .map((entry) => entry.toString().trim().toUpperCase())
               .where((entry) => entry.isNotEmpty)
               .toList()
-          : const ['BTCUSDT'],
+          : const ['BTCUSDT', 'ETHUSDT'],
       maxLeverage: _doubleValue(json['maxLeverage'], 0),
       dailyLoss: RiskLimitValue.fromJson(
         json['dailyLoss'] ?? json['dailyLossLimitUsd'],

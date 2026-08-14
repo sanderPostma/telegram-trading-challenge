@@ -18,10 +18,20 @@ void main() {
         'killSwitch': false,
         'symbolAllowlist': allowlist,
         'maxOrderQtyBtc': maxOrderQtyBtc,
-        if (maxOrderNotional != null) 'maxOrderNotional': maxOrderNotional,
+        'maxOrderNotional': ?maxOrderNotional,
       },
     };
   }
+
+  test('a fresh install allows every tradable asset', () {
+    // Not a migration case, but the same failure it guards against: a default
+    // allowlist naming only some assets rejects the others at the risk gate
+    // while the UI presents them as supported, and no prompt fires for a new
+    // install to catch it.
+    const fresh = AppConfig();
+    expect(fresh.risk.symbolAllowlist, containsAll(['BTCUSDT', 'ETHUSDT']));
+    expect(fresh.ethAllowlistPromptPending, isFalse);
+  });
 
   test('an unversioned blob is treated as v1', () {
     final config = AppConfig.fromPersistentJson(v1Config());

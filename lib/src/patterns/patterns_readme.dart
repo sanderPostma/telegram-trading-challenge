@@ -69,11 +69,26 @@ signal, handled by the close pattern below.
 
 Named capture groups are interpreted by the app:
 
-- btc: BTC quantity
+- qty: quantity of the traded coin (`btc` is still accepted, from older rules)
+- asset: which coin — BTC, XBT, BITCOIN, ETH, ETHER, or ETHEREUM
 - usd: USDT notional
 - pct: percentage to reduce
 - dir: LONG or SHORT
 - trigger: optional limit trigger price
+
+BTC and ETH are both tradable and can be open at the same time. Where a rule
+does not capture `asset` itself, the app reads the coin named anywhere in the
+message — but only if exactly one coin is named. A message mentioning both is
+ambiguous and produces no trade.
+
+A message that names no coin at all inherits the open position's, and is sent
+for manual review rather than guessed when both books are open. "REDUCED 25%"
+is therefore unambiguous with one position open and needs review with two.
+
+Two rules protect against narrative being read as a signal. Trade verbs must
+start a line, and the verbless shorthand ("10 ETH LONG") must be the entire
+line — "10 ETH LONG was the right call" does not trade. Messages longer than
+four lines or 320 characters are treated as discussion and ignored outright.
 
 Separate instructions joined by AND are processed as separate actions. Test
 changes with a sample Telegram message before publishing the YAML. Any AI
