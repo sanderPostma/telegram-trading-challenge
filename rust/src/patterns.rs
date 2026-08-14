@@ -943,3 +943,50 @@ patterns:
         assert!(!rules.iter().any(|r| r.name == "add_btc"));
     }
 }
+
+#[cfg(test)]
+mod eth_end_to_end {
+    use super::*;
+    use crate::interpreter::{interpret, ActionKind, InterpreterState};
+    use crate::scaling::{scale_order, ScaleInput};
+
+    /// The message that prompted multi-asset support, end to end: parse ->
+    /// interpret -> scale, with ETH's real WEEX lot step.
+    #[test]
+    fn ten_eth_long_becomes_a_scaled_eth_order() {
+        let rules = default_rules();
+        let hit = match_first("10 ETH LONG", &rules).unwrap().unwrap();
+        let action = interpret("10 ETH LONG", Some(hit), &InterpreterState::default());
+
+        assert_eq!(action.kind, ActionKind::Enter);
+        assert_eq!(action.asset, Some(Asset::Eth));
+        assert_eq!(action.direction, Some(Direction::Long));
+        assert_eq!(action.size, Some(Size::Coin(10.0)));
+        assert!(action.confidence_high, "a complete signal must not need review");
+
+        let asset = action.asset.unwrap();
+        assert_eq!(asset.symbol(), "ETHUSDT");
+
+        // Master is 10k, we hold 2k -> a fifth of the master's size.
+        let scaled = scale_order(
+            action.size.unwrap(),
+            ScaleInput {
+                master_balance_usd: 10_000.0,
+                my_balance_usd: 2_000.0,
+                mark_price: 3_000.0,
+                qty_step: asset.qty_step(),
+            },
+        )
+        .unwrap();
+        assert_eq!(scaled.qty, 2.0);
+        assert_eq!(scaled.notional_usd, 6_000.0);
+    }
+
+    #[test]
+    fn the_same_message_as_commentary_does_not_trade() {
+        let rules = default_rules();
+        assert!(match_actions("10 ETH LONG was the right call", &rules)
+            .unwrap()
+            .is_empty());
+    }
+}

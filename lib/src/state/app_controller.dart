@@ -92,6 +92,44 @@ class AppController extends ChangeNotifier {
 
   AssetBook bookFor(Asset asset) => books[asset] ?? AssetBook(asset: asset);
 
+  /// Adds ETHUSDT to the symbol allowlist, answering the v1 -> v2 migration
+  /// prompt. Only ever called from an explicit user action: widening a risk
+  /// rail is the user's decision, never a side effect of upgrading.
+  Future<void> acceptEthAllowlistPrompt() async {
+    final allowlist = [...config.risk.symbolAllowlist];
+    for (final asset in Asset.values) {
+      final symbol = symbolOf(asset);
+      if (!allowlist.contains(symbol)) allowlist.add(symbol);
+    }
+    config = config.copyWith(
+      risk: config.risk.copyWith(symbolAllowlist: allowlist),
+      ethAllowlistPromptPending: false,
+    );
+    _log('Symbol allowlist now permits ${allowlist.join(', ')}.');
+    await saveConfig(config);
+    await _pushRiskLimits();
+    notifyListeners();
+  }
+
+  /// Leaves the allowlist as it is. ETH signals keep being rejected, which is a
+  /// legitimate choice — but it is now an informed one.
+  Future<void> declineEthAllowlistPrompt() async {
+    config = config.copyWith(ethAllowlistPromptPending: false);
+    _log(
+      'Symbol allowlist left unchanged; ETH signals will be rejected by the '
+      'risk gate.',
+    );
+    await saveConfig(config);
+    notifyListeners();
+  }
+
+  /// Dismisses the retired-quantity-cap notice once the user has seen it.
+  Future<void> acknowledgeLegacyQtyCap() async {
+    config = config.copyWith(legacyOrderQtyCapBtc: 0);
+    await saveConfig(config);
+    notifyListeners();
+  }
+
   /// Switches which book the detail panels act on. Signals are unaffected —
   /// they are routed by the asset named in the message.
   void selectAsset(Asset asset) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../models/trading.dart';
@@ -248,6 +250,14 @@ class _SettingsPageState extends State<SettingsPage> {
         'Symbols allowed: ${risk.symbolAllowlist.isEmpty ? 'any' : risk.symbolAllowlist.join(', ')}',
         style: theme.textTheme.bodySmall,
       ),
+      if (widget.controller.config.ethAllowlistPromptPending) ...[
+        const SizedBox(height: 12),
+        _EthAllowlistPrompt(controller: widget.controller),
+      ],
+      if (widget.controller.config.legacyOrderQtyCapBtc > 0) ...[
+        const SizedBox(height: 12),
+        _LegacyQtyCapNotice(controller: widget.controller),
+      ],
     ]);
   }
 
@@ -339,6 +349,108 @@ class _RevealTextFieldState extends State<_RevealTextField> {
           onPressed: () => setState(() => _visible = !_visible),
           icon: Icon(_visible ? Icons.visibility_off : Icons.visibility),
         ),
+      ),
+    );
+  }
+}
+
+
+/// Shown once after upgrading from a BTC-only config.
+///
+/// The stored allowlist permits BTCUSDT and nothing else — the default every
+/// v1 install carries whether or not it was ever configured — so every ETH
+/// signal would be rejected by the risk gate while the UI advertised ETH as
+/// supported. The allowlist is not widened without an explicit answer.
+class _EthAllowlistPrompt extends StatelessWidget {
+  const _EthAllowlistPrompt({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('ETH support was added', style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          Text(
+            'Your symbol allowlist currently permits '
+            '${controller.config.risk.symbolAllowlist.join(', ')} only, so ETH '
+            'signals will be rejected before they reach the exchange. Add '
+            'ETHUSDT to the allowlist?',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              FilledButton(
+                onPressed: () =>
+                    unawaited(controller.acceptEthAllowlistPrompt()),
+                child: const Text('Allow ETHUSDT'),
+              ),
+              const SizedBox(width: 10),
+              TextButton(
+                onPressed: () =>
+                    unawaited(controller.declineEthAllowlistPrompt()),
+                child: const Text('Keep BTC only'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Reports what happened to the v1 BTC-denominated per-order quantity cap.
+///
+/// That rail cannot mean anything across two assets, so it is retired — but
+/// silently dropping a configured cap could leave an account with no per-order
+/// limit at all, so the change is surfaced rather than assumed harmless.
+class _LegacyQtyCapNotice extends StatelessWidget {
+  const _LegacyQtyCapNotice({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cap = controller.config.legacyOrderQtyCapBtc;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Per-order quantity cap retired',
+              style: theme.textTheme.titleSmall),
+          const SizedBox(height: 6),
+          Text(
+            'You had a ${cap.toStringAsFixed(4)} BTC per-order cap. A quantity '
+            'cap cannot mean the same thing for BTC and ETH, so order size is '
+            'now capped by notional instead. Set "Max order notional" above if '
+            'you want that rail armed.',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          FilledButton(
+            onPressed: () =>
+                unawaited(controller.acknowledgeLegacyQtyCap()),
+            child: const Text('Got it'),
+          ),
+        ],
       ),
     );
   }
