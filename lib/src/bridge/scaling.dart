@@ -8,13 +8,13 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 class ScaledOrder {
   final double ratio;
-  final double qtyBtc;
+  final double qty;
   final double notionalUsd;
 
-  const ScaledOrder({required this.ratio, required this.qtyBtc, required this.notionalUsd});
+  const ScaledOrder({required this.ratio, required this.qty, required this.notionalUsd});
 
   @override
-  int get hashCode => ratio.hashCode ^ qtyBtc.hashCode ^ notionalUsd.hashCode;
+  int get hashCode => ratio.hashCode ^ qty.hashCode ^ notionalUsd.hashCode;
 
   @override
   bool operator ==(Object other) =>
@@ -22,6 +22,6 @@ class ScaledOrder {
       other is ScaledOrder &&
           runtimeType == other.runtimeType &&
           ratio == other.ratio &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           notionalUsd == other.notionalUsd;
 }

@@ -67,7 +67,7 @@ pub struct WeexMarketOrderRequest {
     pub symbol: String,
     pub base_url: String,
     pub side: String,
-    pub qty_btc: f64,
+    pub qty: f64,
     pub reduce_only: bool,
     pub client_order_id: String,
     pub qty_step: f64,
@@ -81,7 +81,7 @@ pub struct WeexAlgoOrderRequest {
     pub symbol: String,
     pub base_url: String,
     pub side: String,
-    pub qty_btc: f64,
+    pub qty: f64,
     pub trigger_price: f64,
     pub limit_price: f64,
     pub order_type: String,
@@ -107,7 +107,7 @@ pub struct WeexTpSlOrderRequest {
     pub plan_type: String,
     pub trigger_price: f64,
     /// 0 closes the entire position — the scalping default.
-    pub qty_btc: f64,
+    pub qty: f64,
     pub client_algo_id: String,
     pub qty_step: f64,
     pub price_step: f64,
@@ -146,7 +146,7 @@ pub struct WeexAccountBalance {
 pub struct WeexPositionSnapshot {
     pub symbol: String,
     pub direction: String,
-    pub qty_btc: f64,
+    pub qty: f64,
     pub entry_price: f64,
     pub mark_price: f64,
     pub notional_usdt: f64,
@@ -165,7 +165,7 @@ pub struct WeexExecutionSnapshot {
     pub kind: String,
     pub direction: String,
     pub price: f64,
-    pub qty_btc: f64,
+    pub qty: f64,
     pub notional_usdt: f64,
     pub realized_pnl_usdt: f64,
     pub fee_usdt: f64,
@@ -299,8 +299,8 @@ pub async fn reconcile_account(
     let position = client.fetch_position(mark_price).await?;
     let mut recent_executions = client.fetch_recent_executions().await.unwrap_or_default();
     let final_signed_qty = match position.direction.as_str() {
-        "long" => position.qty_btc,
-        "short" => -position.qty_btc,
+        "long" => position.qty,
+        "short" => -position.qty,
         _ => 0.0,
     };
     classify_executions(&mut recent_executions, final_signed_qty);
@@ -331,17 +331,17 @@ pub async fn submit_market_order(
     } else {
         anyhow::bail!("WEEX market order side must be buy or sell");
     };
-    if request.qty_btc <= 0.0 || !request.qty_btc.is_finite() {
+    if request.qty <= 0.0 || !request.qty.is_finite() {
         anyhow::bail!("WEEX market order quantity must be positive");
     }
     // The last gate before the exchange. Everything upstream — Telegram
     // parsing, scaling, manual entry — funnels through here.
     if let Err(reason) =
-        crate::risk::check_order(&client.request.symbol, request.qty_btc, request.reduce_only)
+        crate::risk::check_order(&client.request.symbol, request.qty, request.reduce_only)
     {
         anyhow::bail!(reason);
     }
-    let mut order = OrderRequest::market(&client.request.symbol, side, request.qty_btc);
+    let mut order = OrderRequest::market(&client.request.symbol, side, request.qty);
     order.client_order_id = Some(sanitize_client_order_id(&request.client_order_id));
     if request.reduce_only {
         order = order.reduce_only();
@@ -375,7 +375,7 @@ pub async fn submit_algo_order(
         recent_lookback_ms: 7 * 24 * 60 * 60 * 1000,
     })?;
     let side = parse_order_side(&request.side)?;
-    if request.qty_btc <= 0.0 || !request.qty_btc.is_finite() {
+    if request.qty <= 0.0 || !request.qty.is_finite() {
         anyhow::bail!("WEEX conditional order quantity must be positive");
     }
     if request.trigger_price <= 0.0 || !request.trigger_price.is_finite() {
@@ -395,7 +395,7 @@ pub async fn submit_algo_order(
     let body = algo_order_body(
         &client.request.symbol,
         side,
-        request.qty_btc,
+        request.qty,
         request.trigger_price,
         request.limit_price,
         &order_type,
@@ -442,7 +442,7 @@ pub async fn submit_tp_sl_order(
     if request.trigger_price <= 0.0 || !request.trigger_price.is_finite() {
         anyhow::bail!("WEEX TP/SL trigger price must be positive");
     }
-    if request.qty_btc < 0.0 || !request.qty_btc.is_finite() {
+    if request.qty < 0.0 || !request.qty.is_finite() {
         anyhow::bail!("WEEX TP/SL quantity must be zero (whole position) or positive");
     }
     if let Err(reason) = crate::risk::check_symbol(&client.request.symbol) {
@@ -454,7 +454,7 @@ pub async fn submit_tp_sl_order(
         position_side,
         &plan_type,
         request.trigger_price,
-        request.qty_btc,
+        request.qty,
         &request.client_algo_id,
         request.qty_step,
         request.price_step,
@@ -477,7 +477,7 @@ pub struct WeexOrderStatus {
     /// Exchange status verbatim (NEW, PARTIALLY_FILLED, FILLED, CANCELED,
     /// REJECTED), uppercased. Empty when the order is absent.
     pub status: String,
-    pub filled_qty_btc: f64,
+    pub filled_qty: f64,
     pub avg_price: f64,
 }
 
@@ -524,7 +524,7 @@ pub async fn lookup_order_by_client_id(
             order_id: String::new(),
             client_order_id: Some(client_order_id),
             status: String::new(),
-            filled_qty_btc: 0.0,
+            filled_qty: 0.0,
             avg_price: 0.0,
         });
     }
@@ -535,7 +535,7 @@ pub async fn lookup_order_by_client_id(
         client_order_id: json_optional_id_to_string(&detail.client_order_id)
             .or(Some(client_order_id)),
         status: detail.status.trim().to_ascii_uppercase(),
-        filled_qty_btc: parse_f64_lossy(&detail.executed_qty).abs(),
+        filled_qty: parse_f64_lossy(&detail.executed_qty).abs(),
         avg_price: parse_f64_lossy(&detail.avg_price),
     })
 }
@@ -700,7 +700,7 @@ impl SignedRestClient {
             return Ok(WeexPositionSnapshot {
                 symbol: self.request.symbol.clone(),
                 direction: "flat".to_string(),
-                qty_btc: 0.0,
+                qty: 0.0,
                 entry_price: 0.0,
                 mark_price,
                 notional_usdt: 0.0,
@@ -725,7 +725,7 @@ impl SignedRestClient {
         Ok(WeexPositionSnapshot {
             symbol: pos.symbol.clone(),
             direction: direction.to_string(),
-            qty_btc: qty,
+            qty: qty,
             entry_price,
             mark_price,
             notional_usdt: notional,
@@ -794,7 +794,7 @@ impl SignedRestClient {
                     kind: "unknown".to_string(),
                     direction: "flat".to_string(),
                     price,
-                    qty_btc: qty,
+                    qty: qty,
                     notional_usdt: if quote_qty > 0.0 {
                         quote_qty
                     } else {
@@ -951,17 +951,17 @@ fn decode_payload<T: DeserializeOwned>(value: Value) -> anyhow::Result<T> {
 fn classify_executions(executions: &mut [WeexExecutionSnapshot], final_signed_qty: f64) {
     let returned_delta = executions.iter().fold(0.0_f64, |sum, execution| {
         sum + if execution.side == "buy" {
-            execution.qty_btc
+            execution.qty
         } else {
-            -execution.qty_btc
+            -execution.qty
         }
     });
     let mut signed_qty = final_signed_qty - returned_delta;
     for execution in executions {
         let delta = if execution.side == "buy" {
-            execution.qty_btc
+            execution.qty
         } else {
-            -execution.qty_btc
+            -execution.qty
         };
         let before = signed_qty;
         let after = signed_qty + delta;
@@ -1645,7 +1645,7 @@ mod tests {
         assert_eq!(executions[0].direction, "long");
     }
 
-    fn test_execution(id: &str, side: &str, qty_btc: f64) -> WeexExecutionSnapshot {
+    fn test_execution(id: &str, side: &str, qty: f64) -> WeexExecutionSnapshot {
         WeexExecutionSnapshot {
             exec_id: id.to_string(),
             order_id: id.to_string(),
@@ -1658,8 +1658,8 @@ mod tests {
             kind: "unknown".to_string(),
             direction: "flat".to_string(),
             price: 100_000.0,
-            qty_btc,
-            notional_usdt: qty_btc * 100_000.0,
+            qty,
+            notional_usdt: qty * 100_000.0,
             realized_pnl_usdt: 0.0,
             fee_usdt: 0.0,
             timestamp_ms: id.parse::<i64>().unwrap_or_default(),

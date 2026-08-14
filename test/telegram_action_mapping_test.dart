@@ -36,13 +36,13 @@ void main() {
   group('closeDisposition', () {
     const openPosition = PositionView(
       direction: TradeDirection.short,
-      qtyBtc: 0.5,
+      qty: 0.5,
       notionalUsd: 30000,
       unrealizedPnlUsd: 0,
     );
     const flatPosition = PositionView(
       direction: null,
-      qtyBtc: 0,
+      qty: 0,
       notionalUsd: 0,
       unrealizedPnlUsd: 0,
     );

@@ -1,6 +1,17 @@
+import '../bridge/interpreter.dart' show Asset;
+
 enum TradeDirection { long, short }
 
-enum SizeUnit { btc, usdt }
+/// Manual-entry size unit. [coin] is a quantity of whichever asset the order is
+/// for — it is not BTC-specific.
+enum SizeUnit { coin, usdt }
+
+/// Bumped whenever a stored config needs rewriting to stay correct.
+///
+/// v1 is the BTC-only layout. v2 adds ETH, which retires the BTC-denominated
+/// per-order quantity cap and makes the BTC-only symbol allowlist inherited
+/// from v1 actively harmful — it silently rejects every ETH signal.
+const int currentConfigVersion = 2;
 
 enum TradeKind { enter, add, reduce, close, manual }
 
@@ -196,7 +207,6 @@ class RiskSettings {
   const RiskSettings({
     this.killSwitch = false,
     this.maxOrderNotional = const RiskLimitValue.off(),
-    this.maxOrderQtyBtc = 0,
     this.maxPositionNotional = const RiskLimitValue.off(),
     this.symbolAllowlist = const ['BTCUSDT'],
     this.maxLeverage = 0,
@@ -206,7 +216,6 @@ class RiskSettings {
 
   final bool killSwitch;
   final RiskLimitValue maxOrderNotional;
-  final double maxOrderQtyBtc;
   final RiskLimitValue maxPositionNotional;
   final List<String> symbolAllowlist;
   final double maxLeverage;
@@ -216,7 +225,6 @@ class RiskSettings {
   /// True when at least one numeric rail is armed. The UI nags while false.
   bool get hasAnyLimit =>
       !maxOrderNotional.isOff ||
-      maxOrderQtyBtc > 0 ||
       !maxPositionNotional.isOff ||
       maxLeverage > 0 ||
       !dailyLoss.isOff ||
@@ -225,7 +233,6 @@ class RiskSettings {
   RiskSettings copyWith({
     bool? killSwitch,
     RiskLimitValue? maxOrderNotional,
-    double? maxOrderQtyBtc,
     RiskLimitValue? maxPositionNotional,
     List<String>? symbolAllowlist,
     double? maxLeverage,
@@ -235,7 +242,6 @@ class RiskSettings {
     return RiskSettings(
       killSwitch: killSwitch ?? this.killSwitch,
       maxOrderNotional: maxOrderNotional ?? this.maxOrderNotional,
-      maxOrderQtyBtc: maxOrderQtyBtc ?? this.maxOrderQtyBtc,
       maxPositionNotional: maxPositionNotional ?? this.maxPositionNotional,
       symbolAllowlist: symbolAllowlist ?? this.symbolAllowlist,
       maxLeverage: maxLeverage ?? this.maxLeverage,
@@ -247,7 +253,6 @@ class RiskSettings {
   Map<String, Object> toJson() => {
         'killSwitch': killSwitch,
         'maxOrderNotional': maxOrderNotional.toJson(),
-        'maxOrderQtyBtc': maxOrderQtyBtc,
         'maxPositionNotional': maxPositionNotional.toJson(),
         'symbolAllowlist': symbolAllowlist,
         'maxLeverage': maxLeverage,
@@ -263,7 +268,6 @@ class RiskSettings {
       maxOrderNotional: RiskLimitValue.fromJson(
         json['maxOrderNotional'] ?? json['maxOrderNotionalUsd'],
       ),
-      maxOrderQtyBtc: _doubleValue(json['maxOrderQtyBtc'], 0),
       maxPositionNotional: RiskLimitValue.fromJson(
         json['maxPositionNotional'] ?? json['maxPositionNotionalUsd'],
       ),
@@ -299,6 +303,9 @@ class AppConfig {
     this.simulationMode = true,
     this.minimizeToTray = false,
     this.risk = const RiskSettings(),
+    this.configVersion = currentConfigVersion,
+    this.ethAllowlistPromptPending = false,
+    this.legacyOrderQtyCapBtc = 0,
   });
 
   final String weexApiKey;
@@ -316,6 +323,28 @@ class AppConfig {
   final bool simulationMode;
   final bool minimizeToTray;
   final RiskSettings risk;
+
+  /// Schema version of the stored config. See [currentConfigVersion].
+  final int configVersion;
+
+  /// Set by the v1 -> v2 migration when the stored symbol allowlist permits
+  /// BTCUSDT but not ETHUSDT, which would silently reject every ETH signal.
+  ///
+  /// The allowlist is deliberately left untouched until the user answers:
+  /// widening a risk rail without being asked is exactly the kind of silent
+  /// change this app should never make.
+  final bool ethAllowlistPromptPending;
+
+  /// A v1 `maxOrderQtyBtc` carried across the migration, in BTC.
+  ///
+  /// Non-zero means the rail has not been converted yet. Conversion needs a
+  /// mark price, which is not available at load time, so the controller does it
+  /// once a price arrives. Dropping the cap silently could leave an account
+  /// with no per-order limit at all.
+  final double legacyOrderQtyCapBtc;
+
+  bool get hasPendingMigration =>
+      ethAllowlistPromptPending || legacyOrderQtyCapBtc > 0;
 
   double get scaleRatio =>
       masterBalanceUsd <= 0 ? 0 : myBalanceUsd / masterBalanceUsd;
@@ -374,11 +403,43 @@ class AppConfig {
       'simulationMode': simulationMode,
       'minimizeToTray': minimizeToTray,
       'risk': risk.toJson(),
+      'configVersion': configVersion,
+      'ethAllowlistPromptPending': ethAllowlistPromptPending,
+      'legacyOrderQtyCapBtc': legacyOrderQtyCapBtc,
     };
   }
 
   factory AppConfig.fromPersistentJson(Map<String, Object?> json) {
+    // A blob written before versioning existed is v1 by definition.
+    final storedVersion = _doubleValue(json['configVersion'], 1).round();
+    final riskJson = json['risk'] is Map
+        ? Map<String, Object?>.from(json['risk'] as Map)
+        : const <String, Object?>{};
+    final risk = riskJson.isEmpty
+        ? const RiskSettings()
+        : RiskSettings.fromJson(riskJson);
+    final migratingFromV1 = storedVersion < 2;
+
+    // v1 stored a BTC-denominated per-order quantity cap. It cannot mean
+    // anything across two assets, so it is retired — but carried, not dropped,
+    // until it has been converted to a notional the user can see.
+    final legacyQtyCap = migratingFromV1
+        ? _doubleValue(riskJson['maxOrderQtyBtc'], 0)
+        : _doubleValue(json['legacyOrderQtyCapBtc'], 0);
+
+    // Every v1 install allows BTCUSDT and nothing else, whether or not the user
+    // ever configured it, so ETH would be rejected by the risk gate while the
+    // UI showed it as supported.
+    final allowsBtcOnly = risk.symbolAllowlist.isNotEmpty &&
+        !risk.symbolAllowlist.contains('ETHUSDT');
+    final promptPending = migratingFromV1
+        ? allowsBtcOnly
+        : _boolValue(json['ethAllowlistPromptPending'], false);
+
     return AppConfig(
+      configVersion: currentConfigVersion,
+      ethAllowlistPromptPending: promptPending,
+      legacyOrderQtyCapBtc: legacyQtyCap,
       weexApiKey: _stringValue(json['weexApiKey']),
       weexSecret: _stringValue(json['weexSecret']),
       weexPassphrase: _stringValue(json['weexPassphrase']),
@@ -392,9 +453,7 @@ class AppConfig {
       hasSeenAutoApproveWarning: _boolValue(json['hasSeenAutoApproveWarning'], false),
       simulationMode: _boolValue(json['simulationMode'], true),
       minimizeToTray: false,
-      risk: json['risk'] is Map
-          ? RiskSettings.fromJson(Map<String, Object?>.from(json['risk'] as Map))
-          : const RiskSettings(),
+      risk: risk,
     );
   }
 
@@ -414,6 +473,9 @@ class AppConfig {
     bool? simulationMode,
     bool? minimizeToTray,
     RiskSettings? risk,
+    int? configVersion,
+    bool? ethAllowlistPromptPending,
+    double? legacyOrderQtyCapBtc,
   }) {
     return AppConfig(
       weexApiKey: weexApiKey ?? this.weexApiKey,
@@ -431,6 +493,10 @@ class AppConfig {
       simulationMode: simulationMode ?? this.simulationMode,
       minimizeToTray: minimizeToTray ?? this.minimizeToTray,
       risk: risk ?? this.risk,
+      configVersion: configVersion ?? this.configVersion,
+      ethAllowlistPromptPending:
+          ethAllowlistPromptPending ?? this.ethAllowlistPromptPending,
+      legacyOrderQtyCapBtc: legacyOrderQtyCapBtc ?? this.legacyOrderQtyCapBtc,
     );
   }
 }
@@ -544,19 +610,19 @@ class PlannedOrder {
 class PositionView {
   const PositionView({
     required this.direction,
-    required this.qtyBtc,
+    required this.qty,
     required this.notionalUsd,
     required this.unrealizedPnlUsd,
     this.crossCombinedLeverage = 0,
   });
 
   final TradeDirection? direction;
-  final double qtyBtc;
+  final double qty;
   final double notionalUsd;
   final double unrealizedPnlUsd;
   final double crossCombinedLeverage;
 
-  bool get isFlat => direction == null || qtyBtc == 0;
+  bool get isFlat => direction == null || qty == 0;
 }
 
 class TradeHistoryEntry {
@@ -575,4 +641,59 @@ class TradeHistoryEntry {
   final double filledUsdt;
   final double avgPrice;
   final double realizedPnlUsdt;
+}
+
+/// Per-asset trading state.
+///
+/// BTC and ETH can be open at the same time, so everything that belongs to one
+/// instrument — its mark price, its position, its resting take-profit, its
+/// close-target watch — lives here rather than on the controller. Account-level
+/// facts (balance, equity history, realized PnL) stay on the controller because
+/// they are genuinely shared across books.
+class AssetBook {
+  const AssetBook({
+    required this.asset,
+    this.markPrice = 0,
+    this.position = const PositionView(
+      direction: null,
+      qty: 0,
+      notionalUsd: 0,
+      unrealizedPnlUsd: 0,
+    ),
+    this.closeTargetWatch,
+    this.closeTargetTriggered = false,
+    this.exchangeTakeProfit,
+  });
+
+  final Asset asset;
+  final double markPrice;
+  final PositionView position;
+  final CloseTargetWatch? closeTargetWatch;
+  final bool closeTargetTriggered;
+  final ExchangeTakeProfit? exchangeTakeProfit;
+
+  bool get isFlat => position.isFlat;
+  bool get hasFreshPrice => markPrice > 0;
+
+  AssetBook copyWith({
+    double? markPrice,
+    PositionView? position,
+    CloseTargetWatch? closeTargetWatch,
+    bool clearCloseTargetWatch = false,
+    bool? closeTargetTriggered,
+    ExchangeTakeProfit? exchangeTakeProfit,
+    bool clearExchangeTakeProfit = false,
+  }) {
+    return AssetBook(
+      asset: asset,
+      markPrice: markPrice ?? this.markPrice,
+      position: position ?? this.position,
+      closeTargetWatch:
+          clearCloseTargetWatch ? null : (closeTargetWatch ?? this.closeTargetWatch),
+      closeTargetTriggered: closeTargetTriggered ?? this.closeTargetTriggered,
+      exchangeTakeProfit: clearExchangeTakeProfit
+          ? null
+          : (exchangeTakeProfit ?? this.exchangeTakeProfit),
+    );
+  }
 }

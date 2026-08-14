@@ -5,7 +5,7 @@ import 'package:trading_challenge/src/state/app_controller.dart';
 
 rust_weex.WeexAccountReconciliation _reconciliation({
   required String direction,
-  double qtyBtc = 0,
+  double qty = 0,
 }) {
   return rust_weex.WeexAccountReconciliation(
     balance: const rust_weex.WeexAccountBalance(
@@ -19,10 +19,10 @@ rust_weex.WeexAccountReconciliation _reconciliation({
     position: rust_weex.WeexPositionSnapshot(
       symbol: 'BTCUSDT',
       direction: direction,
-      qtyBtc: qtyBtc,
+      qty: qty,
       entryPrice: 63000,
       markPrice: 63000,
-      notionalUsdt: qtyBtc * 63000,
+      notionalUsdt: qty * 63000,
       unrealizedPnlUsdt: 0,
       leverage: 10,
       updatedAtMs: 0,
@@ -79,7 +79,7 @@ void main() {
     c.armCloseTarget(low: 63600, high: 63700, source: 'Telegram');
     // First reconcile observes the position open (armed watch persists).
     c.applyWeexReconciliation(
-      _reconciliation(direction: 'long', qtyBtc: 0.01),
+      _reconciliation(direction: 'long', qty: 0.01),
     );
     expect(c.closeTargetWatch, isNotNull);
     // Second reconcile observes the same position going flat: disarm.

@@ -38,7 +38,7 @@ flutter_rust_bridge::frb_generated_boilerplate!(
     default_rust_auto_opaque = RustAutoOpaqueMoi,
 );
 pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_VERSION: &str = "2.12.0";
-pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = -1291247560;
+pub(crate) const FLUTTER_RUST_BRIDGE_CODEGEN_CONTENT_HASH: i32 = 851511916;
 
 // Section: executor
 
@@ -46,6 +46,71 @@ flutter_rust_bridge::frb_generated_default_handler!();
 
 // Section: wire_funcs
 
+fn wire__crate__api__asset_for_symbol_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "asset_for_symbol",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            let api_symbol = <String>::sse_decode(&mut deserializer);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::asset_for_symbol(api_symbol))?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
+fn wire__crate__api__asset_specs_impl(
+    port_: flutter_rust_bridge::for_generated::MessagePort,
+    ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
+    rust_vec_len_: i32,
+    data_len_: i32,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap_normal::<flutter_rust_bridge::for_generated::SseCodec, _, _>(
+        flutter_rust_bridge::for_generated::TaskInfo {
+            debug_name: "asset_specs",
+            port: Some(port_),
+            mode: flutter_rust_bridge::for_generated::FfiCallMode::Normal,
+        },
+        move || {
+            let message = unsafe {
+                flutter_rust_bridge::for_generated::Dart2RustMessageSse::from_wire(
+                    ptr_,
+                    rust_vec_len_,
+                    data_len_,
+                )
+            };
+            let mut deserializer =
+                flutter_rust_bridge::for_generated::SseDeserializer::new(message);
+            deserializer.end();
+            move |context| {
+                transform_result_sse::<_, ()>((move || {
+                    let output_ok = Result::<_, ()>::Ok(crate::api::asset_specs())?;
+                    Ok(output_ok)
+                })())
+            }
+        },
+    )
+}
 fn wire__crate__api__chart_data_default_impl(
     port_: flutter_rust_bridge::for_generated::MessagePort,
     ptr_: flutter_rust_bridge::for_generated::PlatformGeneralizedUint8ListPtr,
@@ -1786,6 +1851,26 @@ impl SseDecode for crate::interpreter::Asset {
     }
 }
 
+impl SseDecode for crate::api::AssetSpec {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut var_asset = <crate::interpreter::Asset>::sse_decode(deserializer);
+        let mut var_symbol = <String>::sse_decode(deserializer);
+        let mut var_display = <String>::sse_decode(deserializer);
+        let mut var_qtyStep = <f64>::sse_decode(deserializer);
+        let mut var_priceStep = <f64>::sse_decode(deserializer);
+        let mut var_minOrderSize = <f64>::sse_decode(deserializer);
+        return crate::api::AssetSpec {
+            asset: var_asset,
+            symbol: var_symbol,
+            display: var_display,
+            qty_step: var_qtyStep,
+            price_step: var_priceStep,
+            min_order_size: var_minOrderSize,
+        };
+    }
+}
+
 impl SseDecode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
@@ -1883,6 +1968,18 @@ impl SseDecode for Vec<crate::interpreter::Action> {
         let mut ans_ = Vec::with_capacity(len_ as usize);
         for idx_ in 0..len_ {
             ans_.push(<crate::interpreter::Action>::sse_decode(deserializer));
+        }
+        return ans_;
+    }
+}
+
+impl SseDecode for Vec<crate::api::AssetSpec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
+        let mut len_ = <i32>::sse_decode(deserializer);
+        let mut ans_ = Vec::with_capacity(len_ as usize);
+        for idx_ in 0..len_ {
+            ans_.push(<crate::api::AssetSpec>::sse_decode(deserializer));
         }
         return ans_;
     }
@@ -2438,7 +2535,7 @@ impl SseDecode for crate::weex::WeexAlgoOrderRequest {
         let mut var_symbol = <String>::sse_decode(deserializer);
         let mut var_baseUrl = <String>::sse_decode(deserializer);
         let mut var_side = <String>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_triggerPrice = <f64>::sse_decode(deserializer);
         let mut var_limitPrice = <f64>::sse_decode(deserializer);
         let mut var_orderType = <String>::sse_decode(deserializer);
@@ -2452,7 +2549,7 @@ impl SseDecode for crate::weex::WeexAlgoOrderRequest {
             symbol: var_symbol,
             base_url: var_baseUrl,
             side: var_side,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             trigger_price: var_triggerPrice,
             limit_price: var_limitPrice,
             order_type: var_orderType,
@@ -2493,7 +2590,7 @@ impl SseDecode for crate::weex::WeexExecutionSnapshot {
         let mut var_kind = <String>::sse_decode(deserializer);
         let mut var_direction = <String>::sse_decode(deserializer);
         let mut var_price = <f64>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_notionalUsdt = <f64>::sse_decode(deserializer);
         let mut var_realizedPnlUsdt = <f64>::sse_decode(deserializer);
         let mut var_feeUsdt = <f64>::sse_decode(deserializer);
@@ -2506,7 +2603,7 @@ impl SseDecode for crate::weex::WeexExecutionSnapshot {
             kind: var_kind,
             direction: var_direction,
             price: var_price,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             notional_usdt: var_notionalUsdt,
             realized_pnl_usdt: var_realizedPnlUsdt,
             fee_usdt: var_feeUsdt,
@@ -2542,7 +2639,7 @@ impl SseDecode for crate::weex::WeexMarketOrderRequest {
         let mut var_symbol = <String>::sse_decode(deserializer);
         let mut var_baseUrl = <String>::sse_decode(deserializer);
         let mut var_side = <String>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_reduceOnly = <bool>::sse_decode(deserializer);
         let mut var_clientOrderId = <String>::sse_decode(deserializer);
         let mut var_qtyStep = <f64>::sse_decode(deserializer);
@@ -2553,7 +2650,7 @@ impl SseDecode for crate::weex::WeexMarketOrderRequest {
             symbol: var_symbol,
             base_url: var_baseUrl,
             side: var_side,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             reduce_only: var_reduceOnly,
             client_order_id: var_clientOrderId,
             qty_step: var_qtyStep,
@@ -2568,14 +2665,14 @@ impl SseDecode for crate::weex::WeexOrderStatus {
         let mut var_orderId = <String>::sse_decode(deserializer);
         let mut var_clientOrderId = <Option<String>>::sse_decode(deserializer);
         let mut var_status = <String>::sse_decode(deserializer);
-        let mut var_filledQtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_filledQty = <f64>::sse_decode(deserializer);
         let mut var_avgPrice = <f64>::sse_decode(deserializer);
         return crate::weex::WeexOrderStatus {
             found: var_found,
             order_id: var_orderId,
             client_order_id: var_clientOrderId,
             status: var_status,
-            filled_qty_btc: var_filledQtyBtc,
+            filled_qty: var_filledQty,
             avg_price: var_avgPrice,
         };
     }
@@ -2586,7 +2683,7 @@ impl SseDecode for crate::weex::WeexPositionSnapshot {
     fn sse_decode(deserializer: &mut flutter_rust_bridge::for_generated::SseDeserializer) -> Self {
         let mut var_symbol = <String>::sse_decode(deserializer);
         let mut var_direction = <String>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_entryPrice = <f64>::sse_decode(deserializer);
         let mut var_markPrice = <f64>::sse_decode(deserializer);
         let mut var_notionalUsdt = <f64>::sse_decode(deserializer);
@@ -2597,7 +2694,7 @@ impl SseDecode for crate::weex::WeexPositionSnapshot {
         return crate::weex::WeexPositionSnapshot {
             symbol: var_symbol,
             direction: var_direction,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             entry_price: var_entryPrice,
             mark_price: var_markPrice,
             notional_usdt: var_notionalUsdt,
@@ -2620,7 +2717,7 @@ impl SseDecode for crate::weex::WeexTpSlOrderRequest {
         let mut var_positionSide = <String>::sse_decode(deserializer);
         let mut var_planType = <String>::sse_decode(deserializer);
         let mut var_triggerPrice = <f64>::sse_decode(deserializer);
-        let mut var_qtyBtc = <f64>::sse_decode(deserializer);
+        let mut var_qty = <f64>::sse_decode(deserializer);
         let mut var_clientAlgoId = <String>::sse_decode(deserializer);
         let mut var_qtyStep = <f64>::sse_decode(deserializer);
         let mut var_priceStep = <f64>::sse_decode(deserializer);
@@ -2633,7 +2730,7 @@ impl SseDecode for crate::weex::WeexTpSlOrderRequest {
             position_side: var_positionSide,
             plan_type: var_planType,
             trigger_price: var_triggerPrice,
-            qty_btc: var_qtyBtc,
+            qty: var_qty,
             client_algo_id: var_clientAlgoId,
             qty_step: var_qtyStep,
             price_step: var_priceStep,
@@ -2650,53 +2747,55 @@ fn pde_ffi_dispatcher_primary_impl(
 ) {
     // Codec=Pde (Serialization + dispatch), see doc to use other codecs
     match func_id {
-        1 => wire__crate__api__chart_data_default_impl(port, ptr, rust_vec_len, data_len),
-        2 => wire__crate__api__classify_message_impl(port, ptr, rust_vec_len, data_len),
-        3 => wire__crate__api__classify_message_actions_impl(port, ptr, rust_vec_len, data_len),
-        4 => wire__crate__api__classify_message_actions_with_patterns_impl(
+        1 => wire__crate__api__asset_for_symbol_impl(port, ptr, rust_vec_len, data_len),
+        2 => wire__crate__api__asset_specs_impl(port, ptr, rust_vec_len, data_len),
+        3 => wire__crate__api__chart_data_default_impl(port, ptr, rust_vec_len, data_len),
+        4 => wire__crate__api__classify_message_impl(port, ptr, rust_vec_len, data_len),
+        5 => wire__crate__api__classify_message_actions_impl(port, ptr, rust_vec_len, data_len),
+        6 => wire__crate__api__classify_message_actions_with_patterns_impl(
             port,
             ptr,
             rust_vec_len,
             data_len,
         ),
-        5 => wire__crate__api__close_target_should_fire_impl(port, ptr, rust_vec_len, data_len),
-        6 => wire__crate__api__dedup_pending_actions_impl(port, ptr, rust_vec_len, data_len),
-        7 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        8 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
-        9 => wire__crate__api__extract_master_balance_impl(port, ptr, rust_vec_len, data_len),
-        10 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
-        11 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
-        12 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
-        13 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
-        14 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
-        15 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        16 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
-        17 => wire__crate__api__risk_check_signal_age_impl(port, ptr, rust_vec_len, data_len),
-        18 => wire__crate__api__risk_context_impl(port, ptr, rust_vec_len, data_len),
-        19 => wire__crate__api__risk_limits_impl(port, ptr, rust_vec_len, data_len),
-        20 => wire__crate__api__risk_preview_order_impl(port, ptr, rust_vec_len, data_len),
-        21 => wire__crate__api__risk_set_limits_impl(port, ptr, rust_vec_len, data_len),
-        22 => wire__crate__api__risk_update_context_impl(port, ptr, rust_vec_len, data_len),
-        23 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
-        24 => wire__crate__api__secrets_harden_impl(port, ptr, rust_vec_len, data_len),
-        25 => wire__crate__api__secrets_load_impl(port, ptr, rust_vec_len, data_len),
-        26 => wire__crate__api__secrets_purge_impl(port, ptr, rust_vec_len, data_len),
-        27 => wire__crate__api__secrets_save_impl(port, ptr, rust_vec_len, data_len),
-        28 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
-        29 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
-        30 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
-        31 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
-        32 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
-        33 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
-        34 => wire__crate__api__weex_cancel_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        35 => wire__crate__api__weex_lookup_order_impl(port, ptr, rust_vec_len, data_len),
-        36 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
-        37 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
-        38 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
-        39 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
-        40 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
-        41 => wire__crate__api__weex_submit_tp_sl_order_impl(port, ptr, rust_vec_len, data_len),
-        42 => wire__crate__api__weex_tp_sl_plan_type_impl(port, ptr, rust_vec_len, data_len),
+        7 => wire__crate__api__close_target_should_fire_impl(port, ptr, rust_vec_len, data_len),
+        8 => wire__crate__api__dedup_pending_actions_impl(port, ptr, rust_vec_len, data_len),
+        9 => wire__crate__api__default_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        10 => wire__crate__api__extract_close_target_impl(port, ptr, rust_vec_len, data_len),
+        11 => wire__crate__api__extract_master_balance_impl(port, ptr, rust_vec_len, data_len),
+        12 => wire__crate__api__get_balance_history_impl(port, ptr, rust_vec_len, data_len),
+        13 => wire__crate__api__get_chart_data_impl(port, ptr, rust_vec_len, data_len),
+        14 => wire__crate__api__get_equity_history_impl(port, ptr, rust_vec_len, data_len),
+        15 => wire__crate__api__get_pnl_history_impl(port, ptr, rust_vec_len, data_len),
+        16 => wire__crate__api__hello_impl(port, ptr, rust_vec_len, data_len),
+        17 => wire__crate__api__merge_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        18 => wire__crate__api__record_chart_snapshot_impl(port, ptr, rust_vec_len, data_len),
+        19 => wire__crate__api__risk_check_signal_age_impl(port, ptr, rust_vec_len, data_len),
+        20 => wire__crate__api__risk_context_impl(port, ptr, rust_vec_len, data_len),
+        21 => wire__crate__api__risk_limits_impl(port, ptr, rust_vec_len, data_len),
+        22 => wire__crate__api__risk_preview_order_impl(port, ptr, rust_vec_len, data_len),
+        23 => wire__crate__api__risk_set_limits_impl(port, ptr, rust_vec_len, data_len),
+        24 => wire__crate__api__risk_update_context_impl(port, ptr, rust_vec_len, data_len),
+        25 => wire__crate__api__scale_manual_order_impl(port, ptr, rust_vec_len, data_len),
+        26 => wire__crate__api__secrets_harden_impl(port, ptr, rust_vec_len, data_len),
+        27 => wire__crate__api__secrets_load_impl(port, ptr, rust_vec_len, data_len),
+        28 => wire__crate__api__secrets_purge_impl(port, ptr, rust_vec_len, data_len),
+        29 => wire__crate__api__secrets_save_impl(port, ptr, rust_vec_len, data_len),
+        30 => wire__crate__api__telegram_check_password_impl(port, ptr, rust_vec_len, data_len),
+        31 => wire__crate__api__telegram_finalize_action_impl(port, ptr, rust_vec_len, data_len),
+        32 => wire__crate__api__telegram_message_stream_impl(port, ptr, rust_vec_len, data_len),
+        33 => wire__crate__api__telegram_request_code_impl(port, ptr, rust_vec_len, data_len),
+        34 => wire__crate__api__telegram_sign_in_impl(port, ptr, rust_vec_len, data_len),
+        35 => wire__crate__api__validate_patterns_yaml_impl(port, ptr, rust_vec_len, data_len),
+        36 => wire__crate__api__weex_cancel_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        37 => wire__crate__api__weex_lookup_order_impl(port, ptr, rust_vec_len, data_len),
+        38 => wire__crate__api__weex_public_price_stream_impl(port, ptr, rust_vec_len, data_len),
+        39 => wire__crate__api__weex_reconcile_account_impl(port, ptr, rust_vec_len, data_len),
+        40 => wire__crate__api__weex_sign_preview_impl(port, ptr, rust_vec_len, data_len),
+        41 => wire__crate__api__weex_submit_algo_order_impl(port, ptr, rust_vec_len, data_len),
+        42 => wire__crate__api__weex_submit_market_order_impl(port, ptr, rust_vec_len, data_len),
+        43 => wire__crate__api__weex_submit_tp_sl_order_impl(port, ptr, rust_vec_len, data_len),
+        44 => wire__crate__api__weex_tp_sl_plan_type_impl(port, ptr, rust_vec_len, data_len),
         _ => unreachable!(),
     }
 }
@@ -2963,6 +3062,26 @@ impl flutter_rust_bridge::IntoDart for crate::interpreter::Asset {
 impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::interpreter::Asset {}
 impl flutter_rust_bridge::IntoIntoDart<crate::interpreter::Asset> for crate::interpreter::Asset {
     fn into_into_dart(self) -> crate::interpreter::Asset {
+        self
+    }
+}
+// Codec=Dco (DartCObject based), see doc to use other codecs
+impl flutter_rust_bridge::IntoDart for crate::api::AssetSpec {
+    fn into_dart(self) -> flutter_rust_bridge::for_generated::DartAbi {
+        [
+            self.asset.into_into_dart().into_dart(),
+            self.symbol.into_into_dart().into_dart(),
+            self.display.into_into_dart().into_dart(),
+            self.qty_step.into_into_dart().into_dart(),
+            self.price_step.into_into_dart().into_dart(),
+            self.min_order_size.into_into_dart().into_dart(),
+        ]
+        .into_dart()
+    }
+}
+impl flutter_rust_bridge::for_generated::IntoDartExceptPrimitive for crate::api::AssetSpec {}
+impl flutter_rust_bridge::IntoIntoDart<crate::api::AssetSpec> for crate::api::AssetSpec {
+    fn into_into_dart(self) -> crate::api::AssetSpec {
         self
     }
 }
@@ -3400,7 +3519,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexAlgoOrderRequest {
             self.symbol.into_into_dart().into_dart(),
             self.base_url.into_into_dart().into_dart(),
             self.side.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.trigger_price.into_into_dart().into_dart(),
             self.limit_price.into_into_dart().into_dart(),
             self.order_type.into_into_dart().into_dart(),
@@ -3458,7 +3577,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexExecutionSnapshot {
             self.kind.into_into_dart().into_dart(),
             self.direction.into_into_dart().into_dart(),
             self.price.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.notional_usdt.into_into_dart().into_dart(),
             self.realized_pnl_usdt.into_into_dart().into_dart(),
             self.fee_usdt.into_into_dart().into_dart(),
@@ -3512,7 +3631,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexMarketOrderRequest {
             self.symbol.into_into_dart().into_dart(),
             self.base_url.into_into_dart().into_dart(),
             self.side.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.reduce_only.into_into_dart().into_dart(),
             self.client_order_id.into_into_dart().into_dart(),
             self.qty_step.into_into_dart().into_dart(),
@@ -3539,7 +3658,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexOrderStatus {
             self.order_id.into_into_dart().into_dart(),
             self.client_order_id.into_into_dart().into_dart(),
             self.status.into_into_dart().into_dart(),
-            self.filled_qty_btc.into_into_dart().into_dart(),
+            self.filled_qty.into_into_dart().into_dart(),
             self.avg_price.into_into_dart().into_dart(),
         ]
         .into_dart()
@@ -3559,7 +3678,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexPositionSnapshot {
         [
             self.symbol.into_into_dart().into_dart(),
             self.direction.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.entry_price.into_into_dart().into_dart(),
             self.mark_price.into_into_dart().into_dart(),
             self.notional_usdt.into_into_dart().into_dart(),
@@ -3594,7 +3713,7 @@ impl flutter_rust_bridge::IntoDart for crate::weex::WeexTpSlOrderRequest {
             self.position_side.into_into_dart().into_dart(),
             self.plan_type.into_into_dart().into_dart(),
             self.trigger_price.into_into_dart().into_dart(),
-            self.qty_btc.into_into_dart().into_dart(),
+            self.qty.into_into_dart().into_dart(),
             self.client_algo_id.into_into_dart().into_dart(),
             self.qty_step.into_into_dart().into_dart(),
             self.price_step.into_into_dart().into_dart(),
@@ -3779,6 +3898,18 @@ impl SseEncode for crate::interpreter::Asset {
     }
 }
 
+impl SseEncode for crate::api::AssetSpec {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <crate::interpreter::Asset>::sse_encode(self.asset, serializer);
+        <String>::sse_encode(self.symbol, serializer);
+        <String>::sse_encode(self.display, serializer);
+        <f64>::sse_encode(self.qty_step, serializer);
+        <f64>::sse_encode(self.price_step, serializer);
+        <f64>::sse_encode(self.min_order_size, serializer);
+    }
+}
+
 impl SseEncode for bool {
     // Codec=Sse (Serialization based), see doc to use other codecs
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
@@ -3864,6 +3995,16 @@ impl SseEncode for Vec<crate::interpreter::Action> {
         <i32>::sse_encode(self.len() as _, serializer);
         for item in self {
             <crate::interpreter::Action>::sse_encode(item, serializer);
+        }
+    }
+}
+
+impl SseEncode for Vec<crate::api::AssetSpec> {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
+        <i32>::sse_encode(self.len() as _, serializer);
+        for item in self {
+            <crate::api::AssetSpec>::sse_encode(item, serializer);
         }
     }
 }
@@ -4297,7 +4438,7 @@ impl SseEncode for crate::weex::WeexAlgoOrderRequest {
         <String>::sse_encode(self.symbol, serializer);
         <String>::sse_encode(self.base_url, serializer);
         <String>::sse_encode(self.side, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <f64>::sse_encode(self.trigger_price, serializer);
         <f64>::sse_encode(self.limit_price, serializer);
         <String>::sse_encode(self.order_type, serializer);
@@ -4329,7 +4470,7 @@ impl SseEncode for crate::weex::WeexExecutionSnapshot {
         <String>::sse_encode(self.kind, serializer);
         <String>::sse_encode(self.direction, serializer);
         <f64>::sse_encode(self.price, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <f64>::sse_encode(self.notional_usdt, serializer);
         <f64>::sse_encode(self.realized_pnl_usdt, serializer);
         <f64>::sse_encode(self.fee_usdt, serializer);
@@ -4357,7 +4498,7 @@ impl SseEncode for crate::weex::WeexMarketOrderRequest {
         <String>::sse_encode(self.symbol, serializer);
         <String>::sse_encode(self.base_url, serializer);
         <String>::sse_encode(self.side, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <bool>::sse_encode(self.reduce_only, serializer);
         <String>::sse_encode(self.client_order_id, serializer);
         <f64>::sse_encode(self.qty_step, serializer);
@@ -4371,7 +4512,7 @@ impl SseEncode for crate::weex::WeexOrderStatus {
         <String>::sse_encode(self.order_id, serializer);
         <Option<String>>::sse_encode(self.client_order_id, serializer);
         <String>::sse_encode(self.status, serializer);
-        <f64>::sse_encode(self.filled_qty_btc, serializer);
+        <f64>::sse_encode(self.filled_qty, serializer);
         <f64>::sse_encode(self.avg_price, serializer);
     }
 }
@@ -4381,7 +4522,7 @@ impl SseEncode for crate::weex::WeexPositionSnapshot {
     fn sse_encode(self, serializer: &mut flutter_rust_bridge::for_generated::SseSerializer) {
         <String>::sse_encode(self.symbol, serializer);
         <String>::sse_encode(self.direction, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <f64>::sse_encode(self.entry_price, serializer);
         <f64>::sse_encode(self.mark_price, serializer);
         <f64>::sse_encode(self.notional_usdt, serializer);
@@ -4403,7 +4544,7 @@ impl SseEncode for crate::weex::WeexTpSlOrderRequest {
         <String>::sse_encode(self.position_side, serializer);
         <String>::sse_encode(self.plan_type, serializer);
         <f64>::sse_encode(self.trigger_price, serializer);
-        <f64>::sse_encode(self.qty_btc, serializer);
+        <f64>::sse_encode(self.qty, serializer);
         <String>::sse_encode(self.client_algo_id, serializer);
         <f64>::sse_encode(self.qty_step, serializer);
         <f64>::sse_encode(self.price_step, serializer);

@@ -55,12 +55,12 @@ extension SizePatterns on Size {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( Size_Usd value)?  usd,TResult Function( Size_Btc value)?  btc,TResult Function( Size_Pct value)?  pct,TResult Function( Size_FullClose value)?  fullClose,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( Size_Usdt value)?  usdt,TResult Function( Size_Coin value)?  coin,TResult Function( Size_Pct value)?  pct,TResult Function( Size_FullClose value)?  fullClose,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
-case Size_Usd() when usd != null:
-return usd(_that);case Size_Btc() when btc != null:
-return btc(_that);case Size_Pct() when pct != null:
+case Size_Usdt() when usdt != null:
+return usdt(_that);case Size_Coin() when coin != null:
+return coin(_that);case Size_Pct() when pct != null:
 return pct(_that);case Size_FullClose() when fullClose != null:
 return fullClose(_that);case _:
   return orElse();
@@ -80,12 +80,12 @@ return fullClose(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( Size_Usd value)  usd,required TResult Function( Size_Btc value)  btc,required TResult Function( Size_Pct value)  pct,required TResult Function( Size_FullClose value)  fullClose,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( Size_Usdt value)  usdt,required TResult Function( Size_Coin value)  coin,required TResult Function( Size_Pct value)  pct,required TResult Function( Size_FullClose value)  fullClose,}){
 final _that = this;
 switch (_that) {
-case Size_Usd():
-return usd(_that);case Size_Btc():
-return btc(_that);case Size_Pct():
+case Size_Usdt():
+return usdt(_that);case Size_Coin():
+return coin(_that);case Size_Pct():
 return pct(_that);case Size_FullClose():
 return fullClose(_that);}
 }
@@ -101,12 +101,12 @@ return fullClose(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( Size_Usd value)?  usd,TResult? Function( Size_Btc value)?  btc,TResult? Function( Size_Pct value)?  pct,TResult? Function( Size_FullClose value)?  fullClose,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( Size_Usdt value)?  usdt,TResult? Function( Size_Coin value)?  coin,TResult? Function( Size_Pct value)?  pct,TResult? Function( Size_FullClose value)?  fullClose,}){
 final _that = this;
 switch (_that) {
-case Size_Usd() when usd != null:
-return usd(_that);case Size_Btc() when btc != null:
-return btc(_that);case Size_Pct() when pct != null:
+case Size_Usdt() when usdt != null:
+return usdt(_that);case Size_Coin() when coin != null:
+return coin(_that);case Size_Pct() when pct != null:
 return pct(_that);case Size_FullClose() when fullClose != null:
 return fullClose(_that);case _:
   return null;
@@ -125,11 +125,11 @@ return fullClose(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( double field0)?  usd,TResult Function( double field0)?  btc,TResult Function( double field0)?  pct,TResult Function()?  fullClose,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function( double field0)?  usdt,TResult Function( double field0)?  coin,TResult Function( double field0)?  pct,TResult Function()?  fullClose,required TResult orElse(),}) {final _that = this;
 switch (_that) {
-case Size_Usd() when usd != null:
-return usd(_that.field0);case Size_Btc() when btc != null:
-return btc(_that.field0);case Size_Pct() when pct != null:
+case Size_Usdt() when usdt != null:
+return usdt(_that.field0);case Size_Coin() when coin != null:
+return coin(_that.field0);case Size_Pct() when pct != null:
 return pct(_that.field0);case Size_FullClose() when fullClose != null:
 return fullClose();case _:
   return orElse();
@@ -149,11 +149,11 @@ return fullClose();case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( double field0)  usd,required TResult Function( double field0)  btc,required TResult Function( double field0)  pct,required TResult Function()  fullClose,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function( double field0)  usdt,required TResult Function( double field0)  coin,required TResult Function( double field0)  pct,required TResult Function()  fullClose,}) {final _that = this;
 switch (_that) {
-case Size_Usd():
-return usd(_that.field0);case Size_Btc():
-return btc(_that.field0);case Size_Pct():
+case Size_Usdt():
+return usdt(_that.field0);case Size_Coin():
+return coin(_that.field0);case Size_Pct():
 return pct(_that.field0);case Size_FullClose():
 return fullClose();}
 }
@@ -169,11 +169,11 @@ return fullClose();}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( double field0)?  usd,TResult? Function( double field0)?  btc,TResult? Function( double field0)?  pct,TResult? Function()?  fullClose,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function( double field0)?  usdt,TResult? Function( double field0)?  coin,TResult? Function( double field0)?  pct,TResult? Function()?  fullClose,}) {final _that = this;
 switch (_that) {
-case Size_Usd() when usd != null:
-return usd(_that.field0);case Size_Btc() when btc != null:
-return btc(_that.field0);case Size_Pct() when pct != null:
+case Size_Usdt() when usdt != null:
+return usdt(_that.field0);case Size_Coin() when coin != null:
+return coin(_that.field0);case Size_Pct() when pct != null:
 return pct(_that.field0);case Size_FullClose() when fullClose != null:
 return fullClose();case _:
   return null;
@@ -186,8 +186,8 @@ return fullClose();case _:
 /// @nodoc
 
 
-class Size_Usd extends Size {
-  const Size_Usd(this.field0): super._();
+class Size_Usdt extends Size {
+  const Size_Usdt(this.field0): super._();
   
 
  final  double field0;
@@ -196,13 +196,13 @@ class Size_Usd extends Size {
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-$Size_UsdCopyWith<Size_Usd> get copyWith => _$Size_UsdCopyWithImpl<Size_Usd>(this, _$identity);
+$Size_UsdtCopyWith<Size_Usdt> get copyWith => _$Size_UsdtCopyWithImpl<Size_Usdt>(this, _$identity);
 
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Size_Usd&&(identical(other.field0, field0) || other.field0 == field0));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Size_Usdt&&(identical(other.field0, field0) || other.field0 == field0));
 }
 
 
@@ -211,15 +211,15 @@ int get hashCode => Object.hash(runtimeType,field0);
 
 @override
 String toString() {
-  return 'Size.usd(field0: $field0)';
+  return 'Size.usdt(field0: $field0)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class $Size_UsdCopyWith<$Res> implements $SizeCopyWith<$Res> {
-  factory $Size_UsdCopyWith(Size_Usd value, $Res Function(Size_Usd) _then) = _$Size_UsdCopyWithImpl;
+abstract mixin class $Size_UsdtCopyWith<$Res> implements $SizeCopyWith<$Res> {
+  factory $Size_UsdtCopyWith(Size_Usdt value, $Res Function(Size_Usdt) _then) = _$Size_UsdtCopyWithImpl;
 @useResult
 $Res call({
  double field0
@@ -230,17 +230,17 @@ $Res call({
 
 }
 /// @nodoc
-class _$Size_UsdCopyWithImpl<$Res>
-    implements $Size_UsdCopyWith<$Res> {
-  _$Size_UsdCopyWithImpl(this._self, this._then);
+class _$Size_UsdtCopyWithImpl<$Res>
+    implements $Size_UsdtCopyWith<$Res> {
+  _$Size_UsdtCopyWithImpl(this._self, this._then);
 
-  final Size_Usd _self;
-  final $Res Function(Size_Usd) _then;
+  final Size_Usdt _self;
+  final $Res Function(Size_Usdt) _then;
 
 /// Create a copy of Size
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') $Res call({Object? field0 = null,}) {
-  return _then(Size_Usd(
+  return _then(Size_Usdt(
 null == field0 ? _self.field0 : field0 // ignore: cast_nullable_to_non_nullable
 as double,
   ));
@@ -252,8 +252,8 @@ as double,
 /// @nodoc
 
 
-class Size_Btc extends Size {
-  const Size_Btc(this.field0): super._();
+class Size_Coin extends Size {
+  const Size_Coin(this.field0): super._();
   
 
  final  double field0;
@@ -262,13 +262,13 @@ class Size_Btc extends Size {
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
-$Size_BtcCopyWith<Size_Btc> get copyWith => _$Size_BtcCopyWithImpl<Size_Btc>(this, _$identity);
+$Size_CoinCopyWith<Size_Coin> get copyWith => _$Size_CoinCopyWithImpl<Size_Coin>(this, _$identity);
 
 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Size_Btc&&(identical(other.field0, field0) || other.field0 == field0));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Size_Coin&&(identical(other.field0, field0) || other.field0 == field0));
 }
 
 
@@ -277,15 +277,15 @@ int get hashCode => Object.hash(runtimeType,field0);
 
 @override
 String toString() {
-  return 'Size.btc(field0: $field0)';
+  return 'Size.coin(field0: $field0)';
 }
 
 
 }
 
 /// @nodoc
-abstract mixin class $Size_BtcCopyWith<$Res> implements $SizeCopyWith<$Res> {
-  factory $Size_BtcCopyWith(Size_Btc value, $Res Function(Size_Btc) _then) = _$Size_BtcCopyWithImpl;
+abstract mixin class $Size_CoinCopyWith<$Res> implements $SizeCopyWith<$Res> {
+  factory $Size_CoinCopyWith(Size_Coin value, $Res Function(Size_Coin) _then) = _$Size_CoinCopyWithImpl;
 @useResult
 $Res call({
  double field0
@@ -296,17 +296,17 @@ $Res call({
 
 }
 /// @nodoc
-class _$Size_BtcCopyWithImpl<$Res>
-    implements $Size_BtcCopyWith<$Res> {
-  _$Size_BtcCopyWithImpl(this._self, this._then);
+class _$Size_CoinCopyWithImpl<$Res>
+    implements $Size_CoinCopyWith<$Res> {
+  _$Size_CoinCopyWithImpl(this._self, this._then);
 
-  final Size_Btc _self;
-  final $Res Function(Size_Btc) _then;
+  final Size_Coin _self;
+  final $Res Function(Size_Coin) _then;
 
 /// Create a copy of Size
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') $Res call({Object? field0 = null,}) {
-  return _then(Size_Btc(
+  return _then(Size_Coin(
 null == field0 ? _self.field0 : field0 // ignore: cast_nullable_to_non_nullable
 as double,
   ));

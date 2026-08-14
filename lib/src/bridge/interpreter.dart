@@ -10,6 +10,7 @@ part 'interpreter.freezed.dart';
 
 class Action {
   final ActionKind kind;
+  final Asset? asset;
   final Direction? direction;
   final Size? size;
   final double? triggerPrice;
@@ -19,6 +20,7 @@ class Action {
 
   const Action({
     required this.kind,
+    this.asset,
     this.direction,
     this.size,
     this.triggerPrice,
@@ -30,6 +32,7 @@ class Action {
   @override
   int get hashCode =>
       kind.hashCode ^
+      asset.hashCode ^
       direction.hashCode ^
       size.hashCode ^
       triggerPrice.hashCode ^
@@ -43,6 +46,7 @@ class Action {
       other is Action &&
           runtimeType == other.runtimeType &&
           kind == other.kind &&
+          asset == other.asset &&
           direction == other.direction &&
           size == other.size &&
           triggerPrice == other.triggerPrice &&
@@ -53,14 +57,19 @@ class Action {
 
 enum ActionKind { enter, add, reduce, close, ignore }
 
+/// The traded instrument. Deliberately a closed enum rather than a string or a
+/// config-driven registry: this crate submits real orders, and a closed set
+/// makes the compiler point at every site that still assumes one asset.
+enum Asset { btc, eth }
+
 enum Direction { long, short }
 
 @freezed
 sealed class Size with _$Size {
   const Size._();
 
-  const factory Size.usd(double field0) = Size_Usd;
-  const factory Size.btc(double field0) = Size_Btc;
+  const factory Size.usdt(double field0) = Size_Usdt;
+  const factory Size.coin(double field0) = Size_Coin;
   const factory Size.pct(double field0) = Size_Pct;
   const factory Size.fullClose() = Size_FullClose;
 }

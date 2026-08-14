@@ -58,6 +58,36 @@ impl Asset {
         }
     }
 
+    /// Smallest tradable quantity increment.
+    ///
+    /// From WEEX `/capi/v2/market/contracts`: `size_increment` is a decimal
+    /// place count, so 4 -> 0.0001. The BTC values here reproduce the constants
+    /// this app used before ETH existed, which is what confirms the reading.
+    pub fn qty_step(&self) -> f64 {
+        match self {
+            Asset::Btc => 0.0001,
+            Asset::Eth => 0.001,
+        }
+    }
+
+    /// Smallest price increment. WEEX `tick_size`, also a decimal place count.
+    pub fn price_step(&self) -> f64 {
+        match self {
+            Asset::Btc => 0.1,
+            Asset::Eth => 0.01,
+        }
+    }
+
+    /// Exchange minimum order size. Below this WEEX rejects the order, so a
+    /// remainder smaller than this is dust rather than something to keep
+    /// retrying.
+    pub fn min_order_size(&self) -> f64 {
+        match self {
+            Asset::Btc => 0.0001,
+            Asset::Eth => 0.001,
+        }
+    }
+
     pub fn from_alias(text: &str) -> Option<Asset> {
         let upper = text.trim().to_uppercase();
         Asset::ALL

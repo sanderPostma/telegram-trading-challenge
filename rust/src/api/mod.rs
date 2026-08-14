@@ -151,6 +151,41 @@ fn push_point(series: &mut Vec<SeriesPoint>, point: SeriesPoint) {
     }
 }
 
+/// Contract facts for one tradable asset, so the UI never restates them.
+///
+/// These used to be hardcoded on both sides of the bridge — `0.0001` appeared
+/// in a dozen Dart literals — which meant the two could drift silently and
+/// misround real orders.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssetSpec {
+    pub asset: Asset,
+    pub symbol: String,
+    pub display: String,
+    pub qty_step: f64,
+    pub price_step: f64,
+    pub min_order_size: f64,
+}
+
+/// Every asset this build can trade, in display order.
+pub fn asset_specs() -> Vec<AssetSpec> {
+    Asset::ALL
+        .into_iter()
+        .map(|asset| AssetSpec {
+            asset,
+            symbol: asset.symbol().to_string(),
+            display: asset.display().to_string(),
+            qty_step: asset.qty_step(),
+            price_step: asset.price_step(),
+            min_order_size: asset.min_order_size(),
+        })
+        .collect()
+}
+
+/// Resolves a WEEX symbol back to an asset, for reconciling exchange payloads.
+pub fn asset_for_symbol(symbol: String) -> Option<Asset> {
+    Asset::from_symbol(&symbol)
+}
+
 pub use crate::telegram::{TelegramActionStatus, TelegramClientRequest, TelegramMessageEvent};
 pub use crate::weex::PriceTick;
 

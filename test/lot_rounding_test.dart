@@ -18,7 +18,7 @@ void main() {
         )
         ..position = PositionView(
           direction: TradeDirection.long,
-          qtyBtc: qty,
+          qty: qty,
           notionalUsd: qty * 64000,
           unrealizedPnlUsd: 0,
         );

@@ -170,7 +170,7 @@ class WeexAlgoOrderRequest {
   final String symbol;
   final String baseUrl;
   final String side;
-  final double qtyBtc;
+  final double qty;
   final double triggerPrice;
   final double limitPrice;
   final String orderType;
@@ -185,7 +185,7 @@ class WeexAlgoOrderRequest {
     required this.symbol,
     required this.baseUrl,
     required this.side,
-    required this.qtyBtc,
+    required this.qty,
     required this.triggerPrice,
     required this.limitPrice,
     required this.orderType,
@@ -202,7 +202,7 @@ class WeexAlgoOrderRequest {
       symbol.hashCode ^
       baseUrl.hashCode ^
       side.hashCode ^
-      qtyBtc.hashCode ^
+      qty.hashCode ^
       triggerPrice.hashCode ^
       limitPrice.hashCode ^
       orderType.hashCode ^
@@ -221,7 +221,7 @@ class WeexAlgoOrderRequest {
           symbol == other.symbol &&
           baseUrl == other.baseUrl &&
           side == other.side &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           triggerPrice == other.triggerPrice &&
           limitPrice == other.limitPrice &&
           orderType == other.orderType &&
@@ -277,7 +277,7 @@ class WeexExecutionSnapshot {
   final String kind;
   final String direction;
   final double price;
-  final double qtyBtc;
+  final double qty;
   final double notionalUsdt;
   final double realizedPnlUsdt;
   final double feeUsdt;
@@ -291,7 +291,7 @@ class WeexExecutionSnapshot {
     required this.kind,
     required this.direction,
     required this.price,
-    required this.qtyBtc,
+    required this.qty,
     required this.notionalUsdt,
     required this.realizedPnlUsdt,
     required this.feeUsdt,
@@ -307,7 +307,7 @@ class WeexExecutionSnapshot {
       kind.hashCode ^
       direction.hashCode ^
       price.hashCode ^
-      qtyBtc.hashCode ^
+      qty.hashCode ^
       notionalUsdt.hashCode ^
       realizedPnlUsdt.hashCode ^
       feeUsdt.hashCode ^
@@ -325,7 +325,7 @@ class WeexExecutionSnapshot {
           kind == other.kind &&
           direction == other.direction &&
           price == other.price &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           notionalUsdt == other.notionalUsdt &&
           realizedPnlUsdt == other.realizedPnlUsdt &&
           feeUsdt == other.feeUsdt &&
@@ -374,7 +374,7 @@ class WeexMarketOrderRequest {
   final String symbol;
   final String baseUrl;
   final String side;
-  final double qtyBtc;
+  final double qty;
   final bool reduceOnly;
   final String clientOrderId;
   final double qtyStep;
@@ -386,7 +386,7 @@ class WeexMarketOrderRequest {
     required this.symbol,
     required this.baseUrl,
     required this.side,
-    required this.qtyBtc,
+    required this.qty,
     required this.reduceOnly,
     required this.clientOrderId,
     required this.qtyStep,
@@ -400,7 +400,7 @@ class WeexMarketOrderRequest {
       symbol.hashCode ^
       baseUrl.hashCode ^
       side.hashCode ^
-      qtyBtc.hashCode ^
+      qty.hashCode ^
       reduceOnly.hashCode ^
       clientOrderId.hashCode ^
       qtyStep.hashCode;
@@ -416,7 +416,7 @@ class WeexMarketOrderRequest {
           symbol == other.symbol &&
           baseUrl == other.baseUrl &&
           side == other.side &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           reduceOnly == other.reduceOnly &&
           clientOrderId == other.clientOrderId &&
           qtyStep == other.qtyStep;
@@ -436,7 +436,7 @@ class WeexOrderStatus {
   /// Exchange status verbatim (NEW, PARTIALLY_FILLED, FILLED, CANCELED,
   /// REJECTED), uppercased. Empty when the order is absent.
   final String status;
-  final double filledQtyBtc;
+  final double filledQty;
   final double avgPrice;
 
   const WeexOrderStatus({
@@ -444,7 +444,7 @@ class WeexOrderStatus {
     required this.orderId,
     this.clientOrderId,
     required this.status,
-    required this.filledQtyBtc,
+    required this.filledQty,
     required this.avgPrice,
   });
 
@@ -454,7 +454,7 @@ class WeexOrderStatus {
       orderId.hashCode ^
       clientOrderId.hashCode ^
       status.hashCode ^
-      filledQtyBtc.hashCode ^
+      filledQty.hashCode ^
       avgPrice.hashCode;
 
   @override
@@ -466,14 +466,14 @@ class WeexOrderStatus {
           orderId == other.orderId &&
           clientOrderId == other.clientOrderId &&
           status == other.status &&
-          filledQtyBtc == other.filledQtyBtc &&
+          filledQty == other.filledQty &&
           avgPrice == other.avgPrice;
 }
 
 class WeexPositionSnapshot {
   final String symbol;
   final String direction;
-  final double qtyBtc;
+  final double qty;
   final double entryPrice;
   final double markPrice;
   final double notionalUsdt;
@@ -485,7 +485,7 @@ class WeexPositionSnapshot {
   const WeexPositionSnapshot({
     required this.symbol,
     required this.direction,
-    required this.qtyBtc,
+    required this.qty,
     required this.entryPrice,
     required this.markPrice,
     required this.notionalUsdt,
@@ -499,7 +499,7 @@ class WeexPositionSnapshot {
   int get hashCode =>
       symbol.hashCode ^
       direction.hashCode ^
-      qtyBtc.hashCode ^
+      qty.hashCode ^
       entryPrice.hashCode ^
       markPrice.hashCode ^
       notionalUsdt.hashCode ^
@@ -515,7 +515,7 @@ class WeexPositionSnapshot {
           runtimeType == other.runtimeType &&
           symbol == other.symbol &&
           direction == other.direction &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           entryPrice == other.entryPrice &&
           markPrice == other.markPrice &&
           notionalUsdt == other.notionalUsdt &&
@@ -544,7 +544,7 @@ class WeexTpSlOrderRequest {
   final double triggerPrice;
 
   /// 0 closes the entire position — the scalping default.
-  final double qtyBtc;
+  final double qty;
   final String clientAlgoId;
   final double qtyStep;
   final double priceStep;
@@ -558,7 +558,7 @@ class WeexTpSlOrderRequest {
     required this.positionSide,
     required this.planType,
     required this.triggerPrice,
-    required this.qtyBtc,
+    required this.qty,
     required this.clientAlgoId,
     required this.qtyStep,
     required this.priceStep,
@@ -574,7 +574,7 @@ class WeexTpSlOrderRequest {
       positionSide.hashCode ^
       planType.hashCode ^
       triggerPrice.hashCode ^
-      qtyBtc.hashCode ^
+      qty.hashCode ^
       clientAlgoId.hashCode ^
       qtyStep.hashCode ^
       priceStep.hashCode;
@@ -592,7 +592,7 @@ class WeexTpSlOrderRequest {
           positionSide == other.positionSide &&
           planType == other.planType &&
           triggerPrice == other.triggerPrice &&
-          qtyBtc == other.qtyBtc &&
+          qty == other.qty &&
           clientAlgoId == other.clientAlgoId &&
           qtyStep == other.qtyStep &&
           priceStep == other.priceStep;

@@ -5,7 +5,7 @@ import 'package:trading_challenge/src/state/app_controller.dart';
 
 AppController _controllerWithPosition({
   TradeDirection? direction,
-  double qtyBtc = 0.0055,
+  double qty = 0.0055,
   bool simulationMode = false,
 }) {
   return AppController()
@@ -18,14 +18,14 @@ AppController _controllerWithPosition({
     ..position = direction == null
         ? const PositionView(
             direction: null,
-            qtyBtc: 0,
+            qty: 0,
             notionalUsd: 0,
             unrealizedPnlUsd: 0,
           )
         : PositionView(
             direction: direction,
-            qtyBtc: qtyBtc,
-            notionalUsd: qtyBtc * 64000,
+            qty: qty,
+            notionalUsd: qty * 64000,
             unrealizedPnlUsd: 0,
           );
 }

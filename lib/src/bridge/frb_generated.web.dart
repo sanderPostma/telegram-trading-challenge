@@ -73,10 +73,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiResultWeexOrderStatus dco_decode_api_result_weex_order_status(dynamic raw);
 
   @protected
+  Asset dco_decode_asset(dynamic raw);
+
+  @protected
+  AssetSpec dco_decode_asset_spec(dynamic raw);
+
+  @protected
   bool dco_decode_bool(dynamic raw);
 
   @protected
   Action dco_decode_box_autoadd_action(dynamic raw);
+
+  @protected
+  Asset dco_decode_box_autoadd_asset(dynamic raw);
 
   @protected
   CloseTarget dco_decode_box_autoadd_close_target(dynamic raw);
@@ -163,6 +172,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Action> dco_decode_list_action(dynamic raw);
 
   @protected
+  List<AssetSpec> dco_decode_list_asset_spec(dynamic raw);
+
+  @protected
   List<PendingAction> dco_decode_list_pending_action(dynamic raw);
 
   @protected
@@ -185,6 +197,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Action? dco_decode_opt_box_autoadd_action(dynamic raw);
+
+  @protected
+  Asset? dco_decode_opt_box_autoadd_asset(dynamic raw);
 
   @protected
   CloseTarget? dco_decode_opt_box_autoadd_close_target(dynamic raw);
@@ -351,10 +366,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   ApiResultWeexOrderStatus sse_decode_api_result_weex_order_status(SseDeserializer deserializer);
 
   @protected
+  Asset sse_decode_asset(SseDeserializer deserializer);
+
+  @protected
+  AssetSpec sse_decode_asset_spec(SseDeserializer deserializer);
+
+  @protected
   bool sse_decode_bool(SseDeserializer deserializer);
 
   @protected
   Action sse_decode_box_autoadd_action(SseDeserializer deserializer);
+
+  @protected
+  Asset sse_decode_box_autoadd_asset(SseDeserializer deserializer);
 
   @protected
   CloseTarget sse_decode_box_autoadd_close_target(SseDeserializer deserializer);
@@ -451,6 +475,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   List<Action> sse_decode_list_action(SseDeserializer deserializer);
 
   @protected
+  List<AssetSpec> sse_decode_list_asset_spec(SseDeserializer deserializer);
+
+  @protected
   List<PendingAction> sse_decode_list_pending_action(SseDeserializer deserializer);
 
   @protected
@@ -473,6 +500,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   Action? sse_decode_opt_box_autoadd_action(SseDeserializer deserializer);
+
+  @protected
+  Asset? sse_decode_opt_box_autoadd_asset(SseDeserializer deserializer);
 
   @protected
   CloseTarget? sse_decode_opt_box_autoadd_close_target(SseDeserializer deserializer);
@@ -658,10 +688,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_asset(Asset self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_asset_spec(AssetSpec self, SseSerializer serializer);
+
+  @protected
   void sse_encode_bool(bool self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_action(Action self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_asset(Asset self, SseSerializer serializer);
 
   @protected
   void sse_encode_box_autoadd_close_target(CloseTarget self, SseSerializer serializer);
@@ -778,6 +817,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_list_action(List<Action> self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_asset_spec(List<AssetSpec> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_pending_action(List<PendingAction> self, SseSerializer serializer);
 
   @protected
@@ -803,6 +845,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_opt_box_autoadd_action(Action? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_opt_box_autoadd_asset(Asset? self, SseSerializer serializer);
 
   @protected
   void sse_encode_opt_box_autoadd_close_target(CloseTarget? self, SseSerializer serializer);

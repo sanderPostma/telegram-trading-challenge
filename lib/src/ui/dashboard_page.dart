@@ -475,7 +475,7 @@ class _ManualTradePanelState extends State<ManualTradePanel> {
               child: SegmentedButton<SizeUnit>(
                 segments: const [
                   ButtonSegment(value: SizeUnit.usdt, label: Text('USDT')),
-                  ButtonSegment(value: SizeUnit.btc, label: Text('BTC')),
+                  ButtonSegment(value: SizeUnit.coin, label: Text('BTC')),
                 ],
                 selected: {_unit},
                 onSelectionChanged: (value) =>
@@ -631,7 +631,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
   }
 
   SizeUnit get _unit =>
-      _mode == _ReduceMode.btc ? SizeUnit.btc : SizeUnit.usdt;
+      _mode == _ReduceMode.btc ? SizeUnit.coin : SizeUnit.usdt;
   bool get _isPercent => _mode == _ReduceMode.percent;
 
   @override
@@ -640,7 +640,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
     final position = controller.position;
     final watch = controller.closeTargetWatch;
     final takeProfit = controller.exchangeTakeProfit;
-    final flat = position.isFlat || position.qtyBtc <= 0;
+    final flat = position.isFlat || position.qty <= 0;
     final amount = double.tryParse(_amount.text.replaceAll(',', '')) ?? 0;
     final reduceBtc = controller.previewManualReduceBtc(
       amount: amount,
@@ -648,9 +648,9 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
       isPercent: _isPercent,
     );
     final reduceUsd = reduceBtc * controller.config.markPrice;
-    final remaining = (position.qtyBtc - reduceBtc).clamp(0.0, double.infinity);
-    final pctOfPosition = position.qtyBtc > 0
-        ? (reduceBtc / position.qtyBtc) * 100
+    final remaining = (position.qty - reduceBtc).clamp(0.0, double.infinity);
+    final pctOfPosition = position.qty > 0
+        ? (reduceBtc / position.qty) * 100
         : 0.0;
 
     return Card(
@@ -675,7 +675,7 @@ class _ManualReducePanelState extends State<ManualReducePanel> {
             Text(
               flat
                   ? 'No open position to reduce.'
-                  : 'Open ${position.direction!.name.toUpperCase()} ${position.qtyBtc.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
+                  : 'Open ${position.direction!.name.toUpperCase()} ${position.qty.toStringAsFixed(4)} BTC (${position.notionalUsd.toStringAsFixed(2)} USDT).',
               style: const TextStyle(color: Brand.muted, fontSize: 12),
             ),
             // A resting exchange plan closes on its own; the app-side watch
@@ -913,7 +913,7 @@ class _PositionPanel extends StatelessWidget {
               position.direction?.name.toUpperCase() ?? 'FLAT',
             ),
             const SizedBox(height: 10),
-            _Metric('Quantity', '${position.qtyBtc.toStringAsFixed(4)} BTC'),
+            _Metric('Quantity', '${position.qty.toStringAsFixed(4)} BTC'),
             const SizedBox(height: 10),
             _Metric(
               'Notional',
@@ -1011,7 +1011,7 @@ class _TradeHistoryTable extends StatelessWidget {
 
   List<Widget> _buildRows() {
     final rows = <Widget>[];
-    double remainingQty = controller.position.qtyBtc;
+    double remainingQty = controller.position.qty;
     final currentDir = controller.position.direction?.name.toLowerCase();
 
     for (final trade in controller.tradeHistory.take(20)) {

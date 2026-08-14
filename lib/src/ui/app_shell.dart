@@ -226,7 +226,7 @@ class _AppShellState extends State<AppShell> {
                   ),
                   _kv('Live price', '${live.toStringAsFixed(2)} USDT'),
                   _kv('Side', position.direction?.name.toUpperCase() ?? 'FLAT'),
-                  _kv('Size', '${position.qtyBtc.toStringAsFixed(4)} BTC'),
+                  _kv('Size', '${position.qty.toStringAsFixed(4)} BTC'),
                   _kv(
                     'Unrealized P&L',
                     '${position.unrealizedPnlUsd.toStringAsFixed(2)} USDT',

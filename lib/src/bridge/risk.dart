@@ -87,9 +87,6 @@ class RiskLimits {
   /// Largest notional (qty x reference price) a single opening order may have.
   final Limit maxOrderNotional;
 
-  /// Largest quantity a single opening order may have.
-  final double maxOrderQtyBtc;
-
   /// Largest total position notional allowed after the order fills.
   final Limit maxPositionNotional;
 
@@ -109,7 +106,6 @@ class RiskLimits {
   const RiskLimits({
     required this.killSwitch,
     required this.maxOrderNotional,
-    required this.maxOrderQtyBtc,
     required this.maxPositionNotional,
     required this.symbolAllowlist,
     required this.maxLeverage,
@@ -121,7 +117,6 @@ class RiskLimits {
   int get hashCode =>
       killSwitch.hashCode ^
       maxOrderNotional.hashCode ^
-      maxOrderQtyBtc.hashCode ^
       maxPositionNotional.hashCode ^
       symbolAllowlist.hashCode ^
       maxLeverage.hashCode ^
@@ -135,7 +130,6 @@ class RiskLimits {
           runtimeType == other.runtimeType &&
           killSwitch == other.killSwitch &&
           maxOrderNotional == other.maxOrderNotional &&
-          maxOrderQtyBtc == other.maxOrderQtyBtc &&
           maxPositionNotional == other.maxPositionNotional &&
           symbolAllowlist == other.symbolAllowlist &&
           maxLeverage == other.maxLeverage &&

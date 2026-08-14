@@ -1,0 +1,125 @@
+# Telegram patterns static-file server — node02 (microk8s) standalone manifests.
+#
+# Serves config/telegram_patterns.yaml at
+#   https://telegram-patterns.sander.dnsrouter.nl/telegram_patterns.yaml
+#
+# Replaces the Pi's Docker-Compose + Traefik-labels deploy. On node02 the model
+# is Traefik IngressRoute (CRD) + cert-manager Certificate (letsencrypt-prod),
+# mirroring infra/k8s/trading-stack/extras/botctl-certificate.yaml.
+#
+# The nginx.conf and telegram_patterns.yaml themselves are NOT in this file —
+# they are loaded into ConfigMaps straight from the repo at deploy time (see
+# k8s/README.md), so config/telegram_patterns.yaml stays the single source.
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: telegram-patterns
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-patterns
+  namespace: telegram-patterns
+  labels:
+    app: telegram-patterns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: telegram-patterns
+  template:
+    metadata:
+      labels:
+        app: telegram-patterns
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            # nginx site config (subPath so we don't wipe conf.d). ConfigMap
+            # updates via subPath do NOT hot-reload — roll the deployment after
+            # changing nginx.conf.
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            # The served document. Mounted as a directory (not subPath) so
+            # ConfigMap updates propagate to the pod without a restart; nginx
+            # re-reads the file on each request.
+            - name: patterns
+              mountPath: /usr/share/nginx/html
+          readinessProbe:
+            httpGet:
+              path: /telegram_patterns.yaml
+              port: 80
+            initialDelaySeconds: 2
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /telegram_patterns.yaml
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      volumes:
+        - name: nginx-conf
+          configMap:
+            name: telegram-patterns-nginx
+        - name: patterns
+          configMap:
+            name: telegram-patterns-yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telegram-patterns
+  namespace: telegram-patterns
+  labels:
+    app: telegram-patterns
+spec:
+  selector:
+    app: telegram-patterns
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+---
+# TLS cert for the public host. HTTP-01 challenge via Traefik on :80 — the DNS
+# A record for this host MUST already point at node02 or issuance will hang.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: telegram-patterns-cert
+  namespace: telegram-patterns
+spec:
+  dnsNames:
+    - telegram-patterns.sander.dnsrouter.nl
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  secretName: telegram-patterns-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: telegram-patterns
+  namespace: telegram-patterns
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`telegram-patterns.sander.dnsrouter.nl`)
+      services:
+        - name: telegram-patterns
+          port: 80
+  tls:
+    secretName: telegram-patterns-tls

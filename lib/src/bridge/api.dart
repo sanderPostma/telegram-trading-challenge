@@ -13,9 +13,17 @@ import 'weex.dart';
 
 // These functions are ignored because they are not marked as `pub`: `chart_history`, `classify_message_actions_with_rules`, `push_point`, `weex_rejection_message`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `StateView`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
-Stream<PriceTick> weexPublicPriceStream() => RustLib.instance.api.crateApiWeexPublicPriceStream();
+/// Every asset this build can trade, in display order.
+Future<List<AssetSpec>> assetSpecs() => RustLib.instance.api.crateApiAssetSpecs();
+
+/// Resolves a WEEX symbol back to an asset, for reconciling exchange payloads.
+Future<Asset?> assetForSymbol({required String symbol}) =>
+    RustLib.instance.api.crateApiAssetForSymbol(symbol: symbol);
+
+Stream<PriceTick> weexPublicPriceStream({required Asset asset}) =>
+    RustLib.instance.api.crateApiWeexPublicPriceStream(asset: asset);
 
 Stream<TelegramMessageEvent> telegramMessageStream({required TelegramClientRequest request}) =>
     RustLib.instance.api.crateApiTelegramMessageStream(request: request);
@@ -73,13 +81,10 @@ Future<RiskContext> riskContext() => RustLib.instance.api.crateApiRiskContext();
 /// `value` is null when the order passes; otherwise it is the rejection reason.
 Future<ApiResultString> riskPreviewOrder({
   required String symbol,
-  required double qtyBtc,
+  required double qty,
   required bool reduceOnly,
-}) => RustLib.instance.api.crateApiRiskPreviewOrder(
-  symbol: symbol,
-  qtyBtc: qtyBtc,
-  reduceOnly: reduceOnly,
-);
+}) =>
+    RustLib.instance.api.crateApiRiskPreviewOrder(symbol: symbol, qty: qty, reduceOnly: reduceOnly);
 
 /// `value` is null when the signal is fresh enough, otherwise the reason.
 Future<ApiResultString> riskCheckSignalAge({
@@ -393,6 +398,50 @@ class ApiResultWeexOrderStatus {
           error == other.error;
 }
 
+/// Contract facts for one tradable asset, so the UI never restates them.
+///
+/// These used to be hardcoded on both sides of the bridge — `0.0001` appeared
+/// in a dozen Dart literals — which meant the two could drift silently and
+/// misround real orders.
+class AssetSpec {
+  final Asset asset;
+  final String symbol;
+  final String display;
+  final double qtyStep;
+  final double priceStep;
+  final double minOrderSize;
+
+  const AssetSpec({
+    required this.asset,
+    required this.symbol,
+    required this.display,
+    required this.qtyStep,
+    required this.priceStep,
+    required this.minOrderSize,
+  });
+
+  @override
+  int get hashCode =>
+      asset.hashCode ^
+      symbol.hashCode ^
+      display.hashCode ^
+      qtyStep.hashCode ^
+      priceStep.hashCode ^
+      minOrderSize.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is AssetSpec &&
+          runtimeType == other.runtimeType &&
+          asset == other.asset &&
+          symbol == other.symbol &&
+          display == other.display &&
+          qtyStep == other.qtyStep &&
+          priceStep == other.priceStep &&
+          minOrderSize == other.minOrderSize;
+}
+
 class ChartData {
   final List<SeriesPoint> balance;
   final List<SeriesPoint> equity;
@@ -472,7 +521,11 @@ class ManualScaleRequest {
           qtyStep == other.qtyStep;
 }
 
-enum ManualSizeUnit { btc, usdt }
+enum ManualSizeUnit {
+  /// A base-asset quantity, in units of whichever asset the order is for.
+  coin,
+  usdt,
+}
 
 /// An action reserved in the dedup store that never reached a final status.
 class PendingAction {
