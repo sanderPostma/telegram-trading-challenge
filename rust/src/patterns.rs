@@ -57,6 +57,27 @@ pub struct RuleHit {
 pub const MAX_SIGNAL_LINES: usize = 4;
 pub const MAX_SIGNAL_CHARS: usize = 320;
 
+/// Removes links from a message before any matching happens.
+///
+/// Signals arrive as captions on screenshots, and the caption often carries a
+/// link to the image. That link breaks parsing in two separate ways: it is
+/// trailing text, which defeats the whole-line anchor on the verbless entry
+/// rule, and it contains digits, which the number-extracting rules can read as
+/// a quantity or a price. Neither is recoverable downstream, so links are
+/// blanked out here — replaced by a space, so the words around them do not run
+/// together.
+pub fn strip_urls(text: &str) -> String {
+    // Covers schemed links, bare www hosts, and the t.me / telegram.me forms
+    // the channel uses. Rust regex has no lookaround, so this is a plain
+    // alternation over the shapes that actually appear.
+    let pattern = r"(?i)\b(?:[a-z][a-z0-9+.-]*://|www\.|t\.me/|telegram\.me/)\S*";
+    match Regex::new(pattern) {
+        Ok(re) => re.replace_all(text, " ").into_owned(),
+        // A malformed pattern must not silently disable parsing.
+        Err(_) => text.to_string(),
+    }
+}
+
 fn is_narrative(text: &str) -> bool {
     text.chars().count() > MAX_SIGNAL_CHARS
         || text.lines().filter(|line| !line.trim().is_empty()).count() > MAX_SIGNAL_LINES
@@ -149,6 +170,9 @@ pub fn match_first(text: &str, rules: &[PatternRule]) -> anyhow::Result<Option<R
 }
 
 pub fn match_actions(text: &str, rules: &[PatternRule]) -> anyhow::Result<Vec<RuleHit>> {
+    let stripped = strip_urls(text);
+    let text: &str = &stripped;
+
     // Long messages are narrative, not signals. This runs before the guard
     // rules because it is cheaper and because it is the backstop the verbless
     // entry rule depends on — that rule has no verb to anchor to a line start.
@@ -213,6 +237,7 @@ pub fn match_actions(text: &str, rules: &[PatternRule]) -> anyhow::Result<Vec<Ru
 /// message. Recognizes both the "Account balance $10,000" status line and the
 /// terse "NEW BALANCE $7,800" announcement, with an optional `:`/`=` separator.
 pub fn extract_master_balance(text: &str) -> Option<f64> {
+    let text: &str = &strip_urls(text);
     Regex::new(
         r"(?i)(?:NEW\s+BALANCE|ACCOUNT\s+BALANCE)\s*[:=]?\s*\$?(?P<v>[\d,]+(?:\.\d+)?)",
     )
@@ -223,6 +248,7 @@ pub fn extract_master_balance(text: &str) -> Option<f64> {
 }
 
 pub fn extract_trade_size(text: &str) -> Option<f64> {
+    let text: &str = &strip_urls(text);
     Regex::new(r"(?i)Trade Size\s*\$?(?P<v>[\d,]+(?:\.\d+)?)")
         .ok()?
         .captures(text)?
@@ -235,6 +261,7 @@ pub fn extract_trade_size(text: &str) -> Option<f64> {
 /// value yields `high == low`. Returns `None` for hypothetical/guarded wording,
 /// mirroring the `hypothetical` guard used by the pattern engine.
 pub fn extract_close_target_range(text: &str) -> Option<(f64, f64)> {
+    let text: &str = &strip_urls(text);
     // Same vocabulary as the YAML `hypothetical` guard: discussion, not a signal.
     let guard = Regex::new(
         r"(?i)\b(?:should|would|could)(?:'ve|ve|\s+(?:have|of))\b|\bif\s+i\s+(?:had|would|were)\b|\bwish\s+i\b|\bimagine\b|\bfor\s+(?:example|instance)\b|\bwhat\s+if\b|\bhypothetical",
@@ -988,5 +1015,82 @@ mod eth_end_to_end {
         assert!(match_actions("10 ETH LONG was the right call", &rules)
             .unwrap()
             .is_empty());
+    }
+
+    // --- Screenshot captions ---------------------------------------------
+
+    #[test]
+    fn a_link_in_the_caption_does_not_break_the_whole_line_anchor() {
+        // Signals arrive as captions on screenshots, and the caption carries a
+        // link to the image. Without stripping, that trailing link defeats the
+        // end anchor and the signal is silently ignored.
+        let rules = default_rules();
+        for caption in [
+            "10 ETH LONG https://t.me/c/1003766320116/4521",
+            "10 ETH LONG t.me/c/1003766320116/4521",
+            "10 ETH LONG www.example.com/chart.png",
+            "10 ETH LONG http://example.com/a?b=12345",
+        ] {
+            let hit = match_first(caption, &rules)
+                .unwrap()
+                .unwrap_or_else(|| panic!("no hit for {caption:?}"));
+            assert_eq!(hit.asset, Some(Asset::Eth), "{caption:?}");
+            assert_eq!(hit.size, Some(Size::Coin(10.0)), "{caption:?}");
+            assert_eq!(hit.direction, Some(Direction::Long), "{caption:?}");
+        }
+    }
+
+    #[test]
+    fn digits_inside_a_link_are_never_read_as_a_size() {
+        let rules = default_rules();
+        // The link holds bigger numbers than the signal does; the signal wins.
+        let hit = match_first(
+            "STARTED 0.5 BTC SHORT https://example.com/9999/88888",
+            &rules,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(hit.size, Some(Size::Coin(0.5)));
+        assert_eq!(hit.asset, Some(Asset::Btc));
+    }
+
+    #[test]
+    fn a_link_alone_is_not_a_signal() {
+        let rules = default_rules();
+        assert!(match_actions("https://example.com/10-eth-long", &rules)
+            .unwrap()
+            .is_empty());
+    }
+
+    #[test]
+    fn a_link_does_not_supply_a_close_target() {
+        // "TP SET" style extraction reads bare numbers, so an unstripped link
+        // could arm a watch at a price nobody asked for.
+        assert_eq!(
+            extract_close_target_range("Chart at https://example.com/tp/64450"),
+            None
+        );
+        assert_eq!(
+            extract_close_target_range("TP SET 64450 https://example.com/x/1"),
+            Some((64450.0, 64450.0))
+        );
+    }
+
+    #[test]
+    fn a_link_does_not_supply_an_account_balance() {
+        assert_eq!(
+            extract_master_balance("see https://example.com/balance/99999"),
+            None
+        );
+        assert_eq!(
+            extract_master_balance("Account balance $10,000 https://example.com/1"),
+            Some(10_000.0)
+        );
+    }
+
+    #[test]
+    fn stripping_keeps_the_words_around_a_link_apart() {
+        // Replacing with nothing would weld "ADDED" onto "0.5" here.
+        assert_eq!(strip_urls("a https://x.com/1 b"), "a   b");
     }
 }
