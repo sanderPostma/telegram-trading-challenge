@@ -1535,17 +1535,20 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// True while [asset]'s own feed is recent. The account-level
+  /// [weexPriceConnected] flag goes green on any live book, so a per-asset view
+  /// must ask per asset or a dead ETH feed would keep showing its last price as
+  /// live while BTC carries the flag.
+  bool hasFreshPriceFor(Asset asset) {
+    final last = _lastWeexPriceAt[asset];
+    return last != null &&
+        bookFor(asset).markPrice > 0 &&
+        DateTime.now().difference(last) < _weexPriceStaleAfter;
+  }
+
   /// True while any book has a recent price. The feed is one connection per
   /// asset, so a single live book is enough to call the feed healthy.
-  bool get _hasFreshWeexPrice {
-    final now = DateTime.now();
-    return Asset.values.any((asset) {
-      final last = _lastWeexPriceAt[asset];
-      return last != null &&
-          bookFor(asset).markPrice > 0 &&
-          now.difference(last) < _weexPriceStaleAfter;
-    });
-  }
+  bool get _hasFreshWeexPrice => Asset.values.any(hasFreshPriceFor);
 
   bool get _hasWeexCredentials =>
       config.weexApiKey.trim().isNotEmpty &&

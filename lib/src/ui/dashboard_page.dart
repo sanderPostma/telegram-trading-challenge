@@ -202,11 +202,7 @@ class _DashboardPageState extends State<DashboardPage> {
               spacing: 12,
               runSpacing: 12,
               children: [
-                _StatCard(
-                  title: 'WEEX ${widget.controller.displayOf(widget.controller.selectedAsset)} live',
-                  value: _weexPriceValue(widget.controller),
-                  icon: Icons.show_chart,
-                ),
+                _WeexPriceCard(controller: widget.controller),
                 _StatCard(
                   title: 'My balance',
                   value:
@@ -1249,6 +1245,67 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+/// Every book's live price, not just the selected one. The price feed runs one
+/// subscription per asset regardless of what the detail pane is showing, so the
+/// card reports all of them and each row carries its own freshness.
+class _WeexPriceCard extends StatelessWidget {
+  const _WeexPriceCard({required this.controller});
+
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 260,
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.show_chart, color: Brand.gold),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('WEEX live',
+                        style: TextStyle(color: Brand.muted)),
+                    for (final asset in Asset.values)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 44,
+                              child: Text(
+                                controller.displayOf(asset),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                _weexPriceValue(controller, asset),
+                                style:
+                                    Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Metric extends StatelessWidget {
   const _Metric(this.label, this.value);
 
@@ -1287,9 +1344,9 @@ class _ConnectionDot extends StatelessWidget {
   }
 }
 
-String _weexPriceValue(AppController controller) {
-  if (controller.weexPriceConnected && controller.config.markPrice > 0) {
-    return '${controller.config.markPrice.toStringAsFixed(2)} USDT';
+String _weexPriceValue(AppController controller, Asset asset) {
+  if (controller.hasFreshPriceFor(asset)) {
+    return '${controller.bookFor(asset).markPrice.toStringAsFixed(2)} USDT';
   }
   return switch (controller.weexPriceStatus) {
     WeexPriceStatus.idle => 'Not started',

@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trading_challenge/main.dart';
 import 'package:trading_challenge/src/models/trading.dart';
@@ -33,6 +33,26 @@ void main() {
     expect(find.text('Open Short'), findsOneWidget);
     expect(find.text('USDT'), findsWidgets);
     expect(find.text('BTC'), findsWidgets);
+  });
+
+  testWidgets('price card reports every book, not just the selected one', (
+    tester,
+  ) async {
+    final controller = AppController()
+      ..config = const AppConfig(
+        weexApiKey: 'key',
+        weexSecret: 'secret',
+        weexPassphrase: 'passphrase',
+      );
+    await tester.pumpWidget(TradingChallengeApp(controller: controller));
+
+    final card = find.ancestor(
+      of: find.text('WEEX live'),
+      matching: find.byType(Card),
+    );
+    expect(card, findsOneWidget);
+    expect(find.descendant(of: card, matching: find.text('BTC')), findsOneWidget);
+    expect(find.descendant(of: card, matching: find.text('ETH')), findsOneWidget);
   });
 
   testWidgets('setup wizard exposes Telegram sign-in controls', (tester) async {
