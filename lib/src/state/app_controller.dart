@@ -873,14 +873,14 @@ class AppController extends ChangeNotifier {
     }
 
     // Rust resolves the asset, inheriting it from the live book when the
-    // message omits one and refusing to guess when two books are open. A null
-    // here is that refusal, not a parse gap, so it must not be defaulted.
+    // message omits one and falling back to BTC when no book is live. A null
+    // here means both books are open and the reference is genuinely ambiguous;
+    // it is that refusal, not a parse gap, so it must not be defaulted.
     final asset = action.asset;
     if (asset == null) {
       _log(
         'Telegram needs review: $summary — the message names no asset and '
-        '${openAssets.length > 1 ? 'both books are open' : 'no book is live'}, '
-        'so it is ambiguous.',
+        'both books are open, so it is ambiguous.',
       );
       return rust_telegram.TelegramActionStatus.rejected;
     }

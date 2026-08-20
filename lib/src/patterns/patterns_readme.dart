@@ -83,7 +83,10 @@ ambiguous and produces no trade.
 
 A message that names no coin at all inherits the open position's, and is sent
 for manual review rather than guessed when both books are open. "REDUCED 25%"
-is therefore unambiguous with one position open and needs review with two.
+is therefore unambiguous with one position open and needs review with two. With
+no position open there is no wrong book to hit, so it follows the last signal's
+coin, or BTC when there has not been one — "OPENED 100K SHORT" on a flat
+account opens BTC.
 
 Two rules protect against narrative being read as a signal. Trade verbs must
 start a line, and the verbless shorthand ("10 ETH LONG") must be the entire

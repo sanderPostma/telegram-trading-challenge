@@ -709,7 +709,9 @@ pub fn merge_patterns_yaml(base_yaml: String, local_yaml: String) -> ApiResultSt
 /// `active_assets` are the books with open exposure. They matter because a
 /// message that names no asset ("REDUCED 25%") inherits one — and when more
 /// than one book is live that reference is ambiguous, so the action comes back
-/// with no asset and needs manual review rather than a guess.
+/// with no asset and needs manual review rather than a guess. With no book live
+/// there is no wrong one to hit, so it falls back to `last_asset` and then to
+/// BTC, the default asset.
 pub fn classify_message_actions_with_patterns(
     text: String,
     patterns_yaml: String,

@@ -29,6 +29,10 @@ pub enum Asset {
     Eth,
 }
 
+/// The asset assumed when a message names none and no book is live to inherit
+/// from. The channel trades BTC unless it says otherwise.
+pub const DEFAULT_ASSET: Asset = Asset::Btc;
+
 impl Asset {
     pub const ALL: [Asset; 2] = [Asset::Btc, Asset::Eth];
 
@@ -150,16 +154,20 @@ pub struct InterpreterState {
 impl InterpreterState {
     /// Resolves the asset for a message that did not name one.
     ///
-    /// Returns `None` when the reference is ambiguous — more than one asset is
-    /// live and nothing in the message disambiguates. Reducing the wrong book is
-    /// far worse than dropping a reduce, so this fails closed rather than
-    /// falling back to the most recent signal.
+    /// Returns `None` only when the reference is genuinely ambiguous — more than
+    /// one asset is live and nothing in the message disambiguates. Reducing the
+    /// wrong open book is far worse than dropping a reduce, so that case fails
+    /// closed rather than falling back to the most recent signal.
+    ///
+    /// With nothing live there is no wrong book to hit, so the chain runs to the
+    /// most recent signal and then to BTC, the channel's default asset. That is
+    /// what lets a cold-start "OPENED 100K SHORT" resolve instead of asking.
     fn inherit_asset(&self) -> Option<Asset> {
         let mut live: Vec<Asset> = self.active_assets.clone();
         live.sort_by_key(|asset| *asset as usize);
         live.dedup();
         match live.len() {
-            0 => self.last_asset,
+            0 => self.last_asset.or(Some(DEFAULT_ASSET)),
             1 => Some(live[0]),
             _ => None,
         }
@@ -310,6 +318,23 @@ mod tests {
         assert!(
             action.needs_approval,
             "an ambiguous reduce must go to manual approval, never straight through"
+        );
+    }
+
+    #[test]
+    fn a_cold_start_entry_defaults_to_btc() {
+        // The channel's wording on 2026-08-19 16:19, which went to review:
+        // no asset named, no book open and no earlier signal to inherit from.
+        // BTC is the house default, so this resolves rather than asking.
+        let state = InterpreterState::default();
+        let action = interpret("OPENED 100K SHORT", hit("OPENED 100K SHORT"), &state);
+        assert_eq!(action.kind, ActionKind::Enter);
+        assert_eq!(action.direction, Some(Direction::Short));
+        assert_eq!(action.asset, Some(Asset::Btc));
+        assert!(action.confidence_high);
+        assert!(
+            !action.needs_approval,
+            "a cold-start entry must go straight through under auto-approve"
         );
     }
 
