@@ -710,6 +710,51 @@ mod tests {
     }
 
     #[test]
+    fn subject_first_close_is_a_close() {
+        let rules = default_rules();
+
+        // The channel also reports an exit as a plain statement with the
+        // subject first, which the verb-at-line-start `close` rule cannot see.
+        // "trade closed" (message 278, 2026-08-17 15:31) was ignored.
+        for text in [
+            "trade closed",
+            "Trade closed.",
+            "the trade is closed",
+            "all trades closed",
+            "position closed!",
+            "eth trade closed",
+        ] {
+            let hit = match_first(text, &rules).unwrap();
+            assert_eq!(
+                hit.map(|h| h.action),
+                Some(RuleAction::Close),
+                "must be a close: {text:?}"
+            );
+        }
+
+        // The asset travels with the signal when the author names it, so an
+        // ETH exit cannot flatten the BTC book.
+        let eth = match_first("eth trade closed", &rules).unwrap().unwrap();
+        assert_eq!(eth.asset, Some(Asset::Eth));
+        assert_eq!(match_first("trade closed", &rules).unwrap().unwrap().asset, None);
+
+        // Narrative that merely mentions a closed trade must stay inert: the
+        // whole line has to be the signal and nothing else.
+        for text in [
+            "the trade closed at a loss yesterday",
+            "that trade closed before I could copy it",
+            "my last trade closed green",
+        ] {
+            let hit = match_first(text, &rules).unwrap();
+            assert_ne!(
+                hit.map(|h| h.action),
+                Some(RuleAction::Close),
+                "must not be a close: {text:?}"
+            );
+        }
+    }
+
+    #[test]
     fn extracts_metadata_values() {
         assert_eq!(
             extract_master_balance("Account balance $10,000"),
@@ -842,7 +887,7 @@ patterns:
         // entry_verbless, entry_verbless_short, entry_bare_qty, add_usd,
         // add_coin, reduce_usd, reduce_coin, reduce_pct, reduce_taking_pct,
         // close, noop) + the new custom_add override.
-        assert_eq!(rules.len(), 16);
+        assert_eq!(rules.len(), 17);
         assert_eq!(
             rules
                 .iter()

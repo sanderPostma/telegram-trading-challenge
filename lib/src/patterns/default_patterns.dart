@@ -125,6 +125,15 @@ patterns:
     action: close
     priority: 40
     enabled: true
+  # The same exit reported as a plain statement, subject first: "trade closed".
+  # The whole line must BE the signal, so "the trade closed at a loss
+  # yesterday" stays inert. An asset named before the subject ("eth trade
+  # closed") routes the close to that book.
+  - name: close_subject_first
+    regex: '(?im)^\s*(?:(?:THE|ALL|MY)\s+)?(?:(?:BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\s+)?(?:TRADE|TRADES|POSITION|POSITIONS)\s+(?:(?:IS|ARE|NOW|HAS\s+BEEN|HAVE\s+BEEN)\s+)?CLOSED\s*[.!]?\s*$'
+    action: close
+    priority: 41
+    enabled: true
   - name: noop
     regex: '(?i)\b(TRADE UPDATE|CHAT TEST|NOTIFICATIONS|GOOD MORNING)\b'
     action: ignore

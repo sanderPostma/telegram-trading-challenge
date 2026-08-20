@@ -160,6 +160,19 @@ patterns:
     action: close
     priority: 40
     enabled: true
+  # The same exit reported as a plain statement, subject first: "trade closed".
+  # The verb is not at the start of the line, so `close` cannot see it, and the
+  # line-start anchor is therefore unavailable as a narrative guard here. As
+  # with entry_bare_qty, the whole line must BE the signal and nothing else —
+  # "the trade closed at a loss yesterday" is commentary and must stay inert.
+  # A genuine report with a trailing comment ("trade closed in profit") does
+  # not fire; that is the correct direction to fail in. An asset named before
+  # the subject ("eth trade closed") routes the close to that book.
+  - name: close_subject_first
+    regex: '(?im)^\s*(?:(?:THE|ALL|MY)\s+)?(?:(?:BITCOIN|ETHEREUM|ETHER|XBT|BTC|ETH)\s+)?(?:TRADE|TRADES|POSITION|POSITIONS)\s+(?:(?:IS|ARE|NOW|HAS\s+BEEN|HAVE\s+BEEN)\s+)?CLOSED\s*[.!]?\s*$'
+    action: close
+    priority: 41
+    enabled: true
   - name: noop
     regex: '(?i)\b(TRADE UPDATE|CHAT TEST|NOTIFICATIONS|GOOD MORNING)\b'
     action: ignore

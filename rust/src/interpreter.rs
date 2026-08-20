@@ -326,6 +326,39 @@ mod tests {
     }
 
     #[test]
+    fn a_subject_first_close_flattens_the_open_book() {
+        // The channel's exact wording on 2026-08-17 15:31, which the parser
+        // ignored: no verb at the line start for `close` to anchor to.
+        let state = InterpreterState {
+            last_direction: Some(Direction::Long),
+            last_asset: Some(Asset::Btc),
+            active_assets: vec![Asset::Btc],
+            ..Default::default()
+        };
+        let action = interpret("trade closed", hit("trade closed"), &state);
+        assert_eq!(action.kind, ActionKind::Close);
+        assert_eq!(action.size, Some(Size::FullClose));
+        assert_eq!(action.asset, Some(Asset::Btc));
+    }
+
+    #[test]
+    fn an_unnamed_close_with_two_live_books_fails_closed() {
+        let state = InterpreterState {
+            last_direction: Some(Direction::Long),
+            last_asset: Some(Asset::Btc),
+            active_assets: vec![Asset::Btc, Asset::Eth],
+            ..Default::default()
+        };
+        let action = interpret("trade closed", hit("trade closed"), &state);
+        assert_eq!(action.kind, ActionKind::Close);
+        assert_eq!(
+            action.asset, None,
+            "an unnamed close must not pick a book when both are open"
+        );
+        assert!(action.needs_approval);
+    }
+
+    #[test]
     fn an_inherited_size_is_a_usdt_notional() {
         let state = InterpreterState {
             last_direction: Some(Direction::Long),

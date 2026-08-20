@@ -90,6 +90,12 @@ start a line, and the verbless shorthand ("10 ETH LONG") must be the entire
 line — "10 ETH LONG was the right call" does not trade. Messages longer than
 four lines or 320 characters are treated as discussion and ignored outright.
 
+An exit stated subject-first ("trade closed", "eth position closed") has no
+verb at the line start to anchor, so it follows the verbless rule: the whole
+line must be the signal. "the trade closed at a loss yesterday" does not
+trade, and neither does "trade closed in profit" — a trailing comment costs
+the signal, which is the safer way to be wrong.
+
 Separate instructions joined by AND are processed as separate actions. Test
 changes with a sample Telegram message before publishing the YAML. Any AI
 coding assistant such as ChatGPT, Claude, or Gemini can help generate or
